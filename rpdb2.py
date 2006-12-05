@@ -1487,7 +1487,8 @@ STATE_DISABLED = 'disabled'
 
 BREAKPOINTS_FILE_EXT = '.bpl'
 PYTHON_FILE_EXTENSION = '.py'
-PYTHON_EXT_LIST = ['.py', '.pyc', '.pyd', '.pyo']
+PYTHONW_FILE_EXTENSION = '.pyw'
+PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo']
 
 MODULE_SCOPE = '?'
 SCOPE_SEP = '.'
@@ -1741,7 +1742,13 @@ def my_abspath1(path):
 
 
 def IsPythonSourceFile(filename):
-    return filename.endswith(PYTHON_FILE_EXTENSION)
+    if filename.endswith(PYTHON_FILE_EXTENSION):
+        return True
+        
+    if filename.endswith(PYTHONW_FILE_EXTENSION):
+        return True
+
+    return False
 
 
 
@@ -1758,6 +1765,9 @@ def CalcModuleName(filename):
 
 def CalcScriptName(filename, fAllowAnyExt = True):
     if filename.endswith(PYTHON_FILE_EXTENSION):
+        return filename
+        
+    if filename.endswith(PYTHONW_FILE_EXTENSION):
         return filename
         
     if filename[:-1].endswith(PYTHON_FILE_EXTENSION):
@@ -1784,7 +1794,8 @@ def FindFile(
     FindFile looks for the full path of a script in a rather non-strict
     and human like behavior.
 
-    It will always look for .py files even if a .pyc or no extension is given.
+    It will always look for .py or .pyw files even if a .pyc or no 
+    extension is given.
 
     1. It will check against loaded modules if asked.
     1. full path (if exists).
@@ -1819,16 +1830,24 @@ def FindFile(
             module_filename = CalcScriptName(m.__file__, fAllowAnyExt = True)
             module_filename_lower = winlower(module_filename)
             module_abs_path = my_abspath(module_filename_lower)
-            if not os.path.isfile(module_abs_path):
-                continue
 
-            filename_no_ext = os.path.splitext(filename)[0]
+            if os.path.isfile(module_abs_path):
+                filename_no_ext = os.path.splitext(filename)[0]
+                s = module_abs_path.split(filename_no_ext)
+                if (len(s) == 2) and (s[1] in PYTHON_EXT_LIST + ['']): 
+                    return module_abs_path
 
-            s = module_abs_path.split(filename_no_ext)
-            if (len(s) != 2) or (not s[1] in PYTHON_EXT_LIST + ['']): 
-                continue
-                
-            return module_abs_path
+            #
+            # Check .pyw files
+            #
+            module_abs_path += 'w'
+            if (module_abs_path.endswith(PYTHONW_FILE_EXTENSION)
+                and os.path.isfile(module_abs_path)):
+                filename_no_ext = os.path.splitext(filename)[0]
+                s = module_abs_path.split(filename_no_ext)
+                if (len(s) == 2) and (s[1] == PYTHONW_FILE_EXTENSION): 
+                    return module_abs_path
+                    
                 
     if fAllowAnyExt:
         try:
@@ -1846,23 +1865,39 @@ def FindFile(
         
     if os.path.dirname(script_filename) != '':
         abs_path = my_abspath(script_filename)
+
         if os.path.isfile(abs_path):
             return abs_path
 
+        #
+        # Check .pyw files
+        #
+        abs_path += 'w'
+        if (abs_path.endswith(PYTHONW_FILE_EXTENSION)
+            and os.path.isfile(abs_path)):
+            return abs_path
+        
         raise IOError
 
     cwd = os.getcwd()
     path = os.environ['PATH']
     paths = sources_paths + [cwd] + sys.path + path.split(os.pathsep)
-    norm_filename = os.path.normpath(script_filename)
+    #norm_filename = os.path.normpath(script_filename)
     
     for p in paths:
         f = os.path.join(p, script_filename)
-        if not os.path.isfile(f):
-            continue
-
         abs_path = my_abspath(f)
-        return abs_path
+        
+        if os.path.isfile(abs_path):
+            return abs_path
+
+        #
+        # Check .pyw files
+        #
+        abs_path += 'w'
+        if (abs_path.endswith(PYTHONW_FILE_EXTENSION)
+            and os.path.isfile(abs_path)):
+            return abs_path
 
     raise IOError
 
@@ -5619,7 +5654,7 @@ class CDebuggerEngine(CDebuggerCore):
 
                 if fExpand and (e[DICT_KEY_N_SUBNODES] > 0):
                     fForceNames = (expr in ['globals()', 'locals()']) or (RPDB_EXEC_INFO in expr)
-                    _fFilter = fFilter and (expr == 'globals()')
+                    _fFilter = fFilter and (expr in ['globals()', 'locals()'])
                     e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, _fFilter)
                     
             except:
@@ -6535,7 +6570,7 @@ class CSessionManagerInternal:
         try:
             try:
                 try:
-                    self.__spawn_server(fchdir, ExpandedFilename, args, rid)            
+                    self._spawn_server(fchdir, ExpandedFilename, args, rid)            
                 except SpawnUnsupported:    
                     self.m_printer(STR_SPAWN_UNSUPPORTED)
                     raise
@@ -6555,7 +6590,7 @@ class CSessionManagerInternal:
         finally:
             delete_pwd_file(rid)
 
-    def __spawn_server(self, fchdir, ExpandedFilename, args, rid):
+    def _spawn_server(self, fchdir, ExpandedFilename, args, rid):
         """
         Start an OS console to act as server.
         What it does is to start rpdb again in a new console in server only mode.

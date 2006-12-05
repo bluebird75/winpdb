@@ -477,7 +477,7 @@ TB_NEXT = "Next"
 TB_RETURN = "Return"
 TB_GOTO = "Run to Cursor"
 TB_TOGGLE_BP = "Toggle breakpoint."
-TB_FILTER = "Filter modules, classes, and functions from global namespace."
+TB_FILTER = "Filter modules, classes, and functions from the global and local namespaces."
 TB_EXCEPTION = "Analyze Exception."
 
 COMMAND = "command"
@@ -2642,7 +2642,9 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
         self.m_exception.Enable()
         
     def set_filter(self, fFilter):
+        self.m_locals.set_filter(fFilter)
         self.m_globals.set_filter(fFilter)
+        self.m_exception.set_filter(fFilter)
 
     def get_local_key(self, _stack):
         frame_index = self.m_session_manager.get_frame_index()
