@@ -1491,6 +1491,8 @@ PYTHONW_FILE_EXTENSION = '.pyw'
 PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo']
 
 MODULE_SCOPE = '?'
+MODULE_SCOPE2 = '<module>'
+
 SCOPE_SEP = '.'
 
 BP_FILENAME_SEP = ':'
@@ -3315,7 +3317,7 @@ class CBreakPoint:
         if self.m_scope_offset != 0:
             return None
             
-        if self.m_scope_fqn == MODULE_SCOPE:
+        if self.m_scope_fqn in [MODULE_SCOPE, MODULE_SCOPE2]:
             return None
 
         scope_name_list = self.m_scope_fqn.split(SCOPE_SEP)
@@ -3478,6 +3480,7 @@ class CBreakPointsManager:
         self.m_lock = threading.Lock()
 
         self.m_temp_bp = None
+        self.m_fhard_tbp = False
 
 
     def get_active_break_points_by_file(self, filename):
@@ -3564,11 +3567,12 @@ class CBreakPointsManager:
         return bp    
 
         
-    def del_temp_breakpoint(self, fLock = True):
+    def del_temp_breakpoint(self, fLock = True, breakpoint = None):
         """
         Delete a temoporary breakpoint.
         A temporary breakpoint is used when the debugger is asked to
         run-to a particular line.
+        Hard temporary breakpoints are deleted only when actually hit.
         """
         if self.m_temp_bp is None:
             return
@@ -3580,8 +3584,12 @@ class CBreakPointsManager:
             if self.m_temp_bp is None:
                 return
 
+            if self.m_fhard_tbp and not breakpoint is self.m_temp_bp:
+                return
+
             bp = self.m_temp_bp
             self.m_temp_bp = None
+            self.m_fhard_tbp = False
 
             self.__remove_from_function_list(bp)
             self.__calc_active_break_points_by_file(bp.m_filename)
@@ -3591,11 +3599,12 @@ class CBreakPointsManager:
                 self.m_lock.release()
 
         
-    def set_temp_breakpoint(self, filename, scope, lineno):
+    def set_temp_breakpoint(self, filename, scope, lineno, fhard = False):
         """
         Set a temoporary breakpoint.
         A temporary breakpoint is used when the debugger is asked to
         run-to a particular line.
+        Hard temporary breakpoints are deleted only when actually hit.
         """
         
         _filename = winlower(filename)
@@ -3612,8 +3621,11 @@ class CBreakPointsManager:
         try:    
             self.m_lock.acquire()
 
+            self.m_fhard_tbp = False
             self.del_temp_breakpoint(fLock = False) 
+            self.m_fhard_tbp = fhard
             self.m_temp_bp = bp
+            
             self.__add_to_function_list(bp)
             self.__calc_active_break_points_by_file(bp.m_filename)
 
@@ -4345,6 +4357,14 @@ class CDebuggerCoreThread:
         return False    
 
 
+    def get_breakpoint(self):
+        """
+        Return current line breakpoint if any.
+        """
+        
+        return self.m_code_context.m_file_breakpoints.get(self.m_frame.f_lineno, None)
+
+
 
 class CDebuggerCore:
     """
@@ -4626,7 +4646,7 @@ class CDebuggerCore:
                 self.m_next_frame = None
                 self.m_return_frame = None       
 
-                self.m_bp_manager.del_temp_breakpoint()
+                self.m_bp_manager.del_temp_breakpoint(breakpoint = ctx.get_breakpoint())
 
                 self.m_f_first_to_break = False
                 f_full_notification = True
@@ -8493,6 +8513,7 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
     g_server = CDebuggeeServer(ExpandedFilename, g_debugger, pwd, fAllowUnencrypted, fAllowRemote, rid)
     g_server.start()
 
+    g_debugger.m_bp_manager.set_temp_breakpoint(ExpandedFilename, '', 1, fhard = True)
     g_debugger.settrace()
 
     execfile(ExpandedFilename, d, d)
