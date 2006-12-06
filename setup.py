@@ -27,13 +27,13 @@ from distutils.core import setup
 
 
 LONG_DESC = """Winpdb is an advanced Python debugger with smart breakpoints, 
-thread support, modifiable namespace, and secure connections."""
+thread support, modifiable namespace, and password secured connections."""
 
 
 
 setup(
     name = 'winpdb',
-    version = '1.0.6',
+    version = '1.0.8',
     description = 'An advanced Python debugger.',
     long_description = LONG_DESC,
     author = 'Nir Aides',

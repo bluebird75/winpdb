@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-rpdb2.py - version 2.0.7
+rpdb2.py - version 2.0.8
 
 A remote Python debugger for Python 2.3 and Python 2.4
 
@@ -419,8 +419,8 @@ def settrace():
 
 
 
-RPDB_VERSION = "RPDB_2_0_7"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_0_7"
+RPDB_VERSION = "RPDB_2_0_8"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_0_8"
 
 
 
