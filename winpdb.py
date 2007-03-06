@@ -602,6 +602,7 @@ class CSettings:
         self.m_filename = filename
         self.m_dict = default_settings
 
+
     def calc_path(self):
         if os.name == 'nt' and os.environ.has_key('APPDATA'):
             app_data = os.environ['APPDATA']
@@ -616,6 +617,7 @@ class CSettings:
         path = self.m_filename + SETTINGS_FILENAME_EXT        
         return path
 
+
     def create_path(self):
         if os.name != 'nt':
             return
@@ -626,6 +628,7 @@ class CSettings:
             return
 
         os.mkdir(folder)        
+
             
     def load_settings(self):
         try:
@@ -639,6 +642,7 @@ class CSettings:
             self.m_dict.update(d)
         finally:
             f.close()
+
             
     def save_settings(self):
         self.create_path()
@@ -649,9 +653,11 @@ class CSettings:
             cPickle.dump(self.m_dict, f)
         finally:
             f.close()
+
         
     def __getitem__(self, key):
         return self.m_dict[key]
+
 
     def __setitem__(self, key, value):
         self.m_dict[key] = value
@@ -1138,8 +1144,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #
 
     def __set_sash_positions(self):
-        self.m_splitterh2.SetSashPosition(self.m_settings[SPLITTER_1_POS])
         self.m_splitterh1.SetSashPosition(self.m_settings[SPLITTER_2_POS])
+        self.m_splitterh2.SetSashPosition(self.m_settings[SPLITTER_1_POS])
         self.m_splitterv.SetSashPosition(self.m_settings[SPLITTER_3_POS])
         self.m_splitterh3.SetSashPosition(self.m_settings[SPLITTER_4_POS])
 
