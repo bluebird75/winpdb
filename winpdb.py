@@ -395,8 +395,8 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.0.8"
-WINPDB_VERSION = "WINPDB_1_0_8"
+WINPDB_TITLE = "Winpdb 1.0.9"
+WINPDB_VERSION = "WINPDB_1_0_9"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -533,6 +533,8 @@ SB_ENCRYPTION = "Encryption"
 SHOW = "Show"
 VALUE = "Value"
 BITMAP = "Bitmap"
+
+STR_STATE_BROKEN = 'waiting at break point'
 
 STATE_SPAWNING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH]}
 STATE_ATTACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH]}
@@ -1294,7 +1296,12 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         (menu_update_dict, toolbar_update_dict) = STATE_MAP[self.m_state]
         self.set_menu_items_state(menu_update_dict)
         self.set_toolbar_items_state(toolbar_update_dict)
-        self.set_statusbar_data({SB_STATE: self.m_state.upper()}) 
+
+        state_text = self.m_state
+        if state_text == rpdb2.STATE_BROKEN:
+            state_text = STR_STATE_BROKEN
+            
+        self.set_statusbar_data({SB_STATE: state_text.upper()}) 
 
         if self.m_state == rpdb2.STATE_DETACHED:
             self.set_statusbar_data({SB_ENCRYPTION: (None, None)})
@@ -2274,7 +2281,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         if index < 0:
             return -1
 
-        self.m_threads.SetStringItem(index, 1, [rpdb2.STATE_RUNNING, rpdb2.STATE_BROKEN][fBroken])
+        self.m_threads.SetStringItem(index, 1, [rpdb2.STATE_RUNNING, STR_STATE_BROKEN][fBroken])
 
         return index
         
@@ -2290,7 +2297,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
             tid = s[rpdb2.DICT_KEY_TID]
             fBroken = s[rpdb2.DICT_KEY_BROKEN]
             index = self.m_threads.InsertStringItem(sys.maxint, repr(tid))
-            self.m_threads.SetStringItem(index, 1, [rpdb2.STATE_RUNNING, rpdb2.STATE_BROKEN][fBroken])
+            self.m_threads.SetStringItem(index, 1, [rpdb2.STATE_RUNNING, STR_STATE_BROKEN][fBroken])
             self.m_threads.SetItemData(index, tid)
             if tid == current_thread:
                 j = i
@@ -3310,8 +3317,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_0_8":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_0_8", rpdb2.get_version())
+    if rpdb2.get_version() != "RPDB_2_0_9":
+        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_0_9", rpdb2.get_version())
         return
         
     return rpdb2.main(StartClient)

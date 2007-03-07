@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-rpdb2.py - version 2.0.8
+rpdb2.py - version 2.0.9
 
 A remote Python debugger for Python 2.3 and Python 2.4
 
@@ -419,8 +419,8 @@ def settrace():
 
 
 
-RPDB_VERSION = "RPDB_2_0_8"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_0_8"
+RPDB_VERSION = "RPDB_2_0_9"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_0_9"
 
 
 
@@ -1411,15 +1411,15 @@ STR_SCOPE_NOT_FOUND = "Scope '%s' not found."
 STR_NO_SUCH_BREAKPOINT = "Breakpoint not found."
 STR_THREAD_NOT_FOUND = "Thread was not found."
 STR_NO_THREADS_FOUND = "No threads were found."
-STR_THREAD_NOT_BROKEN = "Thread is not broken."
+STR_THREAD_NOT_BROKEN = "Thread is running."
 STR_THREAD_FOCUS_SET = "Focus was set to chosen thread."
 STR_ILEGAL_ANALYZE_MODE_ARG = "Argument is not allowed in analyze mode. Type 'help analyze' for more info."
 STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'help analyze' for more info."
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to %s."
 STR_BAD_ARGUMENT = "Bad Argument."
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
-STR_DEBUGGEE_NOT_BROKEN = "Debuggee has to be broken, to complete this command."
-STR_DEBUGGER_HAS_BROKEN = "Debuggee has broken (waiting further commands)."
+STR_DEBUGGEE_NOT_BROKEN = "Debuggee has to be waiting at break point to complete this command."
+STR_DEBUGGER_HAS_BROKEN = "Debuggee is waiting at break point for further commands."
 STR_ALREADY_ATTACHED = "Already attached. Detach from debuggee and try again."
 STR_NOT_ATTACHED = "Not attached to any script. Attach to a script and try again."
 STR_COMMUNICATION_FAILURE = "Failed to communicate with debugged script."
@@ -6628,7 +6628,7 @@ class CSessionManagerInternal:
         if name == 'nt' and g_fDebug:
             name = NT_DEBUG
         
-        e = ['', ' --plaintext'][self.m_fAllowUnencrypted]
+        e = ['', ' --encrypt'][not self.m_fAllowUnencrypted]
         r = ['', ' --remote'][self.m_fAllowRemote]
         c = ['', ' --chdir'][fchdir]
         p = ['', ' --pwd="%s"' % (self.m_pwd, )][os.name == 'nt']
@@ -8151,10 +8151,11 @@ script will continue execution."""
 
 (shorthand - b)
 
-Request script to break. The 'break' command returns immdeiately but the 
-break is only established when an active thread submits to the debugger 
-control. If a thread is doing a system call or executing C code, this 
-will happen only when it returns to do python code."""  
+Request script to break (pause execution as if it hit a breakpoint). 
+The 'break' command returns immdeiately but the break is only established 
+when an active thread submits to the debugger control. If a thread is 
+doing a system call or executing C code, this will happen only when 
+it returns to do python code."""  
 
     help_b = help_break
     
@@ -8172,7 +8173,7 @@ Set a breakpoint.
              evaluates to 'True' the break point will break into the debugger.
 
 In case the <filemame> is omitted, the current file is assumed. In this case 
-the debuggee has to be broken.
+the debuggee has to be waiting at break point.
 
 Examples:
 
@@ -8180,7 +8181,7 @@ Examples:
     bp test_file.py:MyClass.Foo
     bp 304
 
-Type 'help break' for more information on 'broken' and non 'broken' threads."""
+Type 'help break' for more information on breakpoints and threads."""
 
     def help_be(self):
         print >> self.stdout, """be (<id_list> | '*')
@@ -8232,7 +8233,7 @@ save breakpoints.
 
 (shorthand - g)
 
-Resume execution of a "broken" script. 
+Resume execution of a script that is waiting at break point. 
 If an argument is present, continue execution until that argument is reached.
 
 <filename> - is the file name which basically is the script's name without
@@ -8270,12 +8271,13 @@ Type 'help attach' for more information."""
 (shorthand - k)
 
 Without an argument, 'stack' prints the stack trace of the focused thread.
-If the thread is 'broken' a special character will mark the focused frame.
+If the thread is waiting at break point a special character will mark the 
+focused frame.
 
 <tid> - print the stack of thread <tid> 
 '*'   - print the stacks of all active threads.
 
-Type 'help break' for more information on 'broken' and un-'broken' threads.
+Type 'help break' for more information on breakpoints and threads.
 Type 'help up' or 'help down' for more information on focused frames."""  
 
     help_k = help_stack
@@ -8293,7 +8295,7 @@ mark the current line according to the event:
     'L>' - line - The interpreter is about to execute a new line of code.
     'R>' - return - A function is about to return.
     'E>' - exception - An exception has been thrown.
-    '*>' - unbroken - The thread is running.
+    '*>' - running - The thread is running.
 
 If a breakpoint is assigned to a line, that line will be marked with:
 
@@ -8309,7 +8311,7 @@ If a breakpoint is assigned to a line, that line will be marked with:
 '*'         - Print the source lines for each of the active threads.
 <nlines>    - Print <nlines> of source
 
-Type 'help break' for more information on 'broken' and un-'broken' threads.
+Type 'help break' for more information on breakpoints and threads.
 Type 'help up' or 'help down' for more information on focused frames."""  
 
     help_l = help_list
@@ -8320,15 +8322,15 @@ Type 'help up' or 'help down' for more information on focused frames."""
 (shorthand - t)
 
 Without an argument, 'thread' prints the list of known active threads, with
-their corresponding state, which can be either 'broken' or 'running'.
-A special character will mark the focused thread.
+their corresponding state, which can be either 'running' or 
+'waiting at break point'. A special character will mark the focused thread.
 
 With an argument <tid>, 'thread' will attempt to set the debugger focus to
 the thread of that tid.
 With an argument <no>, 'thread' will attempt to set the debugger focus to 
 the thread of that order in the thread list.
 
-Type 'help break' for more information on 'broken' and non 'broken' threads."""
+Type 'help break' for more information on breakpoints and threads."""
 
     help_t = help_thread
 
@@ -8552,8 +8554,7 @@ def PrintUsage(fExtended = False):
     -a, --attach    Attach to an already started debuggee.
     -o, --host      Specify host for attachment.
     -r, --remote    Allow debuggees to accept connections from remote machines.
-    -t, --plaintext Allow unencrypted connections between debugger and 
-                    debuggees.
+    -e, --encrypt   Force encrypted connections between debugger and debuggees.
     -p, --pwd       Password. This flag is available only on NT systems. 
                     On other systems the password will be queried interactively 
                     if it is needed.
@@ -8579,8 +8580,8 @@ def main(StartClient_func = StartClient):
     try:
         options, args = getopt.getopt(
                             sys.argv[1:], 
-                            'hdao:rtp:sc', 
-                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'pwd=', 'rid=', 'screen', 'chdir', 'debug']
+                            'hdao:rtep:sc', 
+                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'debug']
                             )
 
     except getopt.GetoptError, e:
@@ -8597,7 +8598,7 @@ def main(StartClient_func = StartClient):
     pwd = None
     fchdir = False
     fAllowRemote = False
-    fAllowUnencrypted = False
+    fAllowUnencrypted = True
     
     for o, a in options:
         if o in ['-h', '--help']:
@@ -8615,6 +8616,8 @@ def main(StartClient_func = StartClient):
             fAllowRemote = True
         if o in ['-t', '--plaintext']:
             fAllowUnencrypted = True
+        if o in ['-e', '--encrypt']:
+            fAllowUnencrypted = False
         if o in ['-p', '--pwd']:
             pwd = a
         if o in ['--rid']:
