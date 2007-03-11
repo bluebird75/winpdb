@@ -1901,7 +1901,7 @@ def FindFile(
     """
 
     if filename.startswith('<'):
-        return filename
+        raise IOError
         
     filename = winlower(filename.strip('\'"'))
 
@@ -2005,9 +2005,6 @@ def IsFileInPath(filename):
     if filename == '':
         return False
 
-    if filename[0] == '<':
-        return False
-        
     try:
         FindFile(filename)
         return True
