@@ -1471,7 +1471,7 @@ STR_BREAKPOINTS_LIST = """List of breakpoints:
  Id  State     Filename          Line  Scope                Condition
 -----------------------------------------------------------------------------""" 
 
-STR_ENCRYPTION_SUPPORT_ERROR = "Encryption is not supported since the python-crypto package was not found. Either install the python-crypto package or allow unencrypted connections with the '-t' command line flag."
+STR_ENCRYPTION_SUPPORT_ERROR = "Encryption is not supported since the python-crypto package was not found. Either install the python-crypto package or allow unencrypted connections."
 STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
