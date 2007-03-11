@@ -441,6 +441,7 @@ ML_LAUNCH = "&Launch"
 ML_ATTACH = "&Attach"
 ML_DETACH = "&Detach"
 ML_STOP = "&Stop"
+ML_RESTART = "&Restart"
 ML_OPEN = "&Open Source"
 ML_EXIT = "E&xit" + AC_CHAR + AC_EXIT
 
@@ -495,6 +496,7 @@ LAUNCH_TIP = "Launch a new debugged script."
 ATTACH_TIP = "Attach to a debugged script."
 DETACH_TIP = "Detach from debugged sctipt."
 STOP_TIP = "Shutdown the debugged script."
+RESTART_TIP = "Restart the debugged script."
 OPEN_TIP = "Open source file in the source viewer."
 WEBSITE_TIP = "Open the Winpdb homepage."
 SUPPORT_TIP = "Open the Winpdb support web page."
@@ -536,13 +538,13 @@ BITMAP = "Bitmap"
 
 STR_STATE_BROKEN = 'waiting at break point'
 
-STATE_SPAWNING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH]}
-STATE_ATTACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH]}
-STATE_BROKEN_MENU = {ENABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
-STATE_ANALYZE_MENU = {ENABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
-STATE_RUNNING_MENU = {ENABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
-STATE_DETACHED_MENU = {ENABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH]}
-STATE_DETACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH]}
+STATE_SPAWNING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
+STATE_ATTACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
+STATE_BROKEN_MENU = {ENABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
+STATE_ANALYZE_MENU = {ENABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
+STATE_RUNNING_MENU = {ENABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
+STATE_DETACHED_MENU = {ENABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART]}
+STATE_DETACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
 
 STATE_BROKEN_TOOLBAR = {ENABLED: [TB_EXCEPTION, TB_FILTER, TB_TOGGLE_BP, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO], DISABLED: [TB_BREAK]}
 STATE_ANALYZE_TOOLBAR = {ENABLED: [TB_EXCEPTION, TB_FILTER, TB_TOGGLE_BP], DISABLED: [TB_BREAK, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO]}
@@ -584,8 +586,10 @@ DOCS_URL = "http://www.digitalpeers.com/pythondebugger/docs.htm"
 UPDATES_URL = "http://www.digitalpeers.com/pythondebugger/download.htm"
 
 STR_ERROR_INTERFACE_COMPATIBILITY = "The rpdb2 module which was found by Winpdb is of unexpected version (version expected: %s, version found: %s). Please upgrade to the latest versions of winpdb.py and rpdb2.py."
+STR_NAMESPACE_DEADLOCK = 'Data Not Available'
 
 BAD_FILE_WARNING_TIMEOUT_SEC = 10.0
+POSITION_TIMEOUT = 2.0
 
 
 
@@ -840,6 +844,7 @@ class CStatusBar:
         self.m_bitmaps = {}
 
         self.sizeChanged = False
+
         
     def init_statusbar(self, resource):
         self.m_widths = [e[WIDTH] for e in resource]
@@ -853,6 +858,7 @@ class CStatusBar:
         self.m_statusbar.Bind(wx.EVT_SIZE, self.OnSize)
         self.m_statusbar.Bind(wx.EVT_IDLE, self.OnIdle)
 
+
     def set_statusbar_data(self, data):
         self.m_data.update(data)
 
@@ -864,6 +870,7 @@ class CStatusBar:
                     else:
                         self.m_statusbar.SetStatusText(self.m_formats[i] % self.m_data, i)
                         break
+
 
     def set_bitmap(self, i, data, tooltip):
         if not i in self.m_bitmaps:
@@ -889,25 +896,28 @@ class CStatusBar:
 
         self.reposition()    
 
+
     def reposition(self):
         for i, (p, sb, tooltip) in self.m_bitmaps.items():
             rect = self.m_statusbar.GetFieldRect(i)
             p.SetPosition((rect.x + 2, rect.y + 2))
             s = sb.GetSize()
             sb.SetSize((s[0], rect.height - 4))
+            sb.SetToolTipString(tooltip)
+            p.SetToolTipString(tooltip)
             p.SetClientSize(sb.GetSize())
-            p.SetToolTip(wx.ToolTip(tooltip))
             
         self.sizeChanged = False
+
 
     def OnSize(self, event):
         self.reposition()
         self.sizeChanged = True
 
+
     def OnIdle(self, event):
         if self.sizeChanged:
             self.reposition()
-
             
 
 
@@ -916,9 +926,11 @@ class CJobs:
         self.__m_jobs_lock = threading.RLock()
         self.__m_n_expected_jobs = 0
         self.__m_f_shutdown = False
+
         
     def init_jobs(self):
         pass
+
 
     def shutdown_jobs(self):    
         self.__m_f_shutdown = True
@@ -934,9 +946,11 @@ class CJobs:
                 self.__m_jobs_lock.release()
 
             time.sleep(0.1)    
+
         
     def job_post(self, job, args, callback = None):
         threading.Thread(target = self.job_do, args = (job, args, callback)).start()
+
         
     def job_do(self, job, args, callback):
         try:
@@ -977,6 +991,7 @@ class CJobs:
         finally:        
             self.__m_jobs_lock.release()
 
+
     def set_cursor(self, id):
         cursor = wx.StockCursor(id)
         self.SetCursor(cursor)        
@@ -1009,8 +1024,6 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_fAttach = fAttach
         self.m_settings = settings
 
-        self.m_last_launch = ""
-
         self.m_stack = None
         
         self.m_state = rpdb2.STATE_DETACHED
@@ -1027,8 +1040,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/0/" + ML_FILE +   "/3/" + ML_OPEN: {COMMAND: self.do_open, TOOLTIP: OPEN_TIP}, 
             "/0/" + ML_FILE +   "/4/" + ML_DETACH: {COMMAND: self.do_detach, TOOLTIP: DETACH_TIP}, 
             "/0/" + ML_FILE +   "/5/" + ML_STOP: {COMMAND: self.do_stop, TOOLTIP: STOP_TIP}, 
-            "/0/" + ML_FILE +   "/6/" + ML_SEPARATOR: None, 
-            "/0/" + ML_FILE +   "/7/" + ML_EXIT: {COMMAND: self.do_exit}, 
+            "/0/" + ML_FILE +   "/6/" + ML_RESTART: {COMMAND: self.do_restart, TOOLTIP: RESTART_TIP}, 
+            "/0/" + ML_FILE +   "/7/" + ML_SEPARATOR: None, 
+            "/0/" + ML_FILE +   "/8/" + ML_EXIT: {COMMAND: self.do_exit}, 
             "/1/" + ML_BREAKPOINTS + "/0/" + ML_TOGGLE: {COMMAND: self.toggle_breakpoint, TOOLTIP: TOGGLE_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/1/" + ML_DISABLE: {COMMAND: self.do_disable, TOOLTIP: DISABLE_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/2/" + ML_ENABLE: {COMMAND: self.do_enable, TOOLTIP: ENABLE_TIP}, 
@@ -1141,6 +1155,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         wx.CallAfter(self.__set_sash_positions)
 
+
     #
     #--------------------------------------------------
     #
@@ -1151,6 +1166,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_splitterv.SetSashPosition(self.m_settings[SPLITTER_3_POS])
         self.m_splitterh3.SetSashPosition(self.m_settings[SPLITTER_4_POS])
 
+
     #
     #----------------- Thread list logic --------------
     #
@@ -1158,17 +1174,21 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def OnThreadSelected(self, tid):
         self.job_post(self.job_thread_select, (tid, ))        
 
+
     def job_thread_select(self, tid):   
         try:
             self.m_session_manager.set_thread(tid)
         except (socket.error, rpdb2.CConnectionException):
             pass
 
+
     def update_threads(self, event):
         wx.CallAfter(self.m_threads_viewer.update_threads_list, event.m_current_thread, event.m_thread_list)
 
+
     def update_no_threads(self, event):
         wx.CallAfter(self.clear_all)
+
 
     def clear_all(self):
         self.m_code_viewer._clear()
@@ -1176,8 +1196,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_stack_viewer._clear()
         self.m_threads_viewer._clear()
 
+
     def update_thread_broken(self, event):
         wx.CallAfter(self.m_threads_viewer.update_thread, event.m_tid, True)
+
 
     #
     #----------------------------------------------------
@@ -1186,8 +1208,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def update_bp(self, event):
         wx.CallAfter(self.m_code_viewer.update_bp, event)
 
+
     def toggle_breakpoint(self, event):
         self.m_code_viewer.toggle_breakpoint()
+
         
     #
     #------------------- Frame Select Logic -------------
@@ -1195,6 +1219,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     
     def OnFrameSelected(self, event):    
         self.job_post(self.job_frame_select, (event.m_itemIndex, ))
+
         
     def job_frame_select(self, index):
         try:
@@ -1202,12 +1227,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         except (socket.error, rpdb2.CConnectionException, rpdb2.DebuggerNotBroken):
             pass
 
+
     def update_frame(self, event):
         wx.CallAfter(self.do_update_frame, event.m_frame_index)
+
 
     def do_update_frame(self, index):
         self.do_set_position(index)
         self.m_stack_viewer.select_frame(index)
+
 
     #
     #----------------------------------------------------------
@@ -1217,11 +1245,13 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_stack = event.m_stack
         wx.CallAfter(self.do_update_stack, event.m_stack)
 
+
     def do_update_stack(self, _stack):
         self.m_stack = _stack
 
         self.do_set_position(0)
         self.m_stack_viewer.update_stack_list(self.m_stack)
+
 
     def do_set_position(self, index):
         s = self.m_stack[rpdb2.DICT_KEY_STACK]
@@ -1235,6 +1265,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         __event = ['running', ['call', _event][index == 0]][fBroken]
 
         self.m_code_viewer.set_position(filename, lineno, __event)
+
         
     #
     #----------------------------------------------------
@@ -1247,20 +1278,24 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_session_manager.set_analyze(f)
         except (socket.error, rpdb2.CConnectionException):
             pass    
+
     
     def update_namespace(self, event):
         wx.CallAfter(self.m_namespave_viewer.update_namespace, self.m_stack)
+
         
     def do_filter(self, event):
         f = event.IsChecked()
         self.m_namespave_viewer.set_filter(f)
         self.m_namespave_viewer.update_namespace(self.m_stack)
+
     
     def do_notify_filename(self, filename, command):
         if command is not None:
             self.add_menu_item(ML_WINDOW, filename, command)
             
         self.m_console.set_filename(filename)
+
     
     def OnCloseWindow(self, event):
         self.m_settings[WINPDB_SIZE] = self.GetSize()
@@ -1276,6 +1311,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.shutdown_jobs()
         self.Destroy()
 
+
     def set_cursor(self, id):
         cursor = wx.StockCursor(id)
         self.SetCursor(cursor)        
@@ -1283,11 +1319,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_threads_viewer.set_cursor(id)        
         self.m_stack_viewer.set_cursor(id)        
 
+
     def do_none(self, event):
         pass
 
+
     def update_state(self, event):
         wx.CallAfter(self.callback_state, event)
+
 
     def callback_state(self, event):
         old_state = self.m_state
@@ -1343,27 +1382,34 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_threads_viewer._disable()
             self.m_console.set_focus()
 
+
     def do_website(self, event):
         self.job_post(webbrowser.open_new, (WEBSITE_URL, ))
+
 
     def do_support(self, event):
         self.job_post(webbrowser.open_new, (SUPPORT_URL, ))
 
+
     def do_docs(self, event):
         self.job_post(webbrowser.open_new, (DOCS_URL, ))
 
+
     def do_updates(self, event):
         self.job_post(webbrowser.open_new, (UPDATES_URL, ))
+
 
     def do_license(self, event):
         about = CHTMLDialog(self, LICENSE_TITLE, LICENSE_NOTICE + COPY_OF_THE_GPL_LICENSE)
         about.ShowModal()
         about.Destroy()
 
+
     def do_about(self, event):
         about = CHTMLDialog(self, ABOUT_TITLE, ABOUT_NOTICE)
         about.ShowModal()
         about.Destroy()
+
 
     def do_password(self, event):
         pwd = self.m_session_manager.get_password()
@@ -1375,6 +1421,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             
         pwd_dialog.Destroy()
 
+
     def job_pwd(self, pwd):
         try:
             self.m_session_manager.set_password(pwd)
@@ -1382,20 +1429,27 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             
         except rpdb2.AlreadyAttached:
             pass
+
         
     def do_launch(self, event):
-        launch_dialog = CLaunchDialog(self, self.m_last_launch)
+        (fchdir, command_line) = self.m_session_manager.get_launch_args()
+
+        if None in (fchdir, command_line):
+            (fchdir, command_line) = (True, '')
+            
+        launch_dialog = CLaunchDialog(self, fchdir, command_line)
         r = launch_dialog.ShowModal()
         if r == wx.ID_OK:
             (command_line, fchdir) = launch_dialog.get_command_line()
-            self.m_last_launch = command_line
             self.job_post(self.job_launch, (fchdir, command_line, ))
             
         launch_dialog.Destroy()
 
+
     def job_launch(self, fchdir, path):
         try:
             self.m_session_manager.launch(fchdir, path)
+            self.m_session_manager.load_breakpoints()
             return
             
         except (socket.error, rpdb2.CConnectionException):
@@ -1404,6 +1458,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             pass
         except IOError:
             pass
+
 
     def do_open(self, event):
         host = self.m_session_manager.get_host()
@@ -1416,6 +1471,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             
         open_dialog.Destroy()
 
+
     def do_attach(self, event):
         attach_dialog = CAttachDialog(self, self.m_session_manager)
         r = attach_dialog.ShowModal()
@@ -1424,6 +1480,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.job_post(self.job_attach, (server, ))
 
         attach_dialog.Destroy()
+
 
     def job_attach(self, server):    
         try:
@@ -1434,9 +1491,11 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             pass
         except rpdb2.BadArgument:
             pass
+
     
     def do_detach(self, event):
         self.job_post(self.job_detach, ())
+
 
     def job_detach(self):    
         try:
@@ -1445,8 +1504,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         except (socket.error, rpdb2.CConnectionException):
             pass
 
+
     def do_stop(self, event):
         self.job_post(self.job_stop, ())
+
         
     def job_stop(self):    
         try:
@@ -1455,65 +1516,92 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         except (socket.error, rpdb2.CConnectionException):
             pass
 
+
+    def do_restart(self, event):
+        self.job_post(self.job_restart, ())
+
+        
+    def job_restart(self):    
+        try:
+            self.m_session_manager.restart()
+            
+        except (socket.error, rpdb2.CConnectionException):
+            pass
+        except rpdb2.BadArgument:
+            pass
+        except IOError:
+            pass
+
+
     def do_disable(self, event):
         try:
             self.m_session_manager.disable_breakpoint([], fAll = True)
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_enable(self, event):
         try:
             self.m_session_manager.enable_breakpoint([], fAll = True)
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_clear(self, event):
         try:
             self.m_session_manager.delete_breakpoint([], fAll = True)
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_load(self, event):
         try:
             self.m_session_manager.load_breakpoints()
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_save(self, event):
         try:
             self.m_session_manager.save_breakpoints()
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_go(self, event):
         try:
             self.m_session_manager.request_go()
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_break(self, event):
         try:
             self.m_session_manager.request_break()
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_step(self, event):
         try:
             self.m_session_manager.request_step()
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_next(self, event):
         try:
             self.m_session_manager.request_next()
         except (socket.error, rpdb2.CConnectionException):
             pass
+
         
     def do_return(self, event):
         try:
             self.m_session_manager.request_return()
         except (socket.error, rpdb2.CConnectionException):
             pass
+
             
     def do_goto(self, event):
         (filename, lineno) = self.m_code_viewer.get_file_lineno()
@@ -1521,6 +1609,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_session_manager.request_go_breakpoint(filename, '', lineno)
         except (socket.error, rpdb2.CConnectionException):
             pass
+
             
     def do_exit(self, event = None):
         self.Close()
@@ -1831,6 +1920,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_breakpoint_lines = {}
         
         self.m_request_number = 0
+        self.m_last_position_time = 0
 
         self.m_event2Marker = {'running': MARKER_RUNNING, 'call': MARKER_CALL, 'line': MARKER_LINE, 'return': MARKER_RETURN,  'exception': MARKER_EXCEPTION}
         
@@ -1852,25 +1942,31 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.Bind(wx.EVT_KEY_UP, self.OnKeyReleased)
         self.Bind(wx.EVT_WINDOW_DESTROY, self.OnDestroyWindow)
 
+
     def OnDestroyWindow(self, event):
         self.shutdown_jobs()
+
         
     def set_cursor(self, id):
         self.m_viewer.SetSTCCursor([stc.STC_CURSORNORMAL, stc.STC_CURSORWAIT][id == wx.CURSOR_WAIT])        
+
 
     def on_margin_clicked(self, event):
         lineno = self.m_viewer.LineFromPosition(event.GetPosition()) + 1
         self.__toggle_breakpoint(lineno)        
         event.Skip()
 
+
     def get_file_lineno(self):
         lineno = self.m_viewer.GetCurrentLine() + 1
 
         return (self.m_cur_filename, lineno)
 
+
     def toggle_breakpoint(self):
         lineno = self.m_viewer.GetCurrentLine() + 1 
         self.__toggle_breakpoint(lineno)        
+
         
     def __toggle_breakpoint(self, lineno):
         bpl = self.m_session_manager.get_breakpoints()
@@ -1884,6 +1980,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         self.job_post(self.job_delete_breakpoint, (id, )) 
 
+
     def job_set_breakpoint(self, filename, lineno):
         try:
             self.m_session_manager.set_breakpoint(filename, '', lineno, True, '')
@@ -1891,6 +1988,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
             pass
         except rpdb2.BadArgument:
             pass
+
         
     def job_delete_breakpoint(self, id):
         try:
@@ -1900,15 +1998,19 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         except rpdb2.BadArgument:
             pass
 
+
     def _disable(self):
         self.m_viewer.Disable()
+
 
     def _enable(self):
         self.m_viewer.Enable()
 
+
     def get_history(self, fBack):
         self.m_history_index = (self.m_history_index + [-1, 1][fBack]) % len(self.m_history)
         return self.m_history[self.m_history_index]
+
         
     def set_history(self, value):
         if value in self.m_history:
@@ -1918,6 +2020,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_history = self.m_history[:50]
         
         self.m_history_index = 0
+
 
     def OnKeyPressed(self, event):
         if len(self.m_history) < 2:
@@ -1930,6 +2033,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         value = self.get_history(event.ShiftDown())  
 
         self.set_file(value, fNoHistory = True)    
+
         
     def OnKeyReleased(self, event):
         if self.m_fSwitch == False:
@@ -1939,6 +2043,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
             return
             
         self.set_history(self.m_cur_filename)
+
         
     def _clear(self):
         self.m_history = []
@@ -1957,6 +2062,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         self.m_viewer._clear()        
 
+
     def __notify_filename(self, filename, fNew):
         if self.m_notify_filename is None:
             return
@@ -1968,6 +2074,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
             command = None
 
         self.m_notify_filename(filename, command)
+
         
     def set_file(self, filename, fNoHistory = False, request_number = 0, fNotify = False, fComplain = False):
         if fNotify:
@@ -2011,6 +2118,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         if fNoHistory == False:
             self.set_history(self.m_cur_filename)
+
         
     def set_position(self, filename, lineno, event, request_number = 0, fNotify = False):
         if fNotify:
@@ -2050,18 +2158,24 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.set_markers()
 
         self.set_history(self.m_cur_filename)
+
+        self.m_last_position_time = time.time()
+
         
     def update_bp(self, event):
         if self.m_pos_filename is None:
             return
 
-        if event.m_action == rpdb2.CEventBreakpoint.SET:
+        fposition_timeout = time.time() - self.m_last_position_time > POSITION_TIMEOUT
+
+        if event.m_action == rpdb2.CEventBreakpoint.SET and fposition_timeout:
             if self.m_cur_filename == event.m_bp.m_filename:
                 lineno = event.m_bp.m_lineno
                 self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
                 self.m_viewer.GotoLine(lineno - 1)            
             
         self.set_markers()
+
         
     def set_markers(self):
         for marker in MARKER_LIST:
@@ -2348,26 +2462,36 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.Bind(wx.EVT_TREE_ITEM_COLLAPSING, self.OnItemCollapsing)
         self.m_tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnItemActivated)
 
-        if wx.Platform == '__WXMSW__':
+        try:
             self.m_tree.Bind(wx.EVT_TREE_ITEM_GETTOOLTIP, self.OnItemToolTip)
+        except:
+            pass
 
         self.Bind(wx.EVT_WINDOW_DESTROY, self.OnDestroyWindow)
 
+
     def OnDestroyWindow(self, event):
         self.shutdown_jobs()
+
         
     def _clear(self):
         self.m_tree.DeleteAllItems()
 
+
     def set_filter(self, fFilter):
         self.m_fFilter = fFilter
+
         
     def bind_caption(self, caption_manager):
         w = self.m_tree.GetMainWindow()
         caption_manager.bind_caption(w)
+
         
     def OnItemActivated(self, event):
         item = event.GetItem()
+        expr = self.m_tree.GetPyData(item)
+        if expr == STR_NAMESPACE_DEADLOCK:
+            return
 
         expr_dialog = CExpressionDialog(self)
         pos = self.GetPositionTuple()
@@ -2394,17 +2518,20 @@ class CNamespacePanel(wx.Panel, CJobs):
             rpdb2.print_debug()
 
         return
+
         
     def OnItemToolTip(self, event):
         item = event.GetItem()
 
         tt = self.m_tree.GetItemText(item, 2)[1:]
         event.SetToolTip(tt)
+
        
     def OnItemCollapsing(self, event):
         item = event.GetItem()
 
         event.Skip()
+
 
     def get_namespace(self, expr, _map):
         if _map is not None:
@@ -2428,17 +2555,73 @@ class CNamespacePanel(wx.Panel, CJobs):
             return None            
         
         return _r
+
+
+    def job_expand_item(self, expr):
+        _r = self.m_session_manager.get_namespace([(expr, True)], self.m_fFilter)
+        if _r is None or len(_r) == 0:
+            wx.CallAfter(self.expand_error, expr)
+            return
+            
+        wx.CallAfter(self.expand_by_expr, expr, _r)  
+
+
+    def expand_error(self, expr):
+        item = self.find_item(expr)
+        if item == None:
+            return
+            
+        child = self.m_tree.AppendItem(item, STR_NAMESPACE_DEADLOCK)
+        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 2)
+        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 1)
+        self.m_tree.SetItemPyData(child, STR_NAMESPACE_DEADLOCK)
+        self.m_tree.Expand(item)
+
+
+    def expand_by_expr(self, expr, _map):
+        item = self.find_item(expr)
+        if item == None:
+            return
+            
+        self.expand_item(item, _map, False, True)               
+                
+
+    def find_item(self, expr):
+        item = self.m_tree.GetRootItem()
+        while item:
+            expr2 = self.m_tree.GetPyData(item)
+            if expr2 == expr:
+                return item               
+                
+            item = self.m_tree.GetNext(item)
+
+        return None    
+    
+
+    def GetChildrenCount(self, item):
+        n = self.m_tree.GetChildrenCount(item)
+        if n != 1:
+            return n 
+
+        child = self.get_children(item)[0]
+        expr = self.m_tree.GetPyData(child)
+
+        if expr == STR_NAMESPACE_DEADLOCK:
+            return 0
+
+        return 1
         
-    def expand_item(self, item, _map = None, froot = False):
+        
+    def expand_item(self, item, _map = None, froot = False, fskip_expansion_check = False):
         if not self.m_tree.ItemHasChildren(item):
             return
         
-        if not froot and self.m_tree.IsExpanded(item):
+        if not froot and not fskip_expansion_check and self.m_tree.IsExpanded(item):
             return
 
-        if self.m_tree.GetChildrenCount(item) > 0:
+        if self.GetChildrenCount(item) > 0:
             return
-            
+        
         expr = self.m_tree.GetPyData(item)
 
         _r = self.get_namespace(expr, _map)
@@ -2468,10 +2651,21 @@ class CNamespacePanel(wx.Panel, CJobs):
 
     
     def OnItemExpanding(self, event):
-        item = event.GetItem()
-        self.expand_item(item)
+        item = event.GetItem()        
+
+        if not self.m_tree.ItemHasChildren(item):
+            event.Skip()
+            return
+        
+        if self.GetChildrenCount(item) > 0:
+            event.Skip()
+            return
+            
+        self.m_tree.DeleteChildren(item)
+        expr = self.m_tree.GetPyData(item)
+
+        self.job_post(self.job_expand_item, (expr, ))
         event.Skip()
-        return
 
 
     def get_children(self, item):
@@ -2483,6 +2677,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             (child, cookie) = self.m_tree.GetNextChild(item, cookie)
 
         return cl    
+
                              
     def get_expression_list(self):
         if self.m_tree.GetCount() == 0:
@@ -2496,7 +2691,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         while len(s) > 0:
             item = s.pop(0)
             expr = self.m_tree.GetPyData(item)
-            fExpand = self.m_tree.IsExpanded(item)
+            fExpand = self.m_tree.IsExpanded(item) and self.GetChildrenCount(item) > 0
             if not fExpand:
                 continue
 
@@ -2505,6 +2700,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             s = items + s
 
         return el    
+
 
     def update_namespace(self, key, el):
         old_key = self.m_key
@@ -2522,11 +2718,13 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         return (old_key, old_el)
 
+
     def post(self, el, fFilter):
         self.m_jobs.insert(0, (el, fFilter))
 
         if self.m_n_workers == 0:
             self.job_post(self.job_update_namespace, ())
+
         
     def job_update_namespace(self):
         while len(self.m_jobs) > 0:
@@ -2549,6 +2747,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             self.m_lock.acquire()
             self.m_n_workers -= 1
             self.m_lock.release()
+
         
     def do_update_namespace(self, rl):    
         self.m_tree.DeleteAllItems()
@@ -2565,6 +2764,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             
             items = self.get_children(item)
             s = items + s
+
                   
     def OnSize(self, event):
         self.m_tree.SetSize(self.GetSize())
@@ -3206,11 +3406,8 @@ class COpenDialog(wx.Dialog):
 
 
 class CLaunchDialog(wx.Dialog):
-    def __init__(self, parent, default_command_line = ''):
+    def __init__(self, parent, fchdir = True, command_line = ''):
         wx.Dialog.__init__(self, parent, -1, DLG_LAUNCH_TITLE)
-        
-        self.m_default_command_line = default_command_line
-
         sizerv = wx.BoxSizer(wx.VERTICAL)
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
@@ -3218,7 +3415,7 @@ class CLaunchDialog(wx.Dialog):
         label = wx.StaticText(self, -1, LABEL_LAUNCH_COMMAND_LINE)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
-        self.m_entry_commandline = wx.TextCtrl(self, value = default_command_line, size = (200, -1))
+        self.m_entry_commandline = wx.TextCtrl(self, value = command_line, size = (200, -1))
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_commandline)
         sizerh.Add(self.m_entry_commandline, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         
@@ -3227,7 +3424,7 @@ class CLaunchDialog(wx.Dialog):
         sizerh.Add(btn, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         self.m_cb = wx.CheckBox(self, -1, CHECKBOX_LAUNCH)
-        self.m_cb.SetValue(True)
+        self.m_cb.SetValue(fchdir)
         sizerv.Add(self.m_cb, 0, wx.ALIGN_LEFT | wx.ALL, 5)
         
         btnsizer = wx.StdDialogButtonSizer()
@@ -3238,7 +3435,7 @@ class CLaunchDialog(wx.Dialog):
         self.m_ok.SetDefault()
         btnsizer.AddButton(self.m_ok)
 
-        if default_command_line == '':
+        if command_line == '':
             self.m_ok.Disable()
 
         btn = wx.Button(self, wx.ID_CANCEL)
