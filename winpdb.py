@@ -602,6 +602,37 @@ def image_from_base64(str_b64):
 
     
 
+def clip_filename(path, number_of_directories = 2):
+    """
+    Clips a pathname string to only used the last two subdirectories.
+    These examples assume a UNIX environment:
+    >>> print os.sep
+    '/'
+    >>> clip_filename("home/file.py")
+    home/file.py
+    >>> clip_filename("this/a/path/file.py")
+    .../a/path/file.py
+    >>> clip_filename("/a/path/file.py")
+    /a/path/file.py
+    """
+
+    #
+    # We only clip if there are more slashes (or whatever sep is)
+    # than the number of directories to be shown.
+    # Find the clipping point by counting back.
+    #
+
+    if path[3:].count(os.sep) <= number_of_directories:
+        return path
+
+    slashpos = path.rfind(os.sep)
+    for i in range(number_of_directories):
+        slashpos = path.rfind(os.sep, 0, slashpos)
+
+    return '...' + path[slashpos:]
+
+
+
 class CSettings:
     def __init__(self, path, filename, default_settings):
         self.m_path = path
@@ -678,7 +709,11 @@ class CMenuBar:
         self.m_cascades = {}
         
     def init_menubar(self, resource):
+        if 'wxMac' in wx.PlatformInfo:
+             wx.MenuBar.SetAutoWindowMenu(False)
+
         self.m_menubar = wx.MenuBar()
+
         self.SetMenuBar(self.m_menubar)
 
         self.m_cascades = {ML_ROOT: self.m_menubar}
@@ -1097,14 +1132,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_splitterv.SetSashGravity(0.5)
         
         self.m_splitterh1 = wx.SplitterWindow(self.m_splitterv, -1, style = wx.SP_LIVE_UPDATE | wx.SP_3D)
-        self.m_splitterh1.SetMinimumPaneSize(100)
+        self.m_splitterh1.SetMinimumPaneSize(70)
         self.m_splitterh1.SetSashGravity(0.67)
 
         self.m_splitterh2 = wx.SplitterWindow(self.m_splitterh1, -1, style = wx.SP_LIVE_UPDATE | wx.SP_3D)
-        self.m_splitterh2.SetMinimumPaneSize(100)
+        self.m_splitterh2.SetMinimumPaneSize(70)
         self.m_splitterh2.SetSashGravity(0.5)
         
-        self.m_namespave_viewer = CNamespaceViewer(self.m_splitterh2, style = wx.STATIC_BORDER, session_manager = self.m_session_manager)
+        self.m_namespace_viewer = CNamespaceViewer(self.m_splitterh2, style = wx.STATIC_BORDER, session_manager = self.m_session_manager)
 
         self.m_threads_viewer = CThreadsViewer(self.m_splitterh2, style = wx.STATIC_BORDER, select_command = self.OnThreadSelected)
 
@@ -1119,7 +1154,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_console = CConsole(self.m_splitterh3, style = wx.STATIC_BORDER | wx.TAB_TRAVERSAL)
         self.job_post(self.m_console.start, (self, self.m_session_manager, self.m_fchdir, self.m_command_line, self.m_fAttach))
         
-        self.m_splitterh2.SplitHorizontally(self.m_namespave_viewer, self.m_threads_viewer)
+        self.m_splitterh2.SplitHorizontally(self.m_namespace_viewer, self.m_threads_viewer)
         self.m_splitterh1.SplitHorizontally(self.m_splitterh2, self.m_stack_viewer)
         self.m_splitterv.SplitVertically(self.m_splitterh1, self.m_splitterh3)
         self.m_splitterh3.SplitHorizontally(self.m_code_viewer, self.m_console)
@@ -1192,7 +1227,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def clear_all(self):
         self.m_code_viewer._clear()
-        self.m_namespave_viewer._clear()
+        self.m_namespace_viewer._clear()
         self.m_stack_viewer._clear()
         self.m_threads_viewer._clear()
 
@@ -1281,13 +1316,13 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     
     def update_namespace(self, event):
-        wx.CallAfter(self.m_namespave_viewer.update_namespace, self.m_stack)
+        wx.CallAfter(self.m_namespace_viewer.update_namespace, self.m_stack)
 
         
     def do_filter(self, event):
         f = event.IsChecked()
-        self.m_namespave_viewer.set_filter(f)
-        self.m_namespave_viewer.update_namespace(self.m_stack)
+        self.m_namespace_viewer.set_filter(f)
+        self.m_namespace_viewer.update_namespace(self.m_stack)
 
     
     def do_notify_filename(self, filename, command):
@@ -1298,7 +1333,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     
     def OnCloseWindow(self, event):
-        self.m_settings[WINPDB_SIZE] = self.GetSize()
+
+        #
+        # On a Mac, the size is magically increased by 47; decrease it back.
+        #
+
+        (w, h) = self.GetSize()
+        if sys.platform == 'darwin':
+            h -= 47
+
+        self.m_settings[WINPDB_SIZE] = (w, h)
         self.m_settings[WINPDB_MAXIMIZE] = self.IsMaximized()
         self.m_settings[SPLITTER_1_POS] = self.m_splitterh2.GetSashPosition()
         self.m_settings[SPLITTER_2_POS] = self.m_splitterh1.GetSashPosition()
@@ -1347,7 +1391,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.clear_menu_items(ML_WINDOW)
             self.m_source_manager._clear()
             self.m_code_viewer._clear()
-            self.m_namespave_viewer._clear()
+            self.m_namespace_viewer._clear()
             self.m_stack_viewer._clear()
             self.m_threads_viewer._clear()
             self.m_console.set_focus()
@@ -1362,7 +1406,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.set_toggle(TB_EXCEPTION, False)
             
             #self.m_code_viewer._enable()
-            self.m_namespave_viewer._enable()
+            self.m_namespace_viewer._enable()
             self.m_stack_viewer._enable()
             self.m_threads_viewer._enable()
             
@@ -1370,14 +1414,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.set_toggle(TB_EXCEPTION, True)
             
             #self.m_code_viewer._enable()
-            self.m_namespave_viewer._enable()
+            self.m_namespace_viewer._enable()
             self.m_stack_viewer._enable()
             self.m_threads_viewer._disable()
             self.m_console.set_focus()
             
         else:
             #self.m_code_viewer._disable()
-            self.m_namespave_viewer._disable()
+            self.m_namespace_viewer._disable()
             self.m_stack_viewer._disable()
             self.m_threads_viewer._disable()
             self.m_console.set_focus()
@@ -1739,6 +1783,7 @@ class CStyledViewer(stc.StyledTextCtrl):
             self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:Courier')
 
         self.StyleClearAll()
+        self.SetTabWidth(4)
         
         self.StyleSetSpec(stc.STC_STYLE_LINENUMBER, 'fore:#000000,back:#99A9C2')    
         self.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, 'fore:#00009D,back:#FFFF00')
@@ -2110,7 +2155,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
         
-        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + _filename)
+        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + clip_filename(_filename))
         
         self.m_cur_filename = _filename
 
@@ -2147,7 +2192,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
         
-        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + filename)
+        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + clip_filename(filename))
         
         self.m_cur_filename = filename
 
@@ -2456,6 +2501,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.AddColumn(TLC_HEADER_REPR)
         self.m_tree.SetColumnWidth(2, 800)
         self.m_tree.SetMainColumn(0) 
+        self.m_tree.SetLineSpacing(0)
         
         self.Bind(wx.EVT_SIZE, self.OnSize)
         self.m_tree.Bind(wx.EVT_TREE_ITEM_EXPANDING, self.OnItemExpanding)
@@ -2635,10 +2681,17 @@ class CNamespacePanel(wx.Panel, CJobs):
             self.m_tree.SetItemHasChildren(item, False)
             return
 
+        #
+        # Create a list of the subitems.
+        # The list is indexed by name or directory key.
+        # In case of a list, no sorting is needed.
+        #
+
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
 
         sorted_snl = [(r[rpdb2.DICT_KEY_NAME], r) for r in snl]
-        sorted_snl.sort()
+        if _r['type'] != 'list':
+            sorted_snl.sort()
         
         for (key_name, r) in sorted_snl:
             child = self.m_tree.AppendItem(item, key_name)
