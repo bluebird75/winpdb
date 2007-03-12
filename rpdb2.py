@@ -2861,7 +2861,7 @@ class CEventDispatcher:
         self.m_registrants = {}
 
 
-    def shutdown():
+    def shutdown(self):
         for er in self.m_registrants.keys():
             self.__remove_dispatcher_record(er)
 
@@ -5773,6 +5773,8 @@ class CDebuggerEngine(CDebuggerCore):
         sys.settrace(None)
         sys.setprofile(None)
                 
+        e = {}
+
         try:
             __globals = _globals
             __locals = _locals
@@ -5784,7 +5786,6 @@ class CDebuggerEngine(CDebuggerCore):
                 
             r = eval(expr, __globals, __locals)
 
-            e = {}
             e[DICT_KEY_EXPR] = expr
             e[DICT_KEY_REPR] = safe_repr_limited(r)
             e[DICT_KEY_TYPE] = self.__parse_type(type(r))
@@ -6597,7 +6598,7 @@ class CServerList:
         self.m_errors = {}
 
 
-    def calcList(self, pwd, rid, report_exception):
+    def calcList(self, pwd, rid, report_exception, fsupress_pwd_warning = False):
         sil = []
         sessions = []
         self.m_errors = {}
@@ -6614,6 +6615,10 @@ class CServerList:
 
             if (s.m_exc_info is not None):
                 #print >> sys.__stderr__, s.m_exc_info[0]
+
+                if fsupress_pwd_warning and (issubclass(s.m_exc_info[0], AuthenticationFailure) or issubclass(s.m_exc_info[0], AuthenticationFailure)):
+                    continue
+                    
                 if issubclass(s.m_exc_info[0], CException):
                     _i = self.m_errors.get(s.m_exc_info[0], 0)
                     self.m_errors[s.m_exc_info[0]] = _i + 1
@@ -6721,13 +6726,13 @@ class CSessionManagerInternal:
     def __wait_for_debuggee(self, rid):
         for i in range(0,STARTUP_RETRIES):
             try:
-                self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception)
+                self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception, fsupress_pwd_warning = True)
                 return self.m_server_list_object.findServers(rid)[0]
             except UnknownServer:
                 time.sleep(STARTUP_TIMEOUT)
                 continue
                 
-        self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception)
+        self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception, fsupress_pwd_warning = True)
         return self.m_server_list_object.findServers(rid)[0]
 
 
@@ -6787,7 +6792,7 @@ class CSessionManagerInternal:
                     self.m_printer(STR_STARTUP_FAILURE)
                     raise
                     
-                self.attach(server.m_rid, server.m_filename)
+                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True)
 
                 self.m_last_command_line = command_line
                 self.m_last_fchdir = fchdir
@@ -6888,7 +6893,7 @@ class CSessionManagerInternal:
             pass
 
 
-    def attach(self, key, name = None):
+    def attach(self, key, name = None, fsupress_pwd_warning = False):
         self.__verify_unattached()
 
         if key == '':
@@ -6907,7 +6912,7 @@ class CSessionManagerInternal:
         self.m_state_manager.set_state(STATE_ATTACHING)
 
         try:
-            self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception)                
+            self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception, fsupress_pwd_warning)                
             servers = self.m_server_list_object.findServers(key)
             server = servers[0] 
 
@@ -6925,10 +6930,10 @@ class CSessionManagerInternal:
             return
 
         except (socket.error, CConnectionException):
-            self.report_exception(*sys.exc_info())
             self.m_printer(STR_ATTACH_FAILED_NAME % (_name, ))
             self.m_state_manager.set_state(STATE_DETACHED)
             raise
+            
         except:
             print_debug()
             assert False
@@ -7063,6 +7068,8 @@ class CSessionManagerInternal:
 
             
     def detach(self):
+        self.__verify_attached()
+
         self.m_printer(STR_ATTEMPTING_TO_DETACH)
 
         self.m_state_manager.set_state(STATE_DETACHING)
@@ -7071,17 +7078,12 @@ class CSessionManagerInternal:
 
         try:
             self.disable_breakpoint([], fAll = True)
-            self.request_go()
-        except (socket.error, CConnectionException):
-            pass
-        except:
-            print_debug()
+            self.request_go()                
 
-        self.m_state_manager.set_state(STATE_DETACHED)
-
-        self.m_session = None
-
-        self.m_printer(STR_DETACH_SUCCEEDED)
+        finally:
+            self.m_state_manager.set_state(STATE_DETACHED)
+            self.m_session = None
+            self.m_printer(STR_DETACH_SUCCEEDED)
 
 
     def __stop_event_monitor(self):
@@ -7528,6 +7530,10 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         return stop
 
 
+    def emptyline(self):
+        pass
+
+        
     def run(self):
         self.cmdloop()
 
@@ -7597,7 +7603,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         
     def do_launch(self, arg):
         if arg == '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
 
         if arg[:2] == '-k':
@@ -7615,18 +7621,18 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             return
             
         except (socket.error, CConnectionException):
-            pass
+            self.m_session_manager.report_exception(*sys.exc_info())
         except BadArgument:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except IOError:
-            print >> self.stdout, 'File', arg, ' not found.'
+            self.printer('File' + arg + ' not found.')
         
         self.fPrintBroken = False
 
 
     def do_restart(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
@@ -7634,11 +7640,11 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             return
             
         except (socket.error, CConnectionException):
-            pass
+            self.m_session_manager.report_exception(*sys.exc_info())
         except BadArgument:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except IOError:
-            print >> self.stdout, 'File', arg, ' not found.'
+            self.printer('File' +  arg +  ' not found.')
         
         self.fPrintBroken = False
 
@@ -7654,9 +7660,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             return
             
         except (socket.error, CConnectionException):
-            pass
+            self.m_session_manager.report_exception(*sys.exc_info())
         except BadArgument:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         
         self.fPrintBroken = False
 
@@ -7669,21 +7675,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         host = self.m_session_manager.get_host()
         print >> self.stdout, STR_SCRIPTS_CONNECTING % (host, )
 
-        try:
-            (server_list, errors) = self.m_session_manager.calc_server_list()
-            for k in errors.keys():
-                if k == AuthenticationBadData:
-                    print >> self.stdout, STR_ACCESS_DENIED
-                if k == AuthenticationFailure:
-                    print >> self.stdout, STR_ACCESS_DENIED
-                if k == EncryptionExpected:
-                    print >> self.stdout, STR_ENCRYPTION_EXPECTED
-                if k == BadVersion:
-                    print >> self.stdout, STR_BAD_VERSION
-
-        except UnsetPassword:
-            print >> self.stdout, STR_PASSWORD_MUST_BE_SET
-            return
+        (server_list, errors) = self.m_session_manager.calc_server_list()
 
         if server_list == []:
             print >> self.stdout, STR_SCRIPTS_NO_SCRIPTS % (host, )
@@ -7702,11 +7694,15 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     def do_detach(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
 
-        self.m_session_manager.save_breakpoints()
-        self.m_session_manager.detach()
+        try:
+            self.m_session_manager.save_breakpoints()
+            self.m_session_manager.detach()
+
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())            
 
 
     def do_host(self, arg):
@@ -7717,19 +7713,21 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         try:
             self.m_session_manager.set_host(arg)
+
         except socket.gaierror, e:
-            print >> self.stdout, STR_HOST_UNKNOWN % (arg, )
-        except AlreadyAttached:
-            print >> self.stdout, STR_ALREADY_ATTACHED
+            self.printer(STR_HOST_UNKNOWN % (arg, ))
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())            
 
         
     def do_break(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
             self.m_session_manager.request_break()
+
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
 
@@ -7770,7 +7768,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
     
     def do_go(self, arg):
         if self.fAnalyzeMode:
-            print >> self.stdout, STR_ILEGAL_ANALYZE_MODE_CMD
+            self.printer(STR_ILEGAL_ANALYZE_MODE_CMD)
             return
 
         try:
@@ -7783,16 +7781,17 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.fPrintBroken = True
             self.m_session_manager.request_go()
             return
+
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except BadArgument:    
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except IOError:
-            print >> self.stdout, STR_FILE_NOT_FOUND % (filename, )
+            self.printer(STR_FILE_NOT_FOUND % (filename, ))
         except InvalidScopeName:
-            print >> self.stdout, STR_SCOPE_NOT_FOUND % (scope, )
+            self.printer(STR_SCOPE_NOT_FOUND % (scope, ))
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
         self.fPrintBroken = False
 
@@ -7801,51 +7800,60 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     def do_step(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         if self.fAnalyzeMode:
-            print >> self.stdout, STR_ILEGAL_ANALYZE_MODE_CMD
+            self.printer(STR_ILEGAL_ANALYZE_MODE_CMD)
             return
 
         try:
             self.m_session_manager.request_step()
+
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
+        except DebuggerNotBroken:
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
     do_s = do_step
 
 
     def do_next(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         if self.fAnalyzeMode:
-            print >> self.stdout, STR_ILEGAL_ANALYZE_MODE_CMD
+            self.printer(STR_ILEGAL_ANALYZE_MODE_CMD)
             return
 
         try:
             self.m_session_manager.request_next()
+
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
+        except DebuggerNotBroken:
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
     do_n = do_next
 
     
     def do_return(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         if self.fAnalyzeMode:
-            print >> self.stdout, STR_ILEGAL_ANALYZE_MODE_CMD
+            self.printer(STR_ILEGAL_ANALYZE_MODE_CMD)
             return
 
         try:
             self.m_session_manager.request_return()
+
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
+        except DebuggerNotBroken:
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
     do_r = do_return
 
@@ -7854,42 +7862,46 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         try:
             lineno = int(arg)
         except ValueError:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
 
         try:
             self.m_session_manager.request_jump(lineno)
+
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
+        except DebuggerNotBroken:
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
     do_j = do_jump
 
     
     def do_bp(self, arg):
         if arg == '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
         
         try:
             (filename, scope, lineno, expr) = self.__parse_bp_arg(arg, fAllowExpr = True)
             self.m_session_manager.set_breakpoint(filename, scope, lineno, True, expr)
+
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except BadArgument:    
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except IOError:
-            print >> self.stdout, STR_FILE_NOT_FOUND % (filename, )
+            self.printer(STR_FILE_NOT_FOUND % (filename, ))
         except InvalidScopeName:
-            print >> self.stdout, STR_SCOPE_NOT_FOUND % (scope, )
+            self.printer(STR_SCOPE_NOT_FOUND % (scope, ))
         except SyntaxError:
-            print >> self.stdout, STR_BAD_EXPRESSION % (expr, )
+            self.printer(STR_BAD_EXPRESSION % (expr, ))
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
 
     def do_be(self, arg):
         if arg == '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
@@ -7901,15 +7913,16 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 id_list = [int(sid) for sid in sid_list]
 
             self.m_session_manager.enable_breakpoint(id_list, fAll)
+
         except ValueError:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
 
 
     def do_bd(self, arg):
         if arg == '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
@@ -7922,14 +7935,14 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
             self.m_session_manager.disable_breakpoint(id_list, fAll)
         except ValueError:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
 
 
     def do_bc(self, arg):
         if arg == '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
@@ -7941,8 +7954,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 id_list = [int(sid) for sid in sid_list]
 
             self.m_session_manager.delete_breakpoint(id_list, fAll)
+
         except ValueError:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
 
@@ -7969,12 +7983,13 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.save_breakpoints(arg)
             print >> self.stdout, STR_BREAKPOINTS_SAVED    
             return
+            
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except IOError:
-            print >> self.stdout, STR_BAD_FILENAME
+            self.printer(STR_BAD_FILENAME)
 
-        print >> self.stdout, STR_BREAKPOINTS_NOT_SAVED    
+        self.printer(STR_BREAKPOINTS_NOT_SAVED)
 
         
     def do_load(self, arg):
@@ -7982,17 +7997,18 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.load_breakpoints(arg)
             print >> self.stdout, STR_BREAKPOINTS_LOADED    
             return
+            
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except cPickle.PickleError:
-            print >> self.stdout, STR_BAD_FILE_DATA
+            self.printer(STR_BAD_FILE_DATA)
         except IOError:
-            print >> self.stdout, STR_BREAKPOINTS_FILE_NOT_FOUND
+            self.printer(STR_BREAKPOINTS_FILE_NOT_FOUND)
 
 
     def do_stack(self, arg):
         if self.fAnalyzeMode and (arg != ''):
-            print >> self.stdout, STR_ILEGAL_ANALYZE_MODE_ARG
+            self.printer(STR_ILEGAL_ANALYZE_MODE_ARG)
             return
 
         try:
@@ -8006,7 +8022,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             sl = self.m_session_manager.get_stack(tid_list, fAll)
 
             if len(sl) == 0:
-                print >> self.stdout, STR_NO_THREADS_FOUND
+                self.printer(STR_NO_THREADS_FOUND)
                 return
 
             frame_index = self.m_session_manager.get_frame_index()
@@ -8026,21 +8042,22 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 while i < len(s):
                     e = s[-(1 + i)]
 
-                    if not fBroken:
-                        m = ['', SOURCE_STATE_UNBROKEN][i == 0]
-                    elif fCurrent:
-                        m = ['', SYMBOL_MARKER][i == frame_index]
+                    marker = [SOURCE_STATE_UNBROKEN, SYMBOL_MARKER][fBroken]
+                    
+                    if fCurrent:
+                        m = ['', marker][i == frame_index]
                     else:
-                        m = ['', SYMBOL_MARKER][i == 0]
+                        m = ['', marker][i == 0]
                         
                     print >> self.stdout, ' %1s %5d  %-28s  %4d  %s' % (m, i, calc_suffix(e[0], 28), e[1], calc_prefix(e[2], 20))
                     i += 1
+                    
         except (socket.error, NoThreads, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except ValueError:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except NoExceptionFound:
-            print >> self.stdout, STR_EXCEPTION_NOT_FOUND
+            self.printer(STR_EXCEPTION_NOT_FOUND)
 
     do_k = do_stack
 
@@ -8075,11 +8092,11 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 fLine = True
 
         except ValueError:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
 
         if self.fAnalyzeMode and fAll:
-            print >> self.stdout, STR_ILEGAL_ANALYZE_MODE_ARG
+            self.printer(STR_ILEGAL_ANALYZE_MODE_ARG)
             return
 
         if fMore and self.m_last_source_line:
@@ -8100,7 +8117,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 r = self.m_session_manager.get_source_lines(nlines, fAll)
 
             if len(r) == 0:
-                print >> self.stdout, STR_NO_THREADS_FOUND
+                self.printer(STR_NO_THREADS_FOUND)
                 return
 
             m = None    
@@ -8110,7 +8127,10 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 breakpoints = d.get(DICT_KEY_BREAKPOINTS, {})
                 source_lines = d.get(DICT_KEY_LINES, [])
                 first_lineno = d.get(DICT_KEY_FIRST_LINENO, 0)
-                
+
+                if len(r) == 1 and first_lineno != 0:
+                    l = first_lineno
+                    
                 fBroken = d.get(DICT_KEY_BROKEN, False)
                 frame_event = d.get(DICT_KEY_EVENT, '')
                 frame_lineno = d.get(DICT_KEY_FRAME_LINENO, 0)
@@ -8153,18 +8173,18 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except NoExceptionFound:
-            print >> self.stdout, STR_EXCEPTION_NOT_FOUND
+            self.printer(STR_EXCEPTION_NOT_FOUND)
         except NoThreads:
             self.m_session_manager.report_exception(*sys.exc_info())
         except (InvalidFrame, IOError):
-            print >> self.stdout, STR_SOURCE_NOT_FOUND
+            self.printer(STR_SOURCE_NOT_FOUND)
 
     do_l = do_list
 
 
     def do_up(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
 
         try:
@@ -8174,12 +8194,12 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
 
     def do_down(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
@@ -8189,7 +8209,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
 
     def __eval_callback(self, e, r):
@@ -8202,7 +8222,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
     
     def do_eval(self, arg):
         if arg == '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
@@ -8216,9 +8236,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except NoExceptionFound:
-            print >> self.stdout, STR_EXCEPTION_NOT_FOUND
+            self.printer(STR_EXCEPTION_NOT_FOUND)
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
         
     do_v = do_eval
 
@@ -8233,7 +8253,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         
     def do_exec(self, arg):
         if arg == '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
             
         try:
@@ -8248,16 +8268,16 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except NoExceptionFound:
-            print >> self.stdout, STR_EXCEPTION_NOT_FOUND
+            self.printer(STR_EXCEPTION_NOT_FOUND)
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
         
     do_x = do_exec
 
     
     def do_thread(self, arg):
         if self.fAnalyzeMode and (arg != ''):
-            print >> self.stdout, STR_ILEGAL_ANALYZE_MODE_ARG
+            self.printer(STR_ILEGAL_ANALYZE_MODE_ARG)
             return
 
         try:
@@ -8277,28 +8297,29 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 print >> self.stdout, ' %1s %3d  %5d  %s' % (m, i, t[DICT_KEY_TID], state[:10])
                 
         except ValueError:
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
         except (socket.error, NoThreads, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except ThreadNotFound:
-            print >> self.stdout, STR_THREAD_NOT_FOUND
+            self.printer(STR_THREAD_NOT_FOUND)
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
 
     do_t = do_thread
 
 
     def do_analyze(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
 
         try:
             self.m_session_manager.set_analyze(not self.fAnalyzeMode)
-        except NotAttached:
-            print >> self.stdout, STR_NOT_ATTACHED        
+
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
         except DebuggerNotBroken:
-            print >> self.stdout, STR_DEBUGGEE_NOT_BROKEN
+            self.printer(STR_DEBUGGEE_NOT_BROKEN)
         
     do_a = do_analyze
 
@@ -8319,8 +8340,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             print >> self.stdout, STR_PASSWORD_SET % (pwd, )
             return
 
-        except AlreadyAttached:
-            print >> self.stdout, STR_ALREADY_ATTACHED
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
 
             
     def do_remote(self, arg):
@@ -8342,22 +8363,24 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             print >> self.stdout, STR_REMOTE_MODE % (str(fAllowRemote), )
             return
 
-        except AlreadyAttached:
-            print >> self.stdout, STR_ALREADY_ATTACHED
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
 
 
     def do_stop(self, arg):
         try:
-            print >> self.stdout, STR_KILL_NOTICE
+            self.printer(STR_KILL_NOTICE)
             self.m_session_manager.save_breakpoints()
             self.m_session_manager.stop_debuggee()
+            
         except (socket.error, CConnectionException):
-            pass
+            self.m_session_manager.report_exception(*sys.exc_info())
+
 
         
     def do_exit(self, arg):
         if arg != '':
-            print >> self.stdout, STR_BAD_ARGUMENT
+            self.printer(STR_BAD_ARGUMENT)
             return
 
         if self.m_session_manager.get_state() != STATE_DETACHED:    
