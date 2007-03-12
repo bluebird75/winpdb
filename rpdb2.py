@@ -7097,13 +7097,20 @@ class CSessionManagerInternal:
 
             except CConnectionException:
                 self.report_exception(*sys.exc_info())
-                threading.Thread(target = self.detach).start()
+                threading.Thread(target = self.detach_job).start()
                 return
                 
             except socket.error:
                 self.report_exception(*sys.exc_info())
                 #threading.Thread(target = self.detach).start()
                 #return
+
+            
+    def detach_job(self):
+        try:
+            self.detach()
+        except:
+            pass            
 
             
     def detach(self):
