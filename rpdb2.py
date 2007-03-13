@@ -1416,6 +1416,7 @@ RPDB_SETTINGS_FOLDER = '.rpdb2_settings'
 
 IDLE_MAX_RATE = 2.0
 PING_TIMEOUT = 4.0
+COMMUNICATION_RETRIES = 5
 
 WAIT_FOR_BREAK_TIMEOUT = 3.0
 
@@ -1627,6 +1628,7 @@ XML_DATA = """<?xml version='1.0'?>
 
 N_WORK_QUEUE_THREADS = 8
 
+DETACH_NO_REPORT = 'no_report'
 
 g_server_lock = threading.RLock()
 g_server = None
@@ -6632,7 +6634,7 @@ class CServerList:
         self.m_errors = {}
 
 
-    def calcList(self, pwd, rid, report_exception, fsupress_pwd_warning = False):
+    def calcList(self, pwd, rid):
         sil = []
         sessions = []
         self.m_errors = {}
@@ -6650,13 +6652,9 @@ class CServerList:
             if (s.m_exc_info is not None):
                 #print >> sys.__stderr__, s.m_exc_info[0]
 
-                if fsupress_pwd_warning and (issubclass(s.m_exc_info[0], AuthenticationFailure) or issubclass(s.m_exc_info[0], AuthenticationFailure)):
-                    continue
-                    
                 if issubclass(s.m_exc_info[0], CException):
                     _i = self.m_errors.get(s.m_exc_info[0], 0)
                     self.m_errors[s.m_exc_info[0]] = _i + 1
-                    report_exception(*s.m_exc_info)
 
                 continue
 
@@ -6758,17 +6756,22 @@ class CSessionManagerInternal:
 
 
     def __wait_for_debuggee(self, rid):
-        for i in range(0,STARTUP_RETRIES):
-            try:
-                self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception, fsupress_pwd_warning = True)
-                return self.m_server_list_object.findServers(rid)[0]
-            except UnknownServer:
-                time.sleep(STARTUP_TIMEOUT)
-                continue
-                
-        self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception, fsupress_pwd_warning = True)
-        return self.m_server_list_object.findServers(rid)[0]
+        try:
+            for i in range(0,STARTUP_RETRIES):
+                try:
+                    self.m_server_list_object.calcList(self.m_pwd, self.m_rid)
+                    return self.m_server_list_object.findServers(rid)[0]
+                except UnknownServer:
+                    time.sleep(STARTUP_TIMEOUT)
+                    continue
+                    
+            self.m_server_list_object.calcList(self.m_pwd, self.m_rid)
+            return self.m_server_list_object.findServers(rid)[0]
 
+        finally:
+            errors = self.m_server_list_object.get_errors()
+            self.__report_server_errors(errors, fsupress_pwd_warning = True)
+                        
 
     def get_encryption(self):
         return self.getSession().get_encryption()
@@ -6951,15 +6954,15 @@ class CSessionManagerInternal:
         self.m_state_manager.set_state(STATE_ATTACHING)
 
         try:
-            self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception, fsupress_pwd_warning)                
+            self.m_server_list_object.calcList(self.m_pwd, self.m_rid)                
             servers = self.m_server_list_object.findServers(key)
             server = servers[0] 
 
             _name = server.m_filename
             
             errors = self.m_server_list_object.get_errors()
-            if (server.m_rid != key) and (len(errors) > 0):
-                self.__report_server_errors(errors)
+            if not key in [server.m_rid, str(server.m_pid)]:
+                self.__report_server_errors(errors, fsupress_pwd_warning)
 
             self.__attach(server)
             if len(servers) > 1:
@@ -7009,16 +7012,12 @@ class CSessionManagerInternal:
             self.m_printer(STR_ACCESS_DENIED)
 
             
-    def __report_server_errors(self, errors):
+    def __report_server_errors(self, errors, fsupress_pwd_warning = False):
         for k in errors.keys():
-            if k == AuthenticationBadData:
-                self.m_printer(STR_ACCESS_DENIED)
-            if k == AuthenticationFailure:
-                self.m_printer(STR_ACCESS_DENIED)
-            if k == EncryptionExpected:
-                self.m_printer(STR_ENCRYPTION_EXPECTED)
-            if k == BadVersion:
-                self.m_printer(STR_BAD_VERSION)
+            if fsupress_pwd_warning and k in [AuthenticationBadData, AuthenticationFailure]:
+                continue
+                
+            self.report_exception(k, None, None)
 
         
     def __attach(self, server):
@@ -7077,6 +7076,7 @@ class CSessionManagerInternal:
     def __event_monitor_proc(self):
         self.m_worker_thread_ident = thread.get_ident()
         t = 0
+        nfailures = 0
         
         while not self.m_fStop:
             try:
@@ -7095,15 +7095,21 @@ class CSessionManagerInternal:
                     self.m_remote_event_index = n
                     self.m_event_dispatcher_proxy.fire_events(sel)
 
+                nfailures = 0
+                
             except CConnectionException:
                 self.report_exception(*sys.exc_info())
                 threading.Thread(target = self.detach_job).start()
                 return
                 
             except socket.error:
+                if nfailures < COMMUNICATION_RETRIES:
+                    nfailures += 1
+                    continue
+                    
                 self.report_exception(*sys.exc_info())
-                #threading.Thread(target = self.detach).start()
-                #return
+                threading.Thread(target = self.detach_job).start()
+                return
 
             
     def detach_job(self):
@@ -7338,9 +7344,10 @@ class CSessionManagerInternal:
         if self.m_pwd is None:
             raise UnsetPassword
         
-        server_list = self.m_server_list_object.calcList(self.m_pwd, self.m_rid, self.report_exception)
+        server_list = self.m_server_list_object.calcList(self.m_pwd, self.m_rid)
         errors = self.m_server_list_object.get_errors()
-
+        self.__report_server_errors(errors)
+        
         return (server_list, errors)
 
 
@@ -7551,13 +7558,14 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     def event_atexit(self, event):
         self.printer(STR_DEBUGGEE_TERMINATED)        
-        self.do_detach("")
+        self.do_detach(DETACH_NO_REPORT)
 
         
     def precmd(self, line):
         self.m_fAddPromptBeforeMsg = True
         if not self.m_eInLoop.isSet():
             self.m_eInLoop.set()
+            time.sleep(0.01)
 
         if not line.strip():
             return line
@@ -7610,6 +7618,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.stdout.write(prefix + s + suffix)
             s = _s 
 
+        self.stdout.flush()
+        
 
     def print_notice(self, notice):
         nl = notice.split('\n')
@@ -7739,7 +7749,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
 
     def do_detach(self, arg):
-        if arg != '':
+        if not arg in ['', DETACH_NO_REPORT]:
             self.printer(STR_BAD_ARGUMENT)
             return
 
@@ -7748,7 +7758,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.detach()
 
         except (socket.error, CConnectionException):
-            self.m_session_manager.report_exception(*sys.exc_info())            
+            if arg != DETACH_NO_REPORT:
+                self.m_session_manager.report_exception(*sys.exc_info())            
 
 
     def do_host(self, arg):
@@ -9029,6 +9040,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRem
     c = CConsole(sm)
     c.start()
 
+    time.sleep(0.5)
+    
     if fAttach:
         sm.attach_nothrow(command_line)
     elif command_line != '':

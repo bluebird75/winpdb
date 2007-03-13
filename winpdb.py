@@ -1789,8 +1789,8 @@ class CStyledViewer(stc.StyledTextCtrl):
         self.StyleSetSpec(stc.STC_P_OPERATOR, 'fore:#800000,bold')
         self.StyleSetSpec(stc.STC_P_IDENTIFIER, 'fore:#000000')
 
-        self.SetSelBackground(True, wx.SystemSettings_GetColour(wx.SYS_COLOUR_HIGHLIGHT))
-        self.SetSelForeground(True, wx.SystemSettings_GetColour(wx.SYS_COLOUR_HIGHLIGHTTEXT))
+        self.SetSelBackground(True, '#316ac5')
+        self.SetSelForeground(True, wx.WHITE)
 
         self.MarkerDefine(MARKER_BREAKPOINT_ENABLED, stc.STC_MARKER_MAX, wx.BLACK, (255, 0, 0))
         self.MarkerDefine(MARKER_BREAKPOINT_DISABLED, stc.STC_MARKER_MAX, wx.BLACK, (255, 255, 128))
