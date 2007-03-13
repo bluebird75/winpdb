@@ -5724,6 +5724,21 @@ class CDebuggerEngine(CDebuggerCore):
         st = rt.split("'")[1]
         return st
 
+
+    def __is_filtered_type(self, v):
+        t = self.__parse_type(type(v))
+
+        if 'function' in t:
+            return True
+
+        if 'module' in t:
+            return True
+
+        if 'classobj' in t:
+            return True
+
+        return False
+        
         
     def __calc_subnodes(self, expr, r, fForceNames, fFilter):
         snl = []
@@ -5743,15 +5758,14 @@ class CDebuggerEngine(CDebuggerCore):
 
         if (type(r) == dict) or isinstance(r, dict):
             for k, v in r.items():
-                rt = self.__parse_type(type(v))
-                if fFilter and (rt in ['function', 'module', 'classobj']):
+                if fFilter and (expr in ['globals()', 'locals()']) and self.__is_filtered_type(v):
                     continue
                     
                 e = {}
                 e[DICT_KEY_EXPR] = '%s[%s]' % (expr, repr(k))
                 e[DICT_KEY_NAME] = [repr(k), k][fForceNames]
                 e[DICT_KEY_REPR] = safe_repr_limited(v)
-                e[DICT_KEY_TYPE] = rt
+                e[DICT_KEY_TYPE] = self.__parse_type(type(v))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
                 snl.append(e)
@@ -5765,6 +5779,9 @@ class CDebuggerEngine(CDebuggerCore):
             except AttributeError:
                 continue
             
+            if fFilter and self.__is_filtered_type(v):
+                continue
+                
             e = {}
             e[DICT_KEY_EXPR] = '%s.%s' % (expr, a)
             e[DICT_KEY_NAME] = a
@@ -5829,8 +5846,7 @@ class CDebuggerEngine(CDebuggerCore):
             
             if fExpand and (e[DICT_KEY_N_SUBNODES] > 0):
                 fForceNames = (expr in ['globals()', 'locals()']) or (RPDB_EXEC_INFO in expr)
-                _fFilter = fFilter and (expr in ['globals()', 'locals()'])
-                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, _fFilter)
+                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, fFilter)
                 e[DICT_KEY_N_SUBNODES] = len(e[DICT_KEY_SUBNODES])
                 
         except:
