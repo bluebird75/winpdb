@@ -615,7 +615,7 @@ class CSessionManager:
     def set_printer(self, printer):
         """
         'printer' is a function that takes one argument and prints it.
-        You can take study CConsoleInternal.printer() as example for use
+        You can study CConsoleInternal.printer() as example for use
         and rational.
         """
         
@@ -835,7 +835,7 @@ class CSessionManager:
         Save breakpoints to file, locally (on the client side)
         """
 
-        return self.__smi.save_breakpoints()
+        return self.__smi.save_breakpoints(_filename)
 
 
     def load_breakpoints(self, _filename = ''):
@@ -843,7 +843,7 @@ class CSessionManager:
         Load breakpoints from file, locally (on the client side)
         """
 
-        return self.__smi.load_breakpoints()
+        return self.__smi.load_breakpoints(_filename)
 
 
     def get_stack(self, tid_list, fAll):   
@@ -1020,7 +1020,7 @@ class CSessionManager:
             expression value, w is always '', and e is an error string if an 
             error occured.
 
-        You can take study CConsoleInternal.do_eval() as an example.
+        You can study CConsoleInternal.do_eval() as an example.
         """
         
         return self.__smi.evaluate_async(callback, obj, expr)
@@ -1057,7 +1057,7 @@ class CSessionManager:
             result - a tuple (w, e) where w is always '', and e is an 
             error string if an error occured.
 
-        You can take study CConsoleInternal.do_eval() as an example.
+        You can study CConsoleInternal.do_eval() as an example.
         """
 
         return self.__smi.execute_async(callback, obj, suite)
@@ -1399,7 +1399,7 @@ osSpawn = {
     GNOME_DEFAULT_TERM: "gnome-terminal -x %s %s &", 
     MAC: '%s %s',
     DARWIN: '%s %s',
-    SCREEN: 'screen -t debugger_console python %s'
+    SCREEN: 'screen -t debuggee_console %s %s'
 }
 
 RPDBTERM = 'RPDBTERM'
@@ -1463,7 +1463,7 @@ STR_STARTUP_SPAWN_NOTICE = "Spawning debuggee..."
 STR_KILL_NOTICE = "Stopping debuggee..."
 STR_STARTUP_FAILURE = "Debuggee failed to start in a timely manner."
 STR_OUTPUT_WARNING = "Textual output will be done at the debuggee."
-STR_OUTPUT_WARNING_ASYNC = "Operation will continue to run in the background."
+STR_OUTPUT_WARNING_ASYNC = "The operation will continue to run in the background."
 STR_ANALYZE_GLOBALS_WARNING = "In analyze mode the globals and locals dictionaries are read only."
 STR_GLOBALS_WARNING = "Any changes made to the globals dictionay at this frame will be discarded."
 STR_BREAKPOINTS_LOADED = "Breakpoints were loaded."
@@ -1629,6 +1629,7 @@ XML_DATA = """<?xml version='1.0'?>
 N_WORK_QUEUE_THREADS = 8
 
 DETACH_NO_REPORT = 'no_report'
+
 
 g_server_lock = threading.RLock()
 g_server = None
@@ -3380,18 +3381,15 @@ class CFileBreakInfo:
 
 
     def FindScopeByName(self, name, offset):
-        if name.startswith(MODULE_SCOPE + SCOPE_SEP):
-            stipped_scope = name[len(MODULE_SCOPE + SCOPE_SEP):]
-        elif name.startswith(MODULE_SCOPE2 + SCOPE_SEP):
-            stipped_scope = name[len(MODULE_SCOPE2 + SCOPE_SEP):]
+        if name.startswith(MODULE_SCOPE):
+            alt_scope = MODULE_SCOPE2 + name[len(MODULE_SCOPE):]
+        elif name.startswith(MODULE_SCOPE2):
+            alt_scope = MODULE_SCOPE + name[len(MODULE_SCOPE2):]
         else: 
-            stipped_scope = name
+            return self.FindScopeByName(MODULE_SCOPE2 + SCOPE_SEP + name, offset)
             
-        moduled_scope1 = MODULE_SCOPE + SCOPE_SEP + stipped_scope
-        moduled_scope2 = MODULE_SCOPE2 + SCOPE_SEP + stipped_scope
-
         for sbi in self.m_scope_break_info:
-            if sbi.m_fqn in [stipped_scope, moduled_scope1, moduled_scope2]:
+            if sbi.m_fqn in [name, alt_scope]:
                 l = sbi.CalcScopeLine(sbi.m_first_line + offset)
                 return (sbi, l)
 
@@ -6026,10 +6024,18 @@ class CWorkQueue:
 
         try:
             self.m_lock.acquire()
-
+            
             self.m_n_threads += 1
             self.m_n_available += 1
+            fcreate_thread = not self.m_f_shutdown and self.m_n_threads < self.m_size            
             
+            self.m_lock.release()
+            
+            if fcreate_thread:
+                self.__create_thread()
+                
+            self.m_lock.acquire()
+
             while not self.m_f_shutdown:
                 self.m_lock.wait()
 
@@ -6039,7 +6045,7 @@ class CWorkQueue:
                 if len(self.m_work_items) == 0:
                     continue
                     
-                fcreate_thread = (self.m_n_available == 1) or (self.m_n_threads < self.m_size)
+                fcreate_thread = self.m_n_available == 1
 
                 (target, args) = self.m_work_items.pop()
 
@@ -7307,6 +7313,9 @@ class CSessionManagerInternal:
 
 
     def evaluate(self, expr):
+        self.__verify_attached()
+        self.__verify_broken()
+
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
@@ -7315,8 +7324,16 @@ class CSessionManagerInternal:
 
         
     def evaluate_job(self, callback, obj, expr):
-        r = self.evaluate(expr)
-        callback(obj, r)
+        try:
+            r = self.evaluate(expr)
+            callback(obj, r)
+                
+        except (socket.error, CConnectionException):
+            self.report_exception(*sys.exc_info())
+        except NoExceptionFound:
+            self.m_printer(STR_EXCEPTION_NOT_FOUND)
+        except DebuggerNotBroken:
+            self.m_printer(STR_DEBUGGEE_NOT_BROKEN)
         
 
     def evaluate_async(self, callback, obj, expr):
@@ -7326,6 +7343,9 @@ class CSessionManagerInternal:
 
 
     def execute(self, suite):
+        self.__verify_attached()
+        self.__verify_broken()
+
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE)
 
@@ -7334,8 +7354,16 @@ class CSessionManagerInternal:
 
 
     def execute_job(self, callback, obj, suite):
-        r = self.execute(suite)
-        callback(obj, r)
+        try:
+            r = self.execute(suite)
+            callback(obj, r)
+
+        except (socket.error, CConnectionException):
+            self.report_exception(*sys.exc_info())
+        except NoExceptionFound:
+            self.m_printer(STR_EXCEPTION_NOT_FOUND)
+        except DebuggerNotBroken:
+            self.m_printer(STR_DEBUGGEE_NOT_BROKEN)
         
 
     def execute_async(self, callback, obj, suite):
@@ -7689,17 +7717,30 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         try:
             self.m_session_manager.launch(fchdir, _arg)
+            
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
+            self.fPrintBroken = False
+            return
+            
+        except BadArgument:
+            self.printer(STR_BAD_ARGUMENT)
+            self.fPrintBroken = False
+            return
+            
+        except IOError:
+            self.printer(STR_FILE_NOT_FOUND % (arg, ))
+            self.fPrintBroken = False
+            return
+                    
+        try:
             self.m_session_manager.load_breakpoints()
             return
             
         except (socket.error, CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
-        except BadArgument:
-            self.printer(STR_BAD_ARGUMENT)
         except IOError:
-            self.printer('File' + arg + ' not found.')
-        
-        self.fPrintBroken = False
+            pass
 
 
     def do_restart(self, arg):
@@ -7716,7 +7757,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except BadArgument:
             self.printer(STR_BAD_ARGUMENT)
         except IOError:
-            self.printer('File' +  arg +  ' not found.')
+            self.printer(STR_FILE_NOT_FOUND % (arg, ))
         
         self.fPrintBroken = False
 
@@ -8298,21 +8339,13 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.printer(STR_BAD_ARGUMENT)
             return
             
-        try:
-            e = threading.Event()
-            t = self.m_session_manager.evaluate_async(self.__eval_callback, e, arg)
-            t.join(WAIT_FOR_BREAK_TIMEOUT)
-            if t.isAlive():
-                print >> self.stdout, STR_OUTPUT_WARNING_ASYNC
-                e.set()
-                
-        except (socket.error, CConnectionException):
-            self.m_session_manager.report_exception(*sys.exc_info())
-        except NoExceptionFound:
-            self.printer(STR_EXCEPTION_NOT_FOUND)
-        except DebuggerNotBroken:
-            self.printer(STR_DEBUGGEE_NOT_BROKEN)
-        
+        e = threading.Event()
+        t = self.m_session_manager.evaluate_async(self.__eval_callback, e, arg)
+        t.join(WAIT_FOR_BREAK_TIMEOUT)
+        if t.isAlive():
+            print >> self.stdout, STR_OUTPUT_WARNING_ASYNC
+            e.set()
+                        
     do_v = do_eval
 
     
@@ -8329,21 +8362,13 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.printer(STR_BAD_ARGUMENT)
             return
             
-        try:
-            print >> self.stdout, STR_OUTPUT_WARNING
-            e = threading.Event()
-            t = self.m_session_manager.execute_async(self.__exec_callback, e, arg)
-            t.join(WAIT_FOR_BREAK_TIMEOUT)
-            if t.isAlive():
-                print >> self.stdout, STR_OUTPUT_WARNING_ASYNC
-                e.set()
-
-        except (socket.error, CConnectionException):
-            self.m_session_manager.report_exception(*sys.exc_info())
-        except NoExceptionFound:
-            self.printer(STR_EXCEPTION_NOT_FOUND)
-        except DebuggerNotBroken:
-            self.printer(STR_DEBUGGEE_NOT_BROKEN)
+        print >> self.stdout, STR_OUTPUT_WARNING
+        e = threading.Event()
+        t = self.m_session_manager.execute_async(self.__exec_callback, e, arg)
+        t.join(WAIT_FOR_BREAK_TIMEOUT)
+        if t.isAlive():
+            print >> self.stdout, STR_OUTPUT_WARNING_ASYNC
+            e.set()
         
     do_x = do_exec
 
@@ -8604,13 +8629,13 @@ consoles on remote machines will BE able to see and attach to the debuggee."""
 
 
     def help_stop(self):
-        print >> self.stdout, """Stop
+        print >> self.stdout, """stop
 
 Shutdown the debugged script."""
 
 
     def help_launch(self):
-        print >> self.stdout, """Launch [-k] <script_name> [<script_args>]
+        print >> self.stdout, """launch [-k] <script_name> [<script_args>]
 
 Spawn script <script_name> and attach to it.
 
@@ -8619,7 +8644,7 @@ Spawn script <script_name> and attach to it.
 
 
     def help_restart(self):
-        print >> self.stdout, """Restart
+        print >> self.stdout, """restart
 
 Restart a script with same arguments from last launch."""
 

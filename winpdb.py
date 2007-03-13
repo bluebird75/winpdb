@@ -2681,7 +2681,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
 
         sorted_snl = [(r[rpdb2.DICT_KEY_NAME], r) for r in snl]
-        if _r['type'] != 'list':
+        if _r[rpdb2.DICT_KEY_TYPE] != 'list':
             sorted_snl.sort()
         
         for (key_name, r) in sorted_snl:
