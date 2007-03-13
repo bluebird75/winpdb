@@ -39,6 +39,8 @@ setup(
     author = 'Nir Aides',
     author_email = 'nir@digitalpeers.com',
     url = 'http://www.digitalpeers.com/pythondebugger/',
+    license = 'GNU GPL',
+    platforms = ["any"],
     py_modules = ['winpdb', 'rpdb2'],
     scripts = ['_winpdb.py', '_rpdb2.py']
     )
