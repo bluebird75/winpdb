@@ -591,6 +591,8 @@ STR_NAMESPACE_DEADLOCK = 'Data Not Available'
 BAD_FILE_WARNING_TIMEOUT_SEC = 10.0
 POSITION_TIMEOUT = 2.0
 
+DEFAULT_PATH_SUFFIX_LENGTH = 55
+
 
 
 def image_from_base64(str_b64):
@@ -602,35 +604,19 @@ def image_from_base64(str_b64):
 
     
 
-def clip_filename(path, number_of_directories = 2):
-    """
-    Clips a pathname string to only used the last two subdirectories.
-    These examples assume a UNIX environment:
-    >>> print os.sep
-    '/'
-    >>> clip_filename("home/file.py")
-    home/file.py
-    >>> clip_filename("this/a/path/file.py")
-    .../a/path/file.py
-    >>> clip_filename("/a/path/file.py")
-    /a/path/file.py
-    """
+def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
+    suffix = rpdb2.calc_suffix(path, n)
+    if not suffix.startswith('...'):
+        return suffix
 
-    #
-    # We only clip if there are more slashes (or whatever sep is)
-    # than the number of directories to be shown.
-    # Find the clipping point by counting back.
-    #
+    index = suffix.find(os.sep)
+    if index == -1:
+        return suffix
 
-    if path[3:].count(os.sep) <= number_of_directories:
-        return path
+    clip = '...' + suffix[index:]
 
-    slashpos = path.rfind(os.sep)
-    for i in range(number_of_directories):
-        slashpos = path.rfind(os.sep, 0, slashpos)
-
-    return '...' + path[slashpos:]
-
+    return clip
+    
 
 
 class CSettings:
@@ -2494,7 +2480,9 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_fFilter = False
         self.m_key = None
 
-        self.m_tree = wx.gizmos.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT)
+        sizerv = wx.BoxSizer(wx.VERTICAL)
+        
+        self.m_tree = wx.gizmos.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
 
         self.m_tree.AddColumn(TLC_HEADER_NAME)
         self.m_tree.AddColumn(TLC_HEADER_TYPE)
@@ -2503,7 +2491,6 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.SetMainColumn(0) 
         self.m_tree.SetLineSpacing(0)
         
-        self.Bind(wx.EVT_SIZE, self.OnSize)
         self.m_tree.Bind(wx.EVT_TREE_ITEM_EXPANDING, self.OnItemExpanding)
         self.m_tree.Bind(wx.EVT_TREE_ITEM_COLLAPSING, self.OnItemCollapsing)
         self.m_tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnItemActivated)
@@ -2514,6 +2501,10 @@ class CNamespacePanel(wx.Panel, CJobs):
             pass
 
         self.Bind(wx.EVT_WINDOW_DESTROY, self.OnDestroyWindow)
+
+        sizerv.Add(self.m_tree, flag = wx.GROW, proportion = 1)
+        self.SetSizer(sizerv)
+        sizerv.Fit(self)
 
 
     def OnDestroyWindow(self, event):
@@ -2818,12 +2809,6 @@ class CNamespacePanel(wx.Panel, CJobs):
             items = self.get_children(item)
             s = items + s
 
-                  
-    def OnSize(self, event):
-        self.m_tree.SetSize(self.GetSize())
-
-        event.Skip()
-
 
 
 class CLocals(CNamespacePanel):
@@ -2893,39 +2878,46 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
         self.SetSizer(_sizerv)
         _sizerv.Fit(self)
 
+
     def _clear(self):
         self.m_locals._clear()
         self.m_globals._clear()
         self.m_exception._clear()
+
 
     def _disable(self):
         self.m_notebook.Disable()
         self.m_locals.Disable()
         self.m_globals.Disable()
         self.m_exception.Disable()
+
         
     def _enable(self):
         self.m_notebook.Enable()
         self.m_locals.Enable()
         self.m_globals.Enable()
         self.m_exception.Enable()
+
         
     def set_filter(self, fFilter):
         self.m_locals.set_filter(fFilter)
         self.m_globals.set_filter(fFilter)
         self.m_exception.set_filter(fFilter)
 
+
     def get_local_key(self, _stack):
         frame_index = self.m_session_manager.get_frame_index()
         c = _stack.get(rpdb2.DICT_KEY_CODE_LIST, [])
         key = c[-(1 + frame_index)]
         return key        
+
             
     def get_global_key(self, _stack):
         frame_index = self.m_session_manager.get_frame_index()
         s = _stack.get(rpdb2.DICT_KEY_STACK, [])
         key = s[-(1 + frame_index)][0]
         return key
+
             
     def update_namespace(self, _stack):
         key = self.get_local_key(_stack)
@@ -2976,22 +2968,28 @@ class CStackViewer(wx.Panel, CCaptionManager):
         self.SetSizer(_sizerv)
         _sizerv.Fit(self)
 
+
     def set_cursor(self, id):
         cursor = wx.StockCursor(id)
         self.SetCursor(cursor)        
         self.m_stack.SetCursor(cursor)        
 
+
     def _clear(self):
         self.m_stack.DeleteAllItems()
+
 
     def _disable(self):
         self.m_stack.Disable()
 
+
     def _enable(self):
         self.m_stack.Enable()
 
+
     def is_selected(self, index):
         return self.m_stack.IsSelected(index)
+
 
     def update_stack_list(self, st):
         self.m_stack.DeleteAllItems()
@@ -3016,6 +3014,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
         self.m_suppress_recursion += 1
         self.m_stack.Select(0)
 
+
     def select_frame(self, index):
         if self.m_suppress_recursion > 0:
             self.m_suppress_recursion -= 1
@@ -3029,6 +3028,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
             
         self.m_suppress_recursion += 1
         self.m_stack.Select(index)
+
     
     def OnFrameSelected(self, event):
         if self.m_suppress_recursion == 0:
@@ -3070,6 +3070,7 @@ class CHTMLDialog(wx.Dialog):
         sizerv.Fit(self)
         self.CentreOnParent(wx.BOTH)
 
+
     def get_html_text(self, text):
         tl = text.split('\n')
         t = '<br>'.join(tl)
@@ -3082,6 +3083,7 @@ class CListCtrl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
     def __init__(self, *args, **kwargs):
         wx.ListCtrl.__init__(self, *args, **kwargs)
         listmix.ListCtrlAutoWidthMixin.__init__(self)
+
 
     def set_columns_width(self):
         n = self.GetColumnCount()
@@ -3159,6 +3161,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         wx.CallAfter(self.init2)
 
+
     def init2(self):
         pwd = self.m_session_manager.get_password()
         if pwd is not None:
@@ -3178,6 +3181,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         pwd_dialog.Destroy()
         self.Close()
         return
+
                 
     def job_pwd(self, pwd):
         try:
@@ -3186,24 +3190,29 @@ class CAttachDialog(wx.Dialog, CJobs):
             
         except rpdb2.AlreadyAttached:
             pass
+
         
     def set_cursor(self, id):
         cursor = wx.StockCursor(id)
         self.SetCursor(cursor)        
         self.m_listbox_scripts.SetCursor(cursor)        
 
+
     def OnCloseWindow(self, event):
         self.shutdown_jobs()
         self.Destroy()
 
+
     def get_server(self):
         return self.m_server_list[self.m_index]
+
         
     def do_refresh(self, event = None):
         host = self.m_entry_host.GetValue()
         if host == '':
             host = 'localhost'
         self.job_post(self.job_calc_scripts, (host, ), self.update_body)
+
         
     def job_calc_scripts(self, host):
         try:
@@ -3215,6 +3224,7 @@ class CAttachDialog(wx.Dialog, CJobs):
             return
         except socket.gaierror, e:
             return (False, host)
+
 
     def update_body(self, result, host):
         if result == False:
@@ -3254,17 +3264,20 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         self.m_listbox_scripts.set_columns_width()
 
+
     def OnItemSelected(self, event):
         self.m_index = event.m_itemIndex
         self.m_ok.Enable()
 
         event.Skip()
 
+
     def OnItemDeselected(self, event):
         if self.m_listbox_scripts.GetSelectedItemCount() == 0:
             self.m_ok.Disable()
 
         event.Skip()    
+
         
     def OnItemActivated(self, event):
         self.m_index = event.m_itemIndex

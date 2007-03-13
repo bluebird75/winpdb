@@ -2307,7 +2307,7 @@ def calc_suffix(str, n):
 def calc_prefix(str, n):
     """
     Return an n charaters prefix of the argument string of the form
-    'suffix...'.
+    'prefix...'.
     """
     
     if len(str) <= n:
