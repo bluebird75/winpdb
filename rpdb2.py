@@ -6271,10 +6271,10 @@ class CPwdServerProxy:
                 #
                 # Decrypt response.
                 #
-                ((max_index, _r, e), fe)= self.m_crypto.undo_crypto(r, fVerifyIndex = False)
+                ((max_index, _r, _e), fe)= self.m_crypto.undo_crypto(r, fVerifyIndex = False)
                 
-                if e is not None:
-                    raise e
+                if _e is not None:
+                    raise _e
 
             except AuthenticationBadIndex, e:
                 self.m_crypto.set_index(e.m_max_index, e.m_anchor)
