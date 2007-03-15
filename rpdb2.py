@@ -6276,7 +6276,7 @@ class CPwdServerProxy:
                 if _e is not None:
                     raise _e
 
-            except sys.modules['rpdb2'].AuthenticationBadIndex, e:
+            except AuthenticationBadIndex, e:
                 self.m_crypto.set_index(e.m_max_index, e.m_anchor)
                 continue
 

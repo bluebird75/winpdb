@@ -310,6 +310,7 @@ import traceback
 import cStringIO
 import threading
 import xmlrpclib
+import tempfile
 import pickle
 import keyword
 import base64
@@ -407,10 +408,7 @@ SPLITTER_4_POS = "splitter_4_pos"
 
 WINPDB_SIZE_MIN = (640, 480)
 
-SETTINGS_FILENAME_EXT = ".cfg"
-
-WINPDB_SETTINGS_PATH = "winpdb"
-WINPDB_SETTINGS_FILENAME = "winpdb_settings"
+WINPDB_SETTINGS_FILENAME = "winpdb_settings.cfg"
 
 WINPDB_SETTINGS_DEFAULT = {
     WINPDB_SIZE: (800, 600),
@@ -620,60 +618,52 @@ def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
 
 
 class CSettings:
-    def __init__(self, path, filename, default_settings):
-        self.m_path = path
-        self.m_filename = filename
+    def __init__(self, default_settings):
         self.m_dict = default_settings
 
 
     def calc_path(self):
-        if os.name == 'nt' and os.environ.has_key('APPDATA'):
-            app_data = os.environ['APPDATA']
-            path = app_data + '\\' + self.m_path + '\\' + self.m_filename + SETTINGS_FILENAME_EXT
-            return path
-            
-        elif os.name == 'posix':
-            app_data = os.path.expanduser('~')
-            path = app_data + '/.' + self.m_filename
+        if not os.name in ['nt', rpdb2.POSIX]:
+           raise NotImplemented
+
+        if os.name == rpdb2.POSIX:
+            home = os.path.expanduser('~')
+            path = os.path.join(home, '.' + WINPDB_SETTINGS_FILENAME)
             return path
 
-        path = self.m_filename + SETTINGS_FILENAME_EXT        
-        return path
+        if os.name == 'nt':
+            tmpdir = tempfile.gettempdir()
+            path = os.path.join(tmpdir, WINPDB_SETTINGS_FILENAME)
+            return path
 
 
-    def create_path(self):
-        if os.name != 'nt':
-            return
-
-        path = self.calc_path()    
-        folder = os.path.dirname(path)
-        if os.path.isdir(folder):
-            return
-
-        os.mkdir(folder)        
-
-            
     def load_settings(self):
         try:
             path = self.calc_path()
             f = open(path, 'r')
-        except IOError:
+            
+        except (NotImplemented, IOError):
             return 
             
         try:
             d = pickle.load(f)
             self.m_dict.update(d)
+            
         finally:
             f.close()
 
             
     def save_settings(self):
-        self.create_path()
-
-        path = self.calc_path()
-        f = open(path, 'w')
+        try:
+            path = self.calc_path()
+            f = open(path, 'w')
+            
+        except (NotImplemented, IOError):
+            return 
+            
         try:
             pickle.dump(self.m_dict, f)
+            
         finally:
             f.close()
 
@@ -1690,7 +1680,7 @@ class CWinpdbApp(wx.App):
         self.m_fAttach = fAttach
         self.m_fAllowUnencrypted = fAllowUnencrypted
         
-        self.m_settings = CSettings(WINPDB_SETTINGS_PATH, WINPDB_SETTINGS_FILENAME, WINPDB_SETTINGS_DEFAULT)
+        self.m_settings = CSettings(WINPDB_SETTINGS_DEFAULT)
 
         wx.App.__init__(self, redirect = False)
 
