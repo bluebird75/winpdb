@@ -265,7 +265,7 @@ import compiler
 import commands
 import tempfile
 import __main__
-import cPickle
+import pickle
 import httplib
 import os.path
 import socket
@@ -2670,12 +2670,12 @@ class CCrypto:
 
     def __sign(self, s):
         i = self.__get_next_index()
-        _s = cPickle.dumps((self.m_index_anchor_ex, i, self.m_rid, s))
+        _s = pickle.dumps((self.m_index_anchor_ex, i, self.m_rid, s))
         
         h = hmac.new(self.m_key, _s, md5)
         _d = h.digest()
         r = (_d, _s)
-        s_signed = cPickle.dumps(r)
+        s_signed = pickle.dumps(r)
 
         return s_signed
 
@@ -2693,7 +2693,7 @@ class CCrypto:
 
     def __verify_signature(self, s, fVerifyIndex):
         try:
-            r = cPickle.loads(s)
+            r = pickle.loads(s)
             
             (_d, _s) = r
             
@@ -2704,7 +2704,7 @@ class CCrypto:
                 self.__wait_a_little()
                 raise AuthenticationFailure
 
-            (anchor, i, id, s_original) = cPickle.loads(_s)
+            (anchor, i, id, s_original) = pickle.loads(_s)
                 
         except AuthenticationFailure:
             raise
@@ -6276,7 +6276,7 @@ class CPwdServerProxy:
                 if _e is not None:
                     raise _e
 
-            except AuthenticationBadIndex, e:
+            except sys.modules['rpdb2'].AuthenticationBadIndex, e:
                 self.m_crypto.set_index(e.m_max_index, e.m_anchor)
                 continue
 
@@ -7324,7 +7324,7 @@ class CSessionManagerInternal:
         try:
             try:
                 bpl = self.get_breakpoints()
-                sbpl = cPickle.dumps(bpl)
+                sbpl = pickle.dumps(bpl)
                 file.write(sbpl)
 
             except:
@@ -7350,7 +7350,7 @@ class CSessionManagerInternal:
         
         try:
             try:
-                bpl = cPickle.load(file)
+                bpl = pickle.load(file)
                 self.delete_breakpoint([], True)
 
             except:

@@ -310,7 +310,7 @@ import traceback
 import cStringIO
 import threading
 import xmlrpclib
-import cPickle
+import pickle
 import keyword
 import base64
 import socket
@@ -661,7 +661,7 @@ class CSettings:
             return 
             
         try:
-            d = cPickle.load(f)
+            d = pickle.load(f)
             self.m_dict.update(d)
         finally:
             f.close()
@@ -673,7 +673,7 @@ class CSettings:
         path = self.calc_path()
         f = open(path, 'w')
         try:
-            cPickle.dump(self.m_dict, f)
+            pickle.dump(self.m_dict, f)
         finally:
             f.close()
 
