@@ -3,7 +3,7 @@
 
     Setup script for winpdb
 
-    Copyright (C) 2005 Nir Aides
+    Copyright (C) 2005-2007 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
     under the terms of the GNU General Public License as published by the 
@@ -33,7 +33,7 @@ thread support, modifiable namespace, and password secured connections."""
 
 setup(
     name = 'winpdb',
-    version = '1.0.9',
+    version = '1.1.0',
     description = 'An advanced Python debugger.',
     long_description = LONG_DESC,
     author = 'Nir Aides',

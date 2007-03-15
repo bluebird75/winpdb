@@ -5,7 +5,7 @@
 
     A wrapper for winpdb.py
 
-    Copyright (C) 2005 Nir Aides
+    Copyright (C) 2005-2007 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
     under the terms of the GNU General Public License as published by the 

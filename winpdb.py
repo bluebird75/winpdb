@@ -5,7 +5,7 @@
 
     A GUI for rpdb2.py
 
-    Copyright (C) 2005 Nir Aides
+    Copyright (C) 2005-2007 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
     under the terms of the GNU General Public License as published by the 
@@ -26,7 +26,7 @@ ABOUT_NOTICE = """winpdb.py
 
 A GUI for rpdb2.py
 
-Copyright (C) 2005 Nir Aides
+Copyright (C) 2005-2007 Nir Aides
 
 This program is free software; you can redistribute it and/or modify it 
 under the terms of the GNU General Public License as published by the 
@@ -395,8 +395,8 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.0.9"
-WINPDB_VERSION = "WINPDB_1_0_9"
+WINPDB_TITLE = "Winpdb 1.1.0"
+WINPDB_VERSION = "WINPDB_1_1_0"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -1479,14 +1479,17 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def job_launch(self, fchdir, path):
         try:
             self.m_session_manager.launch(fchdir, path)
-            self.m_session_manager.load_breakpoints()
-            return
             
         except (socket.error, rpdb2.CConnectionException):
             pass
         except rpdb2.BadArgument:
             pass
         except IOError:
+            pass
+
+        try:
+            self.m_session_manager.load_breakpoints()
+        except:
             pass
 
 
@@ -1530,6 +1533,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def job_detach(self):    
         try:
             self.m_session_manager.save_breakpoints()
+        except:
+            pass
+
+        try:
             self.m_session_manager.detach()
         except (socket.error, rpdb2.CConnectionException):
             pass
@@ -1542,6 +1549,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def job_stop(self):    
         try:
             self.m_session_manager.save_breakpoints()
+        except:
+            pass
+
+        try:    
             self.m_session_manager.stop_debuggee()
         except (socket.error, rpdb2.CConnectionException):
             pass
@@ -1587,15 +1598,39 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def do_load(self, event):
         try:
             self.m_session_manager.load_breakpoints()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+            return
+
+        except rpdb2.NotAttached:
+            return
+            
+        except rpdb2.NotImplemented:
+            error = rpdb2.STR_NOT_IMPLEMENTED
+        
+        except rpdb2.CException:
+            error = rpdb2.STR_BREAKPOINTS_LOAD_PROBLEM
+            
+        except IOError:
+            error = rpdb2.STR_BREAKPOINTS_NOT_FOUND
+            
+        dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+        dlg.ShowModal()
+        dlg.Destroy()
 
         
     def do_save(self, event):
         try:
             self.m_session_manager.save_breakpoints()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+            return
+            
+        except rpdb2.NotImplemented:
+            error = rpdb2.STR_NOT_IMPLEMENTED
+        
+        except (rpdb2.CException, IOError):
+            error = rpdb2.STR_BREAKPOINTS_SAVE_PROBLEM
+            
+        dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+        dlg.ShowModal()
+        dlg.Destroy()
 
         
     def do_go(self, event):
@@ -3220,7 +3255,7 @@ class CAttachDialog(wx.Dialog, CJobs):
             (self.m_server_list, self.m_errors) = self.m_session_manager.calc_server_list()
             return (True, host)
             
-        except UnsetPassword:
+        except rpdb2.UnsetPassword:
             return
         except socket.gaierror, e:
             return (False, host)
@@ -3580,8 +3615,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_0_9":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_0_9", rpdb2.get_version())
+    if rpdb2.get_version() != "RPDB_2_1_0":
+        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_1_0", rpdb2.get_version())
         return
         
     return rpdb2.main(StartClient)
