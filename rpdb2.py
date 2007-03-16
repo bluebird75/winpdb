@@ -4860,7 +4860,7 @@ class CDebuggerCore:
             if self.m_state_manager.get_state() != STATE_BROKEN:
                 self.set_break_dont_lock()
 
-            if ctx.m_fUnhandledException and not self.m_fUnhandledException:
+            if ctx.m_fUnhandledException and not self.m_fUnhandledException and not 'SCRIPT_TERMINATED' in frame.f_locals:
                 self.m_fUnhandledException = ctx.m_fUnhandledException
                 f_uhe_notification = True
                 
@@ -9188,16 +9188,13 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
     except IOError:
         print 'File', args[0], ' not found.'
 
+    #
+    # Insert script directory in front of file search path
+    #
+    sys.path.insert(0, os.path.dirname(ExpandedFilename))
+
     if fchdir:   
-        #
-        # Insert script directory in front of file search path
-        #
-        sys.path.insert(0, os.path.dirname(ExpandedFilename))
         os.chdir(os.path.dirname(ExpandedFilename))
-    else:
-        cwd = os.getcwd()
-        if cwd not in sys.path:
-            sys.path.insert(0, cwd)
 
     sys.argv = args
 
@@ -9432,6 +9429,8 @@ if __name__=='__main__':
     # type 'help analyze' for more information.
     #
     ret = rpdb2.main()
+
+    SCRIPT_TERMINATED = True
 
     #
     # Debuggee breaks (pauses) here 
