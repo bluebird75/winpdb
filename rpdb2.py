@@ -422,7 +422,7 @@ def settrace():
 
 
 RPDB_VERSION = "RPDB_2_1_0"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_0_9"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_1_0"
 
 
 
@@ -2808,6 +2808,13 @@ class CEventState(CEvent):
 
 
 
+class CEventUnhandledException(CEvent):
+    """
+    Sent when an unhandled exception is hit.
+    """
+
+
+    
 class CEventNamespace(CEvent):
     """
     Namespace has changed. 
@@ -2910,8 +2917,9 @@ class CEventSync(CEvent):
     the state of the debuggee.
     """
     
-    def __init__(self, fException):
+    def __init__(self, fException, fSendUnhandled):
         self.m_fException = fException
+        self.m_fSendUnhandled = fSendUnhandled
     
 
     
@@ -4600,6 +4608,7 @@ class CDebuggerCore:
         self.m_event_dispatcher = CEventDispatcher()
         self.m_state_manager = CStateManager(STATE_RUNNING, self.m_event_dispatcher, event_dispatcher_sync = self.m_event_dispatcher)
 
+        self.m_fUnhandledException = False        
         self.m_fBreak = False
 
         self.m_lastest_event = None
@@ -4844,12 +4853,17 @@ class CDebuggerCore:
             
         ctx.m_fBroken = True
         f_full_notification = False
+        f_uhe_notification = False
         
         try: 
             self.m_state_manager.acquire()
             if self.m_state_manager.get_state() != STATE_BROKEN:
                 self.set_break_dont_lock()
-            
+
+            if ctx.m_fUnhandledException and not self.m_fUnhandledException:
+                self.m_fUnhandledException = ctx.m_fUnhandledException
+                f_uhe_notification = True
+                
             if self.m_f_first_to_break or (self.m_current_ctx == ctx):                
                 self.m_current_ctx = ctx
                 self.m_lastest_event = event
@@ -4872,9 +4886,12 @@ class CDebuggerCore:
             self.notify_thread_broken(ctx.m_thread_id)
             self.notify_namespace()
 
+        if f_uhe_notification:
+            self.send_unhandled_exception_event()
+            
         state = self.m_state_manager.wait_for_state([STATE_RUNNING])
         
-        ctx.m_fUnhandledException = False        
+        ctx.m_fUnhandledException = False
         ctx.m_fBroken = False 
         ctx.set_tracers()
 
@@ -4976,6 +4993,7 @@ class CDebuggerCore:
                 
             self.verify_broken()
 
+            self.m_fUnhandledException = False
             self.m_state_manager.set_state(STATE_RUNNING, fLock = False)
             self.set_break_flag()
 
@@ -5025,6 +5043,7 @@ class CDebuggerCore:
             except NoThreads:
                 return
                 
+            self.m_fUnhandledException = False
             self.m_step_tid = ctx.m_thread_id
             self.m_next_frame = None
             self.m_return_frame = None       
@@ -5054,6 +5073,7 @@ class CDebuggerCore:
             if self.m_lastest_event in ['return', 'exception']:
                 return self.request_step(fLock = False)
 
+            self.m_fUnhandledException = False
             self.m_next_frame = ctx.m_frame
             self.m_return_frame = None
             
@@ -5081,6 +5101,7 @@ class CDebuggerCore:
             if self.m_lastest_event == 'return':
                 return self.request_step(fLock = False)
                 
+            self.m_fUnhandledException = False
             self.m_next_frame = None
             self.m_return_frame = ctx.m_frame
 
@@ -5166,6 +5187,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventNoThreads: {},
             CEventThreadBroken: {},
             CEventNamespace: {},
+            CEventUnhandledException: {},
             CEventStack: {},
             CEventExit: {}
             }
@@ -5195,7 +5217,7 @@ class CDebuggerEngine(CDebuggerCore):
         time.sleep(1.0)
 
         
-    def sync_with_events(self, fException):
+    def sync_with_events(self, fException, fSendUnhandled):
         """
         Send debugger state to client.
         """
@@ -5204,7 +5226,7 @@ class CDebuggerEngine(CDebuggerCore):
             self.wait_for_first_thread()
         
         index = self.m_event_queue.get_event_index()
-        event = CEventSync(fException)
+        event = CEventSync(fException, fSendUnhandled)
         self.m_event_dispatcher.fire_event(event)
         return index
 
@@ -5298,8 +5320,10 @@ class CDebuggerEngine(CDebuggerCore):
         
         if isinstance(event, CEventSync):
             fException = event.m_fException
+            fSendUnhandled = event.m_fSendUnhandled
         else:
             fException = False
+            fSendUnhandled = False
 
         try:
             self.send_stack_depth()
@@ -5307,6 +5331,9 @@ class CDebuggerEngine(CDebuggerCore):
             self.send_stack_event(fException)
             self.send_namespace_event()
 
+            if fSendUnhandled and self.m_fUnhandledException:
+                self.send_unhandled_exception_event()
+            
         except NoThreads:
             self.send_no_threads_event()
             
@@ -5314,7 +5341,12 @@ class CDebuggerEngine(CDebuggerCore):
             print_debug()
             raise
 
-    
+
+    def send_unhandled_exception_event(self):
+        event = CEventUnhandledException()
+        self.m_event_dispatcher.fire_event(event)
+
+        
     def send_stack_depth(self):
         """
         Send event with stack depth and exception stack depth.
@@ -6507,8 +6539,8 @@ class CDebuggeeServer(CIOServer):
         si = CServerInfo(age, self.m_port, self.m_pid, self.m_filename, self.m_rid, state)
         return si
 
-    def export_sync_with_events(self, fException):
-        ei = self.m_debugger.sync_with_events(fException)
+    def export_sync_with_events(self, fException, fSendUnhandled):
+        ei = self.m_debugger.sync_with_events(fException, fSendUnhandled)
         return ei
 
     def export_wait_for_event(self, timeout, event_index):
@@ -7138,7 +7170,7 @@ class CSessionManagerInternal:
         
         self.m_server_info = self.get_server_info()
 
-        self.refresh()
+        self.refresh(True)
         self.__start_event_monitor()
 
         self.request_break()
@@ -7164,10 +7196,10 @@ class CSessionManagerInternal:
             raise DebuggerNotBroken
 
     
-    def refresh(self):
+    def refresh(self, fSendUnhandled = False):
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        self.m_remote_event_index = self.getSession().getProxy().sync_with_events(fAnalyzeMode)
+        self.m_remote_event_index = self.getSession().getProxy().sync_with_events(fAnalyzeMode, fSendUnhandled)
         self.m_breakpoints_proxy.sync()
 
         
@@ -9389,9 +9421,7 @@ def main(StartClient_func = StartClient):
     return 0
 
 
-#
-# When invoked as main program, invoke the debugger on a script
-#
+
 if __name__=='__main__':
     import rpdb2
 

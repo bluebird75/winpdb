@@ -349,6 +349,7 @@ DISABLED = False
 
 WINPDB_WILDCARD = "Python source (*.py)|*.py|All files (*.*)|*.*"
 
+MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you like to analyze it?"
 MSG_WARNING_TITLE = "Warning"
 MSG_ERROR_TITLE = "Error"
 MSG_ERROR_HOST_TEXT = "Host '%s' not found."
@@ -1155,6 +1156,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         event_type_dict = {rpdb2.CEventNamespace: {}}
         self.m_session_manager.register_callback(self.update_namespace, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {rpdb2.CEventUnhandledException: {}}
+        self.m_session_manager.register_callback(self.update_unhandled_exception, event_type_dict, fSingleUse = False)
+
         event_type_dict = {rpdb2.CEventThreadBroken: {}}
         self.m_session_manager.register_callback(self.update_thread_broken, event_type_dict, fSingleUse = False)
 
@@ -1294,7 +1298,26 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def update_namespace(self, event):
         wx.CallAfter(self.m_namespace_viewer.update_namespace, self.m_stack)
 
+
+    def update_unhandled_exception(self, event):
+        wx.CallAfter(self.notify_unhandled_exception)
+
+
+    def notify_unhandled_exception(self):
+        dlg = wx.MessageDialog(self, MSG_WARNING_UNHANDLED_EXCEPTION, MSG_WARNING_TITLE, wx.YES_NO | wx.YES_DEFAULT | wx.ICON_QUESTION)
+        res = dlg.ShowModal()
+        dlg.Destroy()
+
+        if res != wx.ID_YES:
+            return
+
+        try:
+            self.m_session_manager.set_analyze(True)
+
+        except (socket.error, rpdb2.CException):
+            pass    
         
+    
     def do_filter(self, event):
         f = event.IsChecked()
         self.m_namespace_viewer.set_filter(f)
