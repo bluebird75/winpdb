@@ -1219,13 +1219,6 @@ class CException(Exception):
 
 
 
-class NotImplemented(Exception):
-    """
-    Feature not implemented on this platform.
-    """
-
-    
-    
 class InvalidScopeName(CException):
     """
     Invalid scope name.
@@ -1480,7 +1473,6 @@ STR_OUTPUT_WARNING_ASYNC = "The operation will continue to run in the background
 STR_ANALYZE_GLOBALS_WARNING = "In analyze mode the globals and locals dictionaries are read only."
 STR_GLOBALS_WARNING = "Any changes made to the globals dictionay at this frame will be discarded."
 STR_BREAKPOINTS_LOADED = "Breakpoints were loaded."
-STR_NOT_IMPLEMENTED = "This feature is not available on this platform."
 STR_BREAKPOINTS_SAVED = "Breakpoints were saved."
 STR_BREAKPOINTS_SAVE_PROBLEM = "A problem occured while saving the breakpoints."
 STR_BREAKPOINTS_LOAD_PROBLEM = "A problem occured while loading the breakpoints."
@@ -2398,19 +2390,21 @@ def calc_bpl_filename(filename):
         path = os.path.join(bpldir, tmp_filename)
         return path + BREAKPOINTS_FILE_EXT
 
-    if os.name == 'nt':
-        tmpdir = tempfile.gettempdir()
-        bpldir = os.path.join(tmpdir, RPDB_BPL_FOLDER_NT)
+    tmpdir = tempfile.gettempdir()
+    bpldir = os.path.join(tmpdir, RPDB_BPL_FOLDER_NT)
 
-        if not os.path.exists(bpldir):
+    if not os.path.exists(bpldir):
+        try:
             os.mkdir(bpldir, 0700)
-        else:    
-            cleanup_bpl_folder(bpldir)
-            
-        path = os.path.join(bpldir, tmp_filename)
-        return path + BREAKPOINTS_FILE_EXT
-    
-    raise NotImplemented
+        except:
+            print_debug()
+            raise CException
+
+    else:    
+        cleanup_bpl_folder(bpldir)
+        
+    path = os.path.join(bpldir, tmp_filename)
+    return path + BREAKPOINTS_FILE_EXT
     
 
     
@@ -6985,6 +6979,7 @@ class CSessionManagerInternal:
             try:
                 self.save_breakpoints()
             except:
+                print_debug()
                 pass
                 
             self.stop_debuggee()
@@ -7349,8 +7344,7 @@ class CSessionManagerInternal:
         if module_name[:1] == '<':
             return
 
-        path = calc_bpl_filename(module_name + filename)
-            
+        path = calc_bpl_filename(module_name + filename)            
         file = open(path, 'wb')
 
         try:
@@ -7374,8 +7368,7 @@ class CSessionManagerInternal:
         if module_name[:1] == '<':
             return
 
-        path = calc_bpl_filename(module_name + filename)
-                            
+        path = calc_bpl_filename(module_name + filename)                            
         file = open(path, 'rb')
 
         ferror = False
@@ -7946,6 +7939,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         try:
             self.m_session_manager.save_breakpoints()
         except:
+            print_debug()
             pass
 
         try:    
@@ -8238,10 +8232,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except NotAttached:
             self.printer(STR_NOT_ATTACHED)
             
-        except NotImplemented:
-            self.printer(STR_NOT_IMPLEMENTED)
-        
-        except (CException, IOError):
+        except (socket.error, CException, IOError):
             self.printer(STR_BREAKPOINTS_SAVE_PROBLEM)
             
         
@@ -8254,10 +8245,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except NotAttached:
             self.printer(STR_NOT_ATTACHED)
             
-        except NotImplemented:
-            self.printer(STR_NOT_IMPLEMENTED)
-        
-        except CException:
+        except (socket.error, CException):
             self.printer(STR_BREAKPOINTS_LOAD_PROBLEM)
             
         except IOError:
@@ -8616,6 +8604,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         try:
             self.m_session_manager.save_breakpoints()
         except:
+            print_debug()
             pass
 
         try:    

@@ -626,18 +626,14 @@ class CSettings:
 
 
     def calc_path(self):
-        if not os.name in ['nt', rpdb2.POSIX]:
-           raise NotImplemented
-
         if os.name == rpdb2.POSIX:
             home = os.path.expanduser('~')
             path = os.path.join(home, '.' + WINPDB_SETTINGS_FILENAME)
             return path
 
-        if os.name == 'nt':
-            tmpdir = tempfile.gettempdir()
-            path = os.path.join(tmpdir, WINPDB_SETTINGS_FILENAME)
-            return path
+        tmpdir = tempfile.gettempdir()
+        path = os.path.join(tmpdir, WINPDB_SETTINGS_FILENAME)
+        return path
 
 
     def load_settings(self):
@@ -645,7 +641,7 @@ class CSettings:
             path = self.calc_path()
             f = open(path, 'r')
             
-        except (NotImplemented, IOError):
+        except IOError:
             return 
             
         try:
@@ -661,7 +657,7 @@ class CSettings:
             path = self.calc_path()
             f = open(path, 'w')
             
-        except (NotImplemented, IOError):
+        except IOError:
             return 
             
         try:
@@ -1623,10 +1619,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         except rpdb2.NotAttached:
             return
             
-        except rpdb2.NotImplemented:
-            error = rpdb2.STR_NOT_IMPLEMENTED
-        
-        except rpdb2.CException:
+        except (socket.error, rpdb2.CException):
             error = rpdb2.STR_BREAKPOINTS_LOAD_PROBLEM
             
         except IOError:
@@ -1642,10 +1635,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_session_manager.save_breakpoints()
             return
             
-        except rpdb2.NotImplemented:
-            error = rpdb2.STR_NOT_IMPLEMENTED
-        
-        except (rpdb2.CException, IOError):
+        except rpdb2.NotAttached:
+            return
+            
+        except (socket.error, rpdb2.CException, IOError):
             error = rpdb2.STR_BREAKPOINTS_SAVE_PROBLEM
             
         dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
