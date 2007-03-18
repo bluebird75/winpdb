@@ -1029,8 +1029,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         #
         # Force 'Left to Right' as long as internationalization is not supported.
+        # Not available on wxPython 2.6
         #
-        self.SetLayoutDirection(1)
+        if hasattr(self, 'SetLayoutDirection'):
+            self.SetLayoutDirection(1)
         
         self.Maximize(settings[WINPDB_MAXIMIZE])
         
@@ -1794,8 +1796,10 @@ class CStyledViewer(stc.StyledTextCtrl):
 
         #
         # Force Left to Right since CStyledViewer is broken for Right to Left.
+        # Not available on wxPython 2.6
         #
-        self.SetLayoutDirection(1)
+        if hasattr(self, 'SetLayoutDirection'):
+            self.SetLayoutDirection(1)
 
         self.SetLexer(stc.STC_LEX_PYTHON)
         self.SetKeyWords(0, " ".join(keyword.kwlist))
