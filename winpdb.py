@@ -704,7 +704,7 @@ class CMenuBar:
                     parent_label = sc[i - 1]
                     parent = self.m_cascades[parent_label]
                     child = wx.Menu()
-
+                    
                     if parent_label == ML_ROOT:
                         parent.Append(child, e)
                     else:
@@ -1024,6 +1024,11 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         wx.Frame.__init__(self, None, -1, WINPDB_TITLE, size = settings[WINPDB_SIZE],
                           style = wx.DEFAULT_FRAME_STYLE | wx.NO_FULL_REPAINT_ON_RESIZE)
 
+        #
+        # Force 'Left to Right' as long as internationalization is not supported.
+        #
+        self.SetLayoutDirection(1)
+        
         self.Maximize(settings[WINPDB_MAXIMIZE])
         
         self.m_session_manager = session_manager
@@ -1783,7 +1788,12 @@ class CStyledViewer(stc.StyledTextCtrl):
         self.m_margin_command = kwargs.pop('margin_command', None)
 
         stc.StyledTextCtrl.__init__(self, *args, **kwargs)
-        
+
+        #
+        # Force Left to Right since CStyledViewer is broken for Right to Left.
+        #
+        self.SetLayoutDirection(1)
+
         self.SetLexer(stc.STC_LEX_PYTHON)
         self.SetKeyWords(0, " ".join(keyword.kwlist))
 
