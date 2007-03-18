@@ -1069,7 +1069,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/1/" + ML_BREAKPOINTS + "/3/" + ML_CLEAR: {COMMAND: self.do_clear, TOOLTIP: CLEAR_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/4/" + ML_LOAD: {COMMAND: self.do_load, TOOLTIP: LOAD_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/5/" + ML_SAVE: {COMMAND: self.do_save, TOOLTIP: SAVE_TIP}, 
-            "/2/" + ML_CONTROL + "/0/" + ML_ANALYZE: {COMMAND: self.do_analyze}, 
+            "/2/" + ML_CONTROL + "/0/" + ML_ANALYZE: {COMMAND: self.do_analyze_menu}, 
             "/2/" + ML_CONTROL + "/1/" + ML_BREAK: {COMMAND: self.do_break}, 
             "/2/" + ML_CONTROL + "/2/" + ML_GO: {COMMAND: self.do_go}, 
             "/2/" + ML_CONTROL + "/3/" + ML_NEXT: {COMMAND: self.do_next}, 
@@ -1295,12 +1295,18 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #----------------------------------------------------
     #
 
+    def do_analyze_menu(self, event):
+        state = self.m_session_manager.get_state()
+        f = (state != rpdb2.STATE_ANALYZE)
+
+        try:
+            self.m_session_manager.set_analyze(f)
+        except (socket.error, rpdb2.CConnectionException):
+            pass    
+
+
     def do_analyze(self, event):
-        if isinstance(event.EventObject, wx._controls.ToolBar):
-            f = event.IsChecked()
-        else:
-            state = self.m_session_manager.get_state()
-            f = (state != rpdb2.STATE_ANALYZE)
+        f = event.IsChecked()
 
         try:
             self.m_session_manager.set_analyze(f)
