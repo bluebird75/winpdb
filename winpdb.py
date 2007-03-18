@@ -37,7 +37,10 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of 
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 
-See the GNU General Public License for more details."""
+See the GNU General Public License for more details.
+
+Credits:
+Jurjen N.E. Bos - Compatibility with OS X."""
 
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it 

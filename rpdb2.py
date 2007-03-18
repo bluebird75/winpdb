@@ -24,6 +24,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 COPYRIGHT_NOTICE = """Copyright (C) 2005-2007 Nir Aides"""
 
+CREDITS_NOTICE = """Jurjen N.E. Bos - Compatibility with OS X."""
+
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it 
 under the terms of the GNU General Public License as published by the 
@@ -1456,7 +1458,7 @@ CONSOLE_PROMPT = '\n> '
 CONSOLE_PROMPT_ANALYZE = '\nAnalayze> '
 CONSOLE_INTRO = ("""RPDB - The Remote Python Debugger, version %s,
 Copyright (C) 2005-2007 Nir Aides.
-Type "help", "copyright", "license" for more information.""" % (RPDB_VERSION))
+Type "help", "copyright", "license", "credits" for more information.""" % (RPDB_VERSION))
 
 PRINT_NOTICE_PROMPT = "Hit Return for more, or q (and Return) to quit:"
 PRINT_NOTICE_LINES_PER_SECTION = 20
@@ -8638,6 +8640,10 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.print_notice(LICENSE_NOTICE + COPY_OF_THE_GPL_LICENSE)
 
 
+    def do_credits(self, arg):
+        self.print_notice(CREDITS_NOTICE)
+
+
     def do_help(self, arg):
         cmd.Cmd.do_help(self, arg)
 
@@ -8696,21 +8702,28 @@ License:
 ----------------
 
 copyright   - Print copyright notice.
-license     - Print license."""
+license     - Print license.
+credits     - Print credits information."""
 
             self.print_notice(help_notice)
 
         
-    def help_copyright(self, arg):
+    def help_copyright(self):
         print >> self.stdout, """copyright
 
 Print copyright notice."""  
 
 
-    def help_license(self, arg):
+    def help_license(self):
         print >> self.stdout, """license
 
 Print license."""  
+
+
+    def help_credits(self):
+        print >> self.stdout, """credits
+
+Print credits information."""  
 
 
     def help_help(self):
