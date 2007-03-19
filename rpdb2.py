@@ -1568,7 +1568,8 @@ STATE_DISABLED = 'disabled'
 BREAKPOINTS_FILE_EXT = '.bpl'
 PYTHON_FILE_EXTENSION = '.py'
 PYTHONW_FILE_EXTENSION = '.pyw'
-PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo']
+PYTHONW_SO_EXTENSION = '.so'
+PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo', '.so']
 
 MODULE_SCOPE = '?'
 MODULE_SCOPE2 = '<module>'
@@ -1664,6 +1665,8 @@ g_traceback_lock = threading.RLock()
 # Filename to Source-lines dictionary of blender Python scripts.
 #
 g_blender_text = {}
+
+g_initial_cwd = []
 
 
 
@@ -1783,33 +1786,37 @@ def split_path(path):
     return (_path, filename)
 
 
+
 def calc_frame_path(frame):
     filename = frame.f_code.co_filename
-
+    
     if filename.startswith('<'):
         return filename
-    
-    basename = os.path.basename(filename)
 
-    if basename != filename:
-        path = filename
+    if os.path.isabs(filename):
+        abspath = my_abspath(filename)
+        lowered = winlower(abspath)        
+        return lowered
         
-    elif hasattr(frame.f_globals, '__file__'):  
-        globals_file = frame.f_globals['__file__']
+    globals_file = frame.f_globals.get('__file__', None)
+    
+    if globals_file != None and os.path.isabs(globals_file):    
         dirname = os.path.dirname(globals_file)
-        path = os.path.join(dirname, basename)
-        
-    else:
-        try:
-            path = FindFile(filename, fModules = True)
+        basename = os.path.basename(filename)
+        path = os.path.join(dirname, basename)        
+        abspath = my_abspath(path)
+        lowered = winlower(abspath)        
+        return lowered
 
-        except IOError:
-            path = filename
+    try:
+        abspath = FindFile(filename, fModules = True)
+        lowered = winlower(abspath)    
+        return lowered
+
+    except IOError:
+        lowered = winlower(filename)    
+        return lowered
         
-    abspath = my_abspath(path)
-    lowered = winlower(abspath)
-    
-    return lowered
             
 
 def my_abspath(path):
@@ -1883,6 +1890,10 @@ def CalcScriptName(filename, fAllowAnyExt = True):
     if filename.endswith(PYTHONW_FILE_EXTENSION):
         return filename
         
+    if filename.endswith(PYTHONW_SO_EXTENSION):
+        scriptname = filename[:-3] + PYTHON_FILE_EXTENSION
+        return scriptname
+
     if filename[:-1].endswith(PYTHON_FILE_EXTENSION):
         scriptname = filename[:-1]
         return scriptname
@@ -1894,6 +1905,83 @@ def CalcScriptName(filename, fAllowAnyExt = True):
         
     return scriptname
         
+
+
+def FindModuleDir(module_name):
+    if module_name == '':
+        raise IOError
+        
+    module_family = module_name.rsplit('.', 1)
+    if len(module_family) == 1:
+        module_family.insert(0, '')        
+    
+    (parent, child) = module_family
+    
+    m = sys.modules[module_name]
+    
+    if not hasattr(m, '__file__') or m.__file__ == None:
+        parent_dir = FindModuleDir(parent)
+        module_dir = os.path.join(parent_dir, winlower(child))
+        return module_dir
+
+    if not os.path.isabs(m.__file__):
+        parent_dir = FindModuleDir(parent)
+        module_dir = os.path.join(parent_dir, winlower(child))
+        return module_dir        
+        
+    (root, ext) = os.path.splitext(m.__file__)
+    if root.endswith('__init__'):
+        root = os.path.dirname(root)
+    
+    abspath = my_abspath(root)
+    lowered = winlower(abspath)
+
+    return lowered
+    
+
+    
+def FindFileAsModule(filename):
+    lowered = winlower(filename)
+    (root, ext) = os.path.splitext(lowered)
+    
+    root_dotted = root.replace('\\', '.').replace('/', '.').replace(':', '.')
+
+    match_list = []    
+    for (module_name, m) in sys.modules.items():
+        lowered_module_name = winlower(module_name)
+        if (root_dotted + '.').startswith(lowered_module_name + '.'):
+            match_list.append((len(module_name), module_name))
+
+            if lowered_module_name == root_dotted:
+                break
+
+    match_list.sort(reverse = True)
+    
+    for (matched_len, matched_module) in match_list:
+        try:
+            module_dir = FindModuleDir(matched_module)
+        except IOError:
+            continue
+        
+        suffix = root[matched_len:]        
+        if suffix == '':
+            path = module_dir + ext
+        else:    
+            path = os.path.join(module_dir, suffix.strip('\\')) + ext
+        
+        scriptname = CalcScriptName(path, fAllowAnyExt = False)
+        if os.path.isfile(scriptname):
+            return scriptname
+
+        #
+        # Check .pyw files
+        #
+        scriptname += 'w'
+        if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
+            return scriptname
+        
+    raise IOError
+
 
 
 def FindFile(
@@ -1921,99 +2009,62 @@ def FindFile(
     if filename.startswith('<'):
         raise IOError
         
-    filename = winlower(filename.strip('\'"'))
+    filename = filename.strip('\'"')
 
-    if fModules:
-        #
-        # Check if the filename matches any of the loaded modules.
-        #
-        
-        filename_dotted = filename.replace('\\', '.')
-        filename_dotted = filename_dotted.replace('/', '.')
-        filename_dotted = filename_dotted.replace(':', '.')
-
-        for (k, m) in sys.modules.items():
-            if not hasattr(m, '__file__'):
-                continue
-
-            #
-            # Check if the module name ends the filename.
-            #
-            s = filename_dotted.split(winlower(k))
-            if (len(s) != 2) or (not s[1] in PYTHON_EXT_LIST + ['']): 
-                continue
-            
-            module_filename = CalcScriptName(m.__file__, fAllowAnyExt = True)
-            module_filename_lower = winlower(module_filename)
-            module_abs_path = my_abspath(module_filename_lower)
-
-            if os.path.isfile(module_abs_path):
-                filename_no_ext = os.path.splitext(filename)[0]
-                s = module_abs_path.split(filename_no_ext)
-                if (len(s) == 2) and (s[1] in PYTHON_EXT_LIST + ['']): 
-                    return module_abs_path
-
-            #
-            # Check .pyw files
-            #
-            module_abs_path += 'w'
-            if (module_abs_path.endswith(PYTHONW_FILE_EXTENSION)
-                and os.path.isfile(module_abs_path)):
-                filename_no_ext = os.path.splitext(filename)[0]
-                s = module_abs_path.split(filename_no_ext)
-                if (len(s) == 2) and (s[1] == PYTHONW_FILE_EXTENSION): 
-                    return module_abs_path
-                    
+    if fModules and not (os.path.isabs(filename) or filename.startswith('.')):
+        try:    
+            return FindFileAsModule(filename)
+        except IOError:
+            pass
                 
     if fAllowAnyExt:
         try:
-            abs_path = FindFile(
+            abspath = FindFile(
                             filename, 
                             sources_paths, 
-                            fModules, 
+                            fModules = False, 
                             fAllowAnyExt = False
                             )
-            return abs_path
+            return abspath
         except IOError:
             pass
 
-    script_filename = CalcScriptName(filename, fAllowAnyExt)
+    if os.path.isabs(filename) or filename.startswith('.'):
+        abspath = my_abspath(filename)
+        lowered = winlower(abspath)
+        scriptname = CalcScriptName(lowered, fAllowAnyExt)
         
-    if os.path.dirname(script_filename) != '':
-        abs_path = my_abspath(script_filename)
-
-        if os.path.isfile(abs_path):
-            return abs_path
+        if os.path.isfile(scriptname):
+            return scriptname
 
         #
         # Check .pyw files
         #
-        abs_path += 'w'
-        if (abs_path.endswith(PYTHONW_FILE_EXTENSION)
-            and os.path.isfile(abs_path)):
-            return abs_path
+        scriptname += 'w'
+        if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
+            return scriptname
         
         raise IOError
 
+    scriptname = CalcScriptName(filename, fAllowAnyExt)
     cwd = os.getcwd()
-    path = os.environ['PATH']
-    paths = sources_paths + [cwd] + sys.path + path.split(os.pathsep)
-    #norm_filename = os.path.normpath(script_filename)
+    env_path = os.environ['PATH']
+    paths = sources_paths + [cwd] + g_initial_cwd + sys.path + env_path.split(os.pathsep)
     
     for p in paths:
-        f = os.path.join(p, script_filename)
-        abs_path = my_abspath(f)
+        f = os.path.join(p, scriptname)
+        abspath = my_abspath(f)
+        lowered = winlower(abspath)
         
-        if os.path.isfile(abs_path):
-            return abs_path
+        if os.path.isfile(lowered):
+            return lowered
 
         #
         # Check .pyw files
         #
-        abs_path += 'w'
-        if (abs_path.endswith(PYTHONW_FILE_EXTENSION)
-            and os.path.isfile(abs_path)):
-            return abs_path
+        lowered += 'w'
+        if lowered.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(lowered):
+            return lowered
 
     raise IOError
 
@@ -5494,6 +5545,8 @@ class CDebuggerEngine(CDebuggerCore):
 
             path_dict[path] = winlower(expanded_path)                   
         
+            #print >> sys.__stderr__, path, path_dict[path]
+                
         __s = [(path_dict[a], b, c, d) for (a, b, c, d) in s]
 
         if (ctx.m_uef_lineno is not None) and (len(__s) > 0):
@@ -9150,6 +9203,7 @@ def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDe
     global g_server
     global g_debugger
     global g_fDebug
+    global g_initial_cwd
 
     try:
         g_server_lock.acquire()
@@ -9168,7 +9222,10 @@ def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDe
         
         f = sys._getframe(2)
         filename = calc_frame_path(f)
-        
+
+        if sys.path[0] == '':
+            g_initial_cwd = [os.getcwd()]
+            
         g_debugger = CDebuggerEngine()
 
         g_server = CDebuggeeServer(filename, g_debugger, pwd, fAllowUnencrypted, fAllowRemote)
