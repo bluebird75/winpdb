@@ -634,6 +634,11 @@ class CSettings:
             path = os.path.join(home, '.' + WINPDB_SETTINGS_FILENAME)
             return path
 
+        #
+        # gettempdir() is used since it works with unicode user names on 
+        # Windows.
+        #
+        
         tmpdir = tempfile.gettempdir()
         path = os.path.join(tmpdir, WINPDB_SETTINGS_FILENAME)
         return path
@@ -1301,7 +1306,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         try:
             self.m_session_manager.set_analyze(f)
-        except (socket.error, rpdb2.CConnectionException):
+        except (socket.error, rpdb2.CException):
             pass    
 
 
@@ -1310,7 +1315,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         try:
             self.m_session_manager.set_analyze(f)
-        except (socket.error, rpdb2.CConnectionException):
+        except (socket.error, rpdb2.CException):
             pass    
 
     

@@ -2440,13 +2440,21 @@ def calc_bpl_filename(filename):
         home = os.path.expanduser('~')
         bpldir = os.path.join(home, RPDB_BPL_FOLDER)
         cleanup_bpl_folder(bpldir)
-        path = os.path.join(bpldir, tmp_filename)
-        return path + BREAKPOINTS_FILE_EXT
+        path = os.path.join(bpldir, tmp_filename) + BREAKPOINTS_FILE_EXT
+        return path
 
+    #
+    # gettempdir() is used since it works with unicode user names on 
+    # Windows.
+    #
+        
     tmpdir = tempfile.gettempdir()
     bpldir = os.path.join(tmpdir, RPDB_BPL_FOLDER_NT)
 
     if not os.path.exists(bpldir):
+        #
+        # Folder creation is done here since this is a temp folder.
+        #
         try:
             os.mkdir(bpldir, 0700)
         except:
@@ -2456,8 +2464,8 @@ def calc_bpl_filename(filename):
     else:    
         cleanup_bpl_folder(bpldir)
         
-    path = os.path.join(bpldir, tmp_filename)
-    return path + BREAKPOINTS_FILE_EXT
+    path = os.path.join(bpldir, tmp_filename) + BREAKPOINTS_FILE_EXT
+    return path
     
 
     
@@ -2857,7 +2865,8 @@ class CEventState(CEvent):
 
 class CEventUnhandledException(CEvent):
     """
-    Sent when an unhandled exception is hit.
+    Unhandled Exception 
+    Sent when an unhandled exception is caught.
     """
 
 
@@ -4908,7 +4917,7 @@ class CDebuggerCore:
                 self.set_break_dont_lock()
 
             if ctx.m_fUnhandledException and not self.m_fUnhandledException and not 'SCRIPT_TERMINATED' in frame.f_locals:
-                self.m_fUnhandledException = ctx.m_fUnhandledException
+                self.m_fUnhandledException = True
                 f_uhe_notification = True
                 
             if self.m_f_first_to_break or (self.m_current_ctx == ctx):                
@@ -5090,7 +5099,6 @@ class CDebuggerCore:
             except NoThreads:
                 return
                 
-            self.m_fUnhandledException = False
             self.m_step_tid = ctx.m_thread_id
             self.m_next_frame = None
             self.m_return_frame = None       
@@ -5120,7 +5128,6 @@ class CDebuggerCore:
             if self.m_lastest_event in ['return', 'exception']:
                 return self.request_step(fLock = False)
 
-            self.m_fUnhandledException = False
             self.m_next_frame = ctx.m_frame
             self.m_return_frame = None
             
@@ -5148,7 +5155,6 @@ class CDebuggerCore:
             if self.m_lastest_event == 'return':
                 return self.request_step(fLock = False)
                 
-            self.m_fUnhandledException = False
             self.m_next_frame = None
             self.m_return_frame = ctx.m_frame
 
@@ -7437,6 +7443,9 @@ class CSessionManagerInternal:
                 print_debug()
                 raise CException
 
+            #
+            # No Breakpoints were found in file.
+            #
             if filename == '' and len(bpl.values()) == 0:
                 raise IOError
                 
@@ -9223,6 +9232,10 @@ def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDe
         f = sys._getframe(2)
         filename = calc_frame_path(f)
 
+        #
+        # This is an attempt to address the Python problem of recording only
+        # relative paths in __file__ members of modules in the following case.
+        #
         if sys.path[0] == '':
             g_initial_cwd = [os.getcwd()]
             
