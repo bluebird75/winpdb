@@ -352,6 +352,7 @@ DISABLED = False
 
 WINPDB_WILDCARD = "Python source (*.py)|*.py|All files (*.*)|*.*"
 
+MSG_WARNING_TRAP = "Are you sure that you want to disable the trapping of unhandled exceptions? If you click Yes unhandled exceptions will not be caught."
 MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you like to analyze it?"
 MSG_WARNING_TITLE = "Warning"
 MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in the future."
@@ -481,10 +482,11 @@ TB_BREAK = "Break"
 TB_STEP = "Step"
 TB_NEXT = "Next"
 TB_RETURN = "Return"
-TB_GOTO = "Run to Cursor"
+TB_GOTO = "Run to cursor"
 TB_TOGGLE_BP = "Toggle breakpoint."
 TB_FILTER = "Filter modules, classes, and functions from the global and local namespaces."
-TB_EXCEPTION = "Analyze Exception."
+TB_EXCEPTION = "Analyze exception."
+TB_TRAP = "Trap unhandled exceptions."
 
 COMMAND = "command"
 TOOLTIP = "tooltip"
@@ -531,6 +533,7 @@ BASE64_UNLOCKED = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTA
 
 BASE64_FILTER = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAZElEQVR42u3UsQlAIQwE0Is4kvtv4Ez5hY2KmDN8xCLXiATeWQSByO3IdNc/vTxP9ZCvtZ2l2C9vvrpgYXCqwIJ3+LaAgS18WcDCDD4UnMAAkJj1ko5hYRZ3J3D3tqz+HEHkyXxoxx+Czcym0QAAAABJRU5ErkJggg=="
 BASE64_EXCEPTION = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAABZklEQVR42u2UsWrCQBzGv+RKRaMgXmzPXbqESBbXUskTqIODm4/hU7j4BA4+hEhKQVyFEJDiXtsqpjWgWDQdLFdbLiTSli5+U+6f//3ug/v+B5wkkBSlSdP6/vea45jSj+C6bvmEEDCWQzKZ4nXPW2I6fcB2u4Vtl6Sj4bp+66tqFpTSwMPn8zlms2fY9o2QIwc5DgMDAKUUqpqFrlu+6P+ZqEgI4WBZBmq1JEwzjkRCguNs0G6/wnV3/IDFYo5IzjWt7zOW4+tyWUGloqDTWaLVeoFhxNBopL7sYSwnvHSh88PLM804AGAwWEP+sFIonAf2h8IPlcnsid3uJa8pihwp56Fw192BUoJ6/RGbzXFDJLTgeUv+bVkrAECxGAMhAGMEzWY6sD8054Zx5+fzVzwt1aqCUimOdFrGePyG4XCNXm/F+yeTe4xG11Ik+D7nF6E5/xykJ+Gk/umE/s/b8huv4klCvQMz8oLsLpAhfwAAAABJRU5ErkJggg=="
+BASE64_TRAP = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA\nB3RJTUUH1wMWBzIMELT6ewAAAixJREFUeNrNlVtIkwEUx39z35zOteU252X6hbNpEeZW5oUyejC7\naEEIERhRPVTMhx6rh3rLqCB8iaSHejGiqF588QJFD3bZg4HQCsNLuE2deNk3v29urtV7N9RvQef1\nnPPjcPif/4F/GFrVBEdOFUm7jmRU+jmVoY7c1EIw7zCajNTvsuuGl3DVa8TalkNFEGUylBZ4B1fK\nPVRdg6mmbAqXTzi6P6Rl50fZ7HlPb1uuJWSOxMyCicon/dGDg3+q16wW3FBEvcHG5XoX04qE/vmA\neXmUyAXVanFS3crG0JmLl9Dt8GAaHWOLaIw/TQZNcj4Oayk1FnBbJT7NrwlewLH2JeabHZZpf2UV\nzlIRo82OYTzBAckQPzT3fWHviDSzTyZel0WDlODz+KrgG6g7KRNs0RCRY7JUkJTILRaxlXuw2woJ\nGc34ZQVhbjah6OKuzkUG3q568gSB4eraxsBU8OuLPamKNxOTS8VlrnjBVjeZgS8MPbxH5sQwvjJl\nZ9dHfP51n4uYxblGJw9edXCj5xYDrW5e70I83ld936lKLdnk7naIC+e9pwjPjlA2NsiiEsx53IPc\nr0otetyub0TPxldi7wJhtgfCzNgi3HmmrPhUOUdzzc1KHY67AoXXBUydwOm19P91LTo2eVMs12vQ\nhCD1Mkm4Ly1erCf/iBZrr0DRbT21rrSZvIC4X4u1W0dJuxrOL66YxTYRojVgfOQyN3el9TUJ5DXo\nMTv53+MHY3Sxa+ko45EAAAAASUVORK5CYII=\n"
 
 SB_LINE = "Line"
 SB_COL = "Col"
@@ -1092,11 +1095,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             {LABEL: TB_TOGGLE_BP, DATA: BASE64_TOGGLE_BP,  COMMAND: self.toggle_breakpoint},
             {LABEL: ML_SEPARATOR},
             {LABEL: TB_FILTER,  DATA: BASE64_FILTER, DATA2: BASE64_FILTER, COMMAND: self.do_filter},
-            {LABEL: TB_EXCEPTION, DATA: BASE64_EXCEPTION, DATA2: BASE64_EXCEPTION, COMMAND: self.do_analyze}
+            {LABEL: TB_EXCEPTION, DATA: BASE64_EXCEPTION, DATA2: BASE64_EXCEPTION, COMMAND: self.do_analyze},
+            {LABEL: TB_TRAP, DATA: BASE64_TRAP, DATA2: BASE64_TRAP, COMMAND: self.do_trap}
         ]
 
         self.init_toolbar(toolbar_resource)
 
+        ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
+        self.set_toggle(TB_TRAP, ftrap)
+        
         statusbar_resource = [
             {WIDTH: -2},
             {WIDTH: -1, FORMAT: SB_STATE + ": %(" + SB_STATE + ")s", KEYS: [SB_STATE]},
@@ -1169,6 +1176,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         event_type_dict = {rpdb2.CEventBreakpoint: {}}
         self.m_session_manager.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {rpdb2.CEventTrap: {}}
+        self.m_session_manager.register_callback(self.update_trap, event_type_dict, fSingleUse = False)
 
         wx.CallAfter(self.__set_sash_positions)
 
@@ -1292,21 +1302,50 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         state = self.m_session_manager.get_state()
         f = (state != rpdb2.STATE_ANALYZE)
 
-        try:
-            self.m_session_manager.set_analyze(f)
-        except (socket.error, rpdb2.CException):
-            pass    
+        self.job_post(self.job_analyze, (f, ))
 
 
     def do_analyze(self, event):
         f = event.IsChecked()
 
+        self.job_post(self.job_analyze, (f, ))
+
+
+    def job_analyze(self, f):
         try:
             self.m_session_manager.set_analyze(f)
+
+        except (socket.error, rpdb2.CException):
+            pass    
+    
+
+    def update_trap(self, event):
+        wx.CallAfter(self.set_toggle, TB_TRAP, event.m_ftrap)
+
+        
+    def do_trap(self, event):
+        f = event.IsChecked()
+
+        if not f:
+            dlg = wx.MessageDialog(self, MSG_WARNING_TRAP, MSG_WARNING_TITLE, wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION)
+            res = dlg.ShowModal()
+            dlg.Destroy()
+
+            if res == wx.ID_NO:
+                self.set_toggle(TB_TRAP, True)
+                return
+
+        self.job_post(self.job_trap, (f, ))
+
+
+    def job_trap(self, f):
+        try:
+            self.m_session_manager.set_trap_unhandled_exceptions(f)
+
         except (socket.error, rpdb2.CException):
             pass    
 
-    
+        
     def update_namespace(self, event):
         wx.CallAfter(self.m_namespace_viewer.update_namespace, self.m_stack)
 

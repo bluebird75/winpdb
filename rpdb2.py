@@ -862,20 +862,22 @@ class CSessionManager:
         return self.__smi.load_breakpoints(_filename)
 
 
-    def trap_unhandled_exceptions(self):
+    def set_trap_unhandled_exceptions(self, ftrap):
         """
-        Trap unhandled exceptions.
+        Set trap-unhandled-exceptions mode.
+        ftrap with a value of False means unhandled exceptions will be ignored.
+        The session manager default is True.
         """
 
-        return self.__smi.trap_unhandled_exceptions(_filename)
+        return self.__smi.set_trap_unhandled_exceptions(ftrap)
     
 
-    def ignore_unhandled_exceptions(self):
+    def get_trap_unhandled_exceptions(self):
         """
-        Ignore unhandled exceptions.
+        Get trap-unhandled-exceptions mode.
         """
 
-        return self.__smi.ignore_unhandled_exceptions(_filename)
+        return self.__smi.get_trap_unhandled_exceptions()
     
 
     def get_stack(self, tid_list, fAll):   
@@ -1521,7 +1523,7 @@ STR_THREAD_NOT_BROKEN = "Thread is running."
 STR_THREAD_FOCUS_SET = "Focus was set to chosen thread."
 STR_ILEGAL_ANALYZE_MODE_ARG = "Argument is not allowed in analyze mode. Type 'help analyze' for more info."
 STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'help analyze' for more info."
-STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to %s."
+STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
 STR_DEBUGGEE_NOT_BROKEN = "Debuggee has to be waiting at break point to complete this command."
@@ -1587,6 +1589,8 @@ STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
+STR_TRAP_MODE = 'Trap unhandled exceptions mode is: %s'
+STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
 STR_LOCAL_NAMESPACE_WARNING = 'Debugger modifications to the original bindings of the local namespace of this frame will be committed before the execution of the next statement of the frame. Any code using these variables executed before that point will see the original values.'
 STR_WARNING = 'Warning: %s' 
 
@@ -1960,11 +1964,13 @@ def FindModuleDir(module_name):
     if module_name == '':
         raise IOError
         
-    module_family = module_name.rsplit('.', 1)
-    if len(module_family) == 1:
-        module_family.insert(0, '')        
-    
-    (parent, child) = module_family
+    dot_index = module_name.rfind('.')
+    if dot_index != -1:
+        parent = module_name[: dot_index]
+        child = module_name[dot_index + 1:]
+    else:
+        parent = ''
+        child = module_name
     
     m = sys.modules[module_name]
     
@@ -2004,7 +2010,8 @@ def FindFileAsModule(filename):
             if lowered_module_name == root_dotted:
                 break
 
-    match_list.sort(reverse = True)
+    match_list.sort()
+    match_list.reverse()
     
     for (matched_len, matched_module) in match_list:
         try:
@@ -2909,6 +2916,21 @@ class CEventState(CEvent):
 
     def is_match(self, arg):
         return self.m_state == arg
+
+
+
+class CEventTrap(CEvent):
+    """
+    Mode of "trap unhandled exceptions".
+    Sent when the mode changes.
+    """
+    
+    def __init__(self, ftrap):
+        self.m_ftrap = ftrap
+
+
+    def is_match(self, arg):
+        return self.m_ftrap == arg
 
 
 
@@ -4199,7 +4221,7 @@ class CDebuggerCoreThread:
             try:
                 self.m_code_context = self.m_core.m_code_contexts[self.m_frame.f_code]
             except AttributeError:
-                if self.m_event != 'return':
+                if self.m_event != 'return' and self.m_core.m_ftrap:
                     #
                     # An exception is raised from the outer-most frame.
                     # This means an unhandled exception.
@@ -4633,7 +4655,7 @@ class CDebuggerCoreThread:
         if event == 'exception':
             self.m_event = event
 
-            if self.m_code_context.m_fExceptionTrap:                
+            if self.m_code_context.m_fExceptionTrap and self.m_core.m_ftrap:                
                 self.set_exc_info(arg)
                 
                 self.m_fUnhandledException = True
@@ -4717,6 +4739,7 @@ class CDebuggerCore:
         self.m_event_dispatcher = CEventDispatcher()
         self.m_state_manager = CStateManager(STATE_RUNNING, self.m_event_dispatcher, event_dispatcher_sync = self.m_event_dispatcher)
 
+        self.m_ftrap = True
         self.m_fUnhandledException = False        
         self.m_fBreak = False
 
@@ -6205,6 +6228,13 @@ class CDebuggerEngine(CDebuggerCore):
         thread.start_new_thread(_atexit, (True, ))
 
 
+    def set_trap_unhandled_exceptions(self, ftrap):
+        self.m_ftrap = ftrap
+
+        event = CEventTrap(ftrap)
+        self.m_event_dispatcher.fire_event(event)
+
+
     
 #
 # ------------------------------------- RPC Server --------------------------------------------
@@ -6796,6 +6826,11 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
+    def export_set_trap_unhandled_exceptions(self, ftrap):
+        self.m_debugger.set_trap_unhandled_exceptions(ftrap)
+        return 0
+
+
         
 #
 # ------------------------------------- RPC Client --------------------------------------------
@@ -7049,18 +7084,27 @@ class CSessionManagerInternal:
         
         event_type_dict = {CEventState: {EVENT_EXCLUDE: [STATE_BROKEN, STATE_ANALYZE]}}
         self.register_callback(self.reset_frame_indexes, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventStackDepth: {}}
         self.register_callback(self.set_stack_depth, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventNoThreads: {}}
         self.register_callback(self._reset_frame_indexes, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventExit: {}}
         self.register_callback(self.on_event_exit, event_type_dict, fSingleUse = False)
         
+        event_type_dict = {CEventTrap: {}}
+        self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
+        self.m_event_dispatcher.register_chain_override(event_type_dict)
+
         self.m_printer = self.__nul_printer
 
         self.m_last_command_line = None
         self.m_last_fchdir = None
 
+        self.m_ftrap = True
+        
     
     def __del__(self):
         self.m_event_dispatcher_proxy.shutdown()
@@ -7317,8 +7361,10 @@ class CSessionManagerInternal:
     def report_exception(self, type, value, tb):
         if type == socket.error:
             self.m_printer(STR_COMMUNICATION_FAILURE)
-        elif type == BadVersion:
+        elif type == BadVersion and value != None:
             self.m_printer((STR_BAD_VERSION % (value.m_version, )))
+        elif type == BadVersion and value == None:
+            self.m_printer((STR_BAD_VERSION % ('Unknown', )))
         elif type == UnexpectedData:
             self.m_printer(STR_UNEXPECTED_DATA)
         elif type == AlreadyAttached:
@@ -7367,6 +7413,8 @@ class CSessionManagerInternal:
         self.m_server_info = self.get_server_info()
 
         self.refresh(True)
+        self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
+        
         self.__start_event_monitor()
 
         self.request_break()
@@ -7618,12 +7666,27 @@ class CSessionManagerInternal:
             file.close()
 
 
-    def trap_unhandled_exceptions(self):
-        pass
-    
+    def on_event_trap(self, event):
+        ffire = self.m_ftrap != event.m_ftrap
+        self.m_ftrap = event.m_ftrap
 
-    def ignore_unhandled_exceptions(self):
-        pass
+        if ffire:
+            event = CEventTrap(ftrap)
+            self.m_event_dispatcher.fire_event(event)
+        
+        
+    def set_trap_unhandled_exceptions(self, ftrap):
+        self.m_ftrap = ftrap
+
+        if self.__is_attached():
+            self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
+
+        event = CEventTrap(ftrap)
+        self.m_event_dispatcher.fire_event(event)
+
+    
+    def get_trap_unhandled_exceptions(self):
+        return self.m_ftrap
     
 
     def get_stack(self, tid_list, fAll):    
@@ -7955,12 +8018,15 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.prompt = [[CONSOLE_PROMPT, CONSOLE_PROMPT_ANALYZE][self.fAnalyzeMode], ""][fSplit]
         self.intro = CONSOLE_INTRO
         #self.setDaemon(True)
-
-        event_type_dict = {CEventState: {}}
         
         self.m_session_manager = session_manager
         self.m_session_manager.set_printer(self.printer)
+
+        event_type_dict = {CEventState: {}}
         self.m_session_manager.register_callback(self.event_handler, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {CEventTrap: {}}
+        self.m_session_manager.register_callback(self.trap_handler, event_type_dict, fSingleUse = False)
 
         self.m_last_source_line = None
         self.m_last_nlines = DEFAULT_NUMBER_OF_LINES
@@ -8068,6 +8134,10 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.prompt = [CONSOLE_PROMPT_ANALYZE, ""][self.m_fSplit]
             self.printer(STR_ANALYZE_MODE_TOGGLE % (MODE_ON, ))
             return
+
+
+    def trap_handler(self, event):
+        self.printer(STR_TRAP_MODE_SET % (str(event.m_ftrap), ))
 
         
     def do_launch(self, arg):
@@ -8808,6 +8878,27 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
     do_a = do_analyze
 
     
+    def do_trap(self, arg):
+        if arg == '':
+            ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
+            print >> self.stdout, STR_TRAP_MODE % (str(ftrap), )
+            return
+
+        if arg == str(True):
+            ftrap = True
+        elif arg == str(False):
+            ftrap = False
+        else:
+            print >> self.stdout, STR_BAD_ARGUMENT
+            return
+
+        try:
+            self.m_session_manager.set_trap_unhandled_exceptions(ftrap)
+
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
+        
+    
     def do_password(self, arg):
         if arg == '':
             pwd = self.m_session_manager.get_password()
@@ -8940,6 +9031,7 @@ down        - Go down one frame in stack.
 eval        - Evaluate expression in the context of the current frame.
 exec        - Execute suite in the context of the current frame.
 analyze     - Toggle analyze last exception mode.
+trap        - Get or set "trap unhandled exceptions" mode.
 
 License:
 ----------------
@@ -9021,6 +9113,18 @@ consoles on remote machines will NOT BE able to see or attach to the debuggee.
 When set to True: 
 Newly launched debuggees will listen on INADDR_ANY. In this mode, debugger 
 consoles on remote machines will BE able to see and attach to the debuggee."""
+
+
+    def help_trap(self):
+        print >> self.stdout, """trap [True | False]
+
+Get or set "trap unhandled exceptions" mode.
+
+When set to False: 
+Debuggee will ignore unhandled exceptions.
+
+When set to True: 
+Debuggee will pause on unhandled exceptions for inspection."""
 
 
     def help_stop(self):
