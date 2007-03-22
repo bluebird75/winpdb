@@ -354,6 +354,7 @@ WINPDB_WILDCARD = "Python source (*.py)|*.py|All files (*.*)|*.*"
 
 MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you like to analyze it?"
 MSG_WARNING_TITLE = "Warning"
+MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in the future."
 MSG_ERROR_TITLE = "Error"
 MSG_ERROR_HOST_TEXT = "Host '%s' not found."
 MSG_ERROR_FILE_NOT_FOUND = "File not found."
@@ -400,8 +401,8 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.1.0"
-WINPDB_VERSION = "WINPDB_1_1_0"
+WINPDB_TITLE = "Winpdb 1.1.1"
+WINPDB_VERSION = "WINPDB_1_1_1"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -544,9 +545,9 @@ STR_STATE_BROKEN = 'waiting at break point'
 
 STATE_SPAWNING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
 STATE_ATTACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
-STATE_BROKEN_MENU = {ENABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
-STATE_ANALYZE_MENU = {ENABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH]}
-STATE_RUNNING_MENU = {ENABLED: [ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_ANALYZE, ML_PWD, ML_LAUNCH, ML_ATTACH]}
+STATE_BROKEN_MENU = {ENABLED: [ML_ANALYZE, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH, ML_BREAK]}
+STATE_ANALYZE_MENU = {ENABLED: [ML_ANALYZE, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH, ML_BREAK, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO]}
+STATE_RUNNING_MENU = {ENABLED: [ML_BREAK, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_ANALYZE, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO]}
 STATE_DETACHED_MENU = {ENABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART]}
 STATE_DETACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
 
@@ -595,7 +596,9 @@ STR_NAMESPACE_DEADLOCK = 'Data Not Available'
 BAD_FILE_WARNING_TIMEOUT_SEC = 10.0
 POSITION_TIMEOUT = 2.0
 
-DEFAULT_PATH_SUFFIX_LENGTH = 55
+
+
+g_ignored_warnings = {'': True}
 
 
 
@@ -607,21 +610,6 @@ def image_from_base64(str_b64):
     return image
 
     
-
-def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
-    suffix = rpdb2.calc_suffix(path, n)
-    if not suffix.startswith('...'):
-        return suffix
-
-    index = suffix.find(os.sep)
-    if index == -1:
-        return suffix
-
-    clip = '...' + suffix[index:]
-
-    return clip
-    
-
 
 class CSettings:
     def __init__(self, default_settings):
@@ -1403,6 +1391,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.set_menu_items_state(menu_update_dict)
         self.set_toolbar_items_state(toolbar_update_dict)
 
+        try:
+            index = STATE_DETACHED_MENU[DISABLED].index(ML_RESTART)
+            del STATE_DETACHED_MENU[DISABLED][index]
+            STATE_DETACHED_MENU[ENABLED].append(ML_RESTART)
+
+        except ValueError:
+            pass
+            
         state_text = self.m_state
         if state_text == rpdb2.STATE_BROKEN:
             state_text = STR_STATE_BROKEN
@@ -1524,11 +1520,6 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         except IOError:
             pass
 
-        try:
-            self.m_session_manager.load_breakpoints()
-        except:
-            pass
-
 
     def do_open(self, event):
         host = self.m_session_manager.get_host()
@@ -1569,11 +1560,6 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def job_detach(self):    
         try:
-            self.m_session_manager.save_breakpoints()
-        except:
-            pass
-
-        try:
             self.m_session_manager.detach()
         except (socket.error, rpdb2.CConnectionException):
             pass
@@ -1584,11 +1570,6 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         
     def job_stop(self):    
-        try:
-            self.m_session_manager.save_breakpoints()
-        except:
-            pass
-
         try:    
             self.m_session_manager.stop_debuggee()
         except (socket.error, rpdb2.CConnectionException):
@@ -2217,7 +2198,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
         
-        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + clip_filename(_filename))
+        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + rpdb2.clip_filename(_filename))
         
         self.m_cur_filename = _filename
 
@@ -2254,7 +2235,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
         
-        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + clip_filename(filename))
+        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + rpdb2.clip_filename(filename))
         
         self.m_cur_filename = filename
 
@@ -2621,11 +2602,21 @@ class CNamespacePanel(wx.Panel, CJobs):
             _expr = self.m_tree.GetPyData(item)
             _suite = "%s = %s" % (_expr, expr)
             rl = self.m_session_manager.execute(_suite)
+
             error = rl[1]
             if error != '':
                 dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
                 dlg.ShowModal()
                 dlg.Destroy()
+
+            warning = rl[0]
+            if not warning in g_ignored_warnings:
+                dlg = wx.MessageDialog(self, MSG_WARNING_TEMPLATE % (warning, ), MSG_WARNING_TITLE, wx.OK | wx.CANCEL | wx.YES_DEFAULT | wx.ICON_WARNING)
+                res = dlg.ShowModal()
+                dlg.Destroy()
+
+                if res == wx.ID_CANCEL:
+                    g_ignored_warnings[warning] = True
                                
         except:
             rpdb2.print_debug()
@@ -3656,8 +3647,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_1_0":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_1_0", rpdb2.get_version())
+    if rpdb2.get_version() != "RPDB_2_1_1":
+        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_1_1", rpdb2.get_version())
         return
         
     return rpdb2.main(StartClient)

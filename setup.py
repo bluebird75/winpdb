@@ -33,7 +33,7 @@ thread support, modifiable namespace, and password secured connections."""
 
 setup(
     name = 'winpdb',
-    version = '1.1.0',
+    version = '1.1.1',
     description = 'An advanced Python debugger.',
     long_description = LONG_DESC,
     author = 'Nir Aides',
