@@ -862,6 +862,22 @@ class CSessionManager:
         return self.__smi.load_breakpoints(_filename)
 
 
+    def trap_unhandled_exceptions(self):
+        """
+        Trap unhandled exceptions.
+        """
+
+        return self.__smi.trap_unhandled_exceptions(_filename)
+    
+
+    def ignore_unhandled_exceptions(self):
+        """
+        Ignore unhandled exceptions.
+        """
+
+        return self.__smi.ignore_unhandled_exceptions(_filename)
+    
+
     def get_stack(self, tid_list, fAll):   
         return self.__smi.get_stack(tid_list, fAll)
 
@@ -4959,6 +4975,9 @@ class CDebuggerCore:
             if self.m_state_manager.get_state() != STATE_BROKEN:
                 self.set_break_dont_lock()
 
+            if not frame.f_exc_traceback is None:
+                ctx.set_exc_info((frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback))
+                
             if ctx.m_fUnhandledException and not self.m_fUnhandledException and not 'SCRIPT_TERMINATED' in frame.f_locals:
                 self.m_fUnhandledException = True
                 f_uhe_notification = True
@@ -7151,7 +7170,7 @@ class CSessionManagerInternal:
                 raise
 
             try:
-                self.m_session_manager.load_breakpoints()
+                self.load_breakpoints()
             except:
                 pass
 
@@ -7442,7 +7461,7 @@ class CSessionManagerInternal:
         self.__verify_attached()
 
         try:
-            self.m_session_manager.save_breakpoints()
+            self.save_breakpoints()
         except:
             print_debug()
             pass
@@ -7598,6 +7617,14 @@ class CSessionManagerInternal:
         finally:
             file.close()
 
+
+    def trap_unhandled_exceptions(self):
+        pass
+    
+
+    def ignore_unhandled_exceptions(self):
+        pass
+    
 
     def get_stack(self, tid_list, fAll):    
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
