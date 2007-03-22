@@ -391,6 +391,7 @@ HLIST_HEADER_PID = "PID"
 HLIST_HEADER_FILENAME = "Filename"
 
 HLIST_HEADER_TID = "TID"
+HLIST_HEADER_NAME = "Name"
 HLIST_HEADER_STATE = "State"
 
 HLIST_HEADER_FRAME = "Frame"
@@ -543,8 +544,6 @@ SB_ENCRYPTION = "Encryption"
 SHOW = "Show"
 VALUE = "Value"
 BITMAP = "Bitmap"
-
-STR_STATE_BROKEN = 'waiting at break point'
 
 STATE_SPAWNING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
 STATE_ATTACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
@@ -1225,7 +1224,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def update_thread_broken(self, event):
-        wx.CallAfter(self.m_threads_viewer.update_thread, event.m_tid, True)
+        wx.CallAfter(self.m_threads_viewer.update_thread, event.m_tid, event.m_name, True)
 
 
     #
@@ -1440,7 +1439,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             
         state_text = self.m_state
         if state_text == rpdb2.STATE_BROKEN:
-            state_text = STR_STATE_BROKEN
+            state_text = rpdb2.STR_STATE_BROKEN
             
         self.set_statusbar_data({SB_STATE: state_text.upper()}) 
 
@@ -2490,7 +2489,8 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         self.m_threads = CListCtrl(parent = self, style = wx.LC_REPORT | wx.LC_SINGLE_SEL)
         self.bind_caption(self.m_threads)
         self.m_threads.InsertColumn(0, HLIST_HEADER_TID)
-        self.m_threads.InsertColumn(1, HLIST_HEADER_STATE)
+        self.m_threads.InsertColumn(1, HLIST_HEADER_NAME)
+        self.m_threads.InsertColumn(2, HLIST_HEADER_STATE)
         sizerv.Add(self.m_threads, 1, wx.EXPAND | wx.ALL, 0)
 
         if self.m_select_command:
@@ -2499,32 +2499,40 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         self.SetSizer(_sizerv)
         _sizerv.Fit(self)
 
+
     def set_cursor(self, id):
         cursor = wx.StockCursor(id)
         self.SetCursor(cursor)        
         self.m_threads.SetCursor(cursor)        
 
+
     def _clear(self):
         self.m_threads.DeleteAllItems()
         self.m_threads.Disable()
 
+
     def _disable(self):
         self.m_threads.Disable()
+
 
     def _enable(self):
         self.m_threads.Enable()
 
+
     def is_selected(self, index):
         return self.m_threads.IsSelected(index)
 
-    def update_thread(self, thread_id, fBroken):
+
+    def update_thread(self, thread_id, thread_name, fBroken):
         index = self.m_threads.FindItemData(-1, thread_id)
         if index < 0:
             return -1
 
-        self.m_threads.SetStringItem(index, 1, [rpdb2.STATE_RUNNING, STR_STATE_BROKEN][fBroken])
+        self.m_threads.SetStringItem(index, 1, thread_name)
+        self.m_threads.SetStringItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
 
         return index
+
         
     def update_threads_list(self, current_thread, threads_list):
         if self.m_suppress_recursion > 0:
@@ -2536,9 +2544,11 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         j = None
         for i, s in enumerate(threads_list):
             tid = s[rpdb2.DICT_KEY_TID]
+            name = s[rpdb2.DICT_KEY_NAME]
             fBroken = s[rpdb2.DICT_KEY_BROKEN]
             index = self.m_threads.InsertStringItem(sys.maxint, repr(tid))
-            self.m_threads.SetStringItem(index, 1, [rpdb2.STATE_RUNNING, STR_STATE_BROKEN][fBroken])
+            self.m_threads.SetStringItem(index, 1, name)
+            self.m_threads.SetStringItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
             self.m_threads.SetItemData(index, tid)
             if tid == current_thread:
                 j = i
@@ -2548,6 +2558,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         if j is not None:
             self.m_suppress_recursion += 1
             self.m_threads.Select(j)
+
 
     def OnThreadSelected(self, event):                
         if self.m_suppress_recursion == 0:

@@ -1573,8 +1573,8 @@ STR_SOURCE_LINES = """Source lines for thread %d from file '%s':
 """ 
 STR_ACTIVE_THREADS = """List of active threads known to the debugger:
 
-    No    Tid  State                 
--------------------------------""" 
+    No    Tid  Name             State                 
+-----------------------------------------------""" 
 STR_BREAKPOINTS_LIST = """List of breakpoints:
 
  Id  State      Line  Filename-Scope-Condition
@@ -1619,6 +1619,8 @@ BP_EVAL_SEP = ','
 DEBUGGER_FILENAME = 'rpdb2.py'
 THREADING_FILENAME = 'threading.py'
 CODECS_FILENAME = 'codecs.py'
+
+STR_STATE_BROKEN = 'waiting at break point'
 
 STATE_BROKEN = 'broken'
 STATE_RUNNING = 'running'
@@ -2979,8 +2981,9 @@ class CEventThreadBroken(CEvent):
     A thread has broken.
     """
     
-    def __init__(self, tid):
+    def __init__(self, tid, name):
         self.m_tid = tid
+        self.m_name = name
 
 
         
@@ -4186,8 +4189,9 @@ class CDebuggerCoreThread:
     subtle bug fixes, be carefull not to mess it up...
     """
     
-    def __init__(self, core_debugger, frame, event):
+    def __init__(self, name, core_debugger, frame, event):
         self.m_thread_id = thread.get_ident()
+        self.m_thread_name = name
         self.m_fBroken = False
         self.m_fUnhandledException = False
         
@@ -4912,7 +4916,13 @@ class CDebuggerCore:
         
         self.set_exception_trap_frame(frame)
 
-        ctx = CDebuggerCoreThread(self, frame, event)
+        try:
+            t = threading.currentThread()
+            name = t.getName()
+        except:
+            name = ''
+        
+        ctx = CDebuggerCoreThread(name, self, frame, event)
         ctx.set_tracers()
         self.m_threads[ctx.m_thread_id] = ctx
 
@@ -5000,7 +5010,13 @@ class CDebuggerCore:
 
             if not frame.f_exc_traceback is None:
                 ctx.set_exc_info((frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback))
-                
+
+            try:
+                t = threading.currentThread()
+                ctx.m_thread_name = t.getName()
+            except:
+                pass
+            
             if ctx.m_fUnhandledException and not self.m_fUnhandledException and not 'SCRIPT_TERMINATED' in frame.f_locals:
                 self.m_fUnhandledException = True
                 f_uhe_notification = True
@@ -5024,7 +5040,7 @@ class CDebuggerCore:
         if f_full_notification:
             self.send_events(None) 
         else:
-            self.notify_thread_broken(ctx.m_thread_id)
+            self.notify_thread_broken(ctx.m_thread_id, ctx.m_thread_name)
             self.notify_namespace()
 
         if f_uhe_notification:
@@ -5037,14 +5053,14 @@ class CDebuggerCore:
         ctx.set_tracers()
 
 
-    def notify_thread_broken(self, tid):
+    def notify_thread_broken(self, tid, name):
         """
         Notify that thread (tid) has broken.
         This notification is sent for each thread that breaks after
         the first one.
         """
         
-        _event = CEventThreadBroken(tid)
+        _event = CEventThreadBroken(tid, name)
         self.m_event_dispatcher.fire_event(_event)
 
     
@@ -6207,7 +6223,7 @@ class CDebuggerEngine(CDebuggerCore):
             current_thread_id = ctx.m_thread_id  
             
         ctx_list = self.get_threads().values()
-        tl = [{DICT_KEY_TID: c.m_thread_id, DICT_KEY_BROKEN: c.m_fBroken, DICT_KEY_EVENT: c.m_event} for c in ctx_list]
+        tl = [{DICT_KEY_TID: c.m_thread_id, DICT_KEY_NAME: c.m_thread_name, DICT_KEY_BROKEN: c.m_fBroken, DICT_KEY_EVENT: c.m_event} for c in ctx_list]
 
         return (current_thread_id, tl)
 
@@ -8849,8 +8865,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             print >> self.stdout, STR_ACTIVE_THREADS    
             for i, t in enumerate(tl):
                 m = ['', SYMBOL_MARKER][t[DICT_KEY_TID] == current_thread_id]
-                state = [STATE_RUNNING, STATE_BROKEN][t[DICT_KEY_BROKEN]]
-                print >> self.stdout, ' %1s %3d  %5d  %s' % (m, i, t[DICT_KEY_TID], state[:10])
+                state = [STATE_RUNNING, STR_STATE_BROKEN][t[DICT_KEY_BROKEN]]
+                print >> self.stdout, ' %1s %3d  %5d  %-15s  %s' % (m, i, t[DICT_KEY_TID], t[DICT_KEY_NAME], state[:25])
                 
         except ValueError:
             self.printer(STR_BAD_ARGUMENT)
