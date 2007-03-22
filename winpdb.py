@@ -314,7 +314,7 @@ import cStringIO
 import threading
 import xmlrpclib
 import tempfile
-import pickle
+import cPickle
 import keyword
 import base64
 import socket
@@ -644,7 +644,7 @@ class CSettings:
             return 
             
         try:
-            d = pickle.load(f)
+            d = cPickle.load(f)
             self.m_dict.update(d)
             
         finally:
@@ -660,7 +660,7 @@ class CSettings:
             return 
             
         try:
-            pickle.dump(self.m_dict, f)
+            cPickle.dump(self.m_dict, f)
             
         finally:
             f.close()

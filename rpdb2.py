@@ -267,7 +267,7 @@ import compiler
 import commands
 import tempfile
 import __main__
-import pickle
+import cPickle
 import httplib
 import os.path
 import socket
@@ -2781,12 +2781,12 @@ class CCrypto:
 
     def __sign(self, s):
         i = self.__get_next_index()
-        _s = pickle.dumps((self.m_index_anchor_ex, i, self.m_rid, s))
+        _s = cPickle.dumps((self.m_index_anchor_ex, i, self.m_rid, s))
         
         h = hmac.new(self.m_key, _s, md5)
         _d = h.digest()
         r = (_d, _s)
-        s_signed = pickle.dumps(r)
+        s_signed = cPickle.dumps(r)
 
         return s_signed
 
@@ -2804,7 +2804,7 @@ class CCrypto:
 
     def __verify_signature(self, s, fVerifyIndex):
         try:
-            r = pickle.loads(s)
+            r = cPickle.loads(s)
             
             (_d, _s) = r
             
@@ -2815,7 +2815,7 @@ class CCrypto:
                 self.__wait_a_little()
                 raise AuthenticationFailure
 
-            (anchor, i, id, s_original) = pickle.loads(_s)
+            (anchor, i, id, s_original) = cPickle.loads(_s)
                 
         except AuthenticationFailure:
             raise
@@ -6593,7 +6593,7 @@ class CIOServer(threading.Thread):
             raise BadVersion(get_version())
 
         _params = params[len(rpdb_version):]
-            
+
         try:
             #
             # Decrypt parameters.
@@ -7524,7 +7524,9 @@ class CSessionManagerInternal:
             self.disable_breakpoint([], fAll = True)
 
             try:
+                self.getSession().getProxy().set_trap_unhandled_exceptions(False)
                 self.request_go()
+
             except DebuggerNotBroken:
                 pass
 
@@ -7614,7 +7616,7 @@ class CSessionManagerInternal:
         try:
             try:
                 bpl = self.get_breakpoints()
-                sbpl = pickle.dumps(bpl)
+                sbpl = cPickle.dumps(bpl)
                 file.write(sbpl)
 
             except:
@@ -7639,7 +7641,7 @@ class CSessionManagerInternal:
         
         try:
             try:
-                bpl = pickle.load(file)
+                bpl = cPickle.load(file)
                 self.delete_breakpoint([], True)
 
             except:
