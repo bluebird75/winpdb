@@ -7417,12 +7417,12 @@ class CSessionManagerInternal:
         
         self.m_server_info = self.get_server_info()
 
-        self.request_break()
         self.refresh(True)
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
         
         self.__start_event_monitor()
 
+        self.request_break()
         self.enable_breakpoint([], fAll = True)
 
         
