@@ -2523,7 +2523,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
 
         self.m_threads = CListCtrl(parent = self, style = wx.LC_REPORT | wx.LC_SINGLE_SEL)
         self.bind_caption(self.m_threads)
-        self.m_threads.InsertColumn(0, HLIST_HEADER_TID)
+        self.m_threads.InsertColumn(0, HLIST_HEADER_TID + '    ')
         self.m_threads.InsertColumn(1, HLIST_HEADER_NAME)
         self.m_threads.InsertColumn(2, HLIST_HEADER_STATE)
         sizerv.Add(self.m_threads, 1, wx.EXPAND | wx.ALL, 0)
@@ -3028,7 +3028,7 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
         sizerv.Add(self.m_notebook, 1, wx.EXPAND | wx.ALL, 0)
         
         self.SetSizer(_sizerv)
-        _sizerv.Fit(self)
+        _sizerv.Fit(self)        
 
 
     def _clear(self):
