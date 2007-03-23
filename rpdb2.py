@@ -3283,14 +3283,9 @@ class CStateManager:
     The state can also be queried or waited for.
     """
     
-    def __init__(self, initial_state, event_dispatcher_output = None, event_dispatcher_input = None, event_dispatcher_sync = None):
+    def __init__(self, initial_state, event_dispatcher_output = None, event_dispatcher_input = None):
         self.m_event_dispatcher_input = event_dispatcher_input
         self.m_event_dispatcher_output = event_dispatcher_output
-        self.m_event_dispatcher_sync = event_dispatcher_sync
-
-        if self.m_event_dispatcher_sync is not None:
-            event_type_dict = {CEventSync: {}}
-            self.m_event_dispatcher_sync.register_callback(self.event_handler, event_type_dict, fSingleUse = False)
 
         if self.m_event_dispatcher_input is not None:
             event_type_dict = {CEventState: {}}
@@ -3309,20 +3304,11 @@ class CStateManager:
 
 
     def shutdown(self):
-        if self.m_event_dispatcher_sync is not None:
-            self.m_event_dispatcher_sync.remove_callback(self.event_handler)
-
         if self.m_event_dispatcher_input is not None:
             self.m_event_dispatcher_input.remove_callback(self.event_handler)
 
 
     def event_handler(self, event):
-        if isinstance(event, CEventSync):
-            if not event.m_fException:                
-                self.set_state()
-
-            return
-            
         self.set_state(event.m_state)
 
 
@@ -4741,7 +4727,7 @@ class CDebuggerCore:
         self.m_threads = {}
 
         self.m_event_dispatcher = CEventDispatcher()
-        self.m_state_manager = CStateManager(STATE_RUNNING, self.m_event_dispatcher, event_dispatcher_sync = self.m_event_dispatcher)
+        self.m_state_manager = CStateManager(STATE_RUNNING, self.m_event_dispatcher)
 
         self.m_ftrap = True
         self.m_fUnhandledException = False        
@@ -5478,6 +5464,9 @@ class CDebuggerEngine(CDebuggerCore):
             fSendUnhandled = False
 
         try:
+            if not fException:
+                self.m_state_manager.set_state()
+                
             self.send_stack_depth()
             self.send_threads_event(fException)
             self.send_stack_event(fException)
@@ -6616,7 +6605,7 @@ class CIOServer(threading.Thread):
             #
             ((name, _params, target_rid), fEncryption) = self.m_crypto.undo_crypto(_params)
         except AuthenticationBadIndex, e:
-            print_debug()
+            #print_debug()
 
             #
             # Notify the caller on the expected index.
@@ -7428,12 +7417,12 @@ class CSessionManagerInternal:
         
         self.m_server_info = self.get_server_info()
 
+        self.request_break()
         self.refresh(True)
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
         
         self.__start_event_monitor()
 
-        self.request_break()
         self.enable_breakpoint([], fAll = True)
 
         

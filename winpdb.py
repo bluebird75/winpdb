@@ -1145,6 +1145,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_splitterh3.SplitHorizontally(self.m_code_viewer, self.m_console)
         
         self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
+        self.Bind(wx.EVT_SIZE, self.OnSizeWindow)
 
         state = self.m_session_manager.get_state()
         self.update_state(rpdb2.CEventState(state))
@@ -1381,17 +1382,22 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_console.set_filename(filename)
 
     
+    def OnSizeWindow(self, event):
+        if not self.IsMaximized():
+            #
+            # On a Mac, the size is magically increased by 47; decrease it back.
+            #
+
+            (w, h) = self.GetSize()
+            if sys.platform == 'darwin':
+                h -= 47
+
+            self.m_settings[WINPDB_SIZE] = (w, h)
+
+        event.Skip()
+        
+        
     def OnCloseWindow(self, event):
-
-        #
-        # On a Mac, the size is magically increased by 47; decrease it back.
-        #
-
-        (w, h) = self.GetSize()
-        if sys.platform == 'darwin':
-            h -= 47
-
-        self.m_settings[WINPDB_SIZE] = (w, h)
         self.m_settings[WINPDB_MAXIMIZE] = self.IsMaximized()
         self.m_settings[SPLITTER_1_POS] = self.m_splitterh2.GetSashPosition()
         self.m_settings[SPLITTER_2_POS] = self.m_splitterh1.GetSashPosition()
@@ -1403,6 +1409,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_console.stop()
         self.shutdown_jobs()
         self.Destroy()
+
+        event.Skip()
 
 
     def set_cursor(self, id):
@@ -2353,7 +2361,8 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_caption = CCaption(self, label = CAPTION_CONSOLE)
         sizerv.Add(self.m_caption, 0, wx.EXPAND | wx.ALL, 0)
 
-        self.m_console_out = wx.TextCtrl(self, style = wx.TAB_TRAVERSAL | wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL | wx.VSCROLL)
+        self.m_console_out = wx.TextCtrl(self, style = wx.TAB_TRAVERSAL | wx.TE_MULTILINE | wx.HSCROLL | wx.VSCROLL)
+        self.m_console_out.Bind(wx.EVT_KEY_DOWN, self.OnConsoleOutKeyPressed)
         self.bind_caption(self.m_console_out)
         self.set_font(self.m_console_out)
         sizerv.Add(self.m_console_out, 1, wx.EXPAND | wx.ALL, 0)
@@ -2364,7 +2373,7 @@ class CConsole(wx.Panel, CCaptionManager):
         label = wx.StaticText(self, -1, LABEL_CONSOLE, style = wx.TAB_TRAVERSAL)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 0)
 
-        self.m_console_in = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.m_console_in = wx.TextCtrl(self, style = wx.TE_PROCESS_ENTER)
         self.bind_caption(self.m_console_in)
         self.set_font(self.m_console_in)
         self.m_console_in.SetFocus()
@@ -2375,11 +2384,30 @@ class CConsole(wx.Panel, CCaptionManager):
         self.SetSizer(_sizerv)
         _sizerv.Fit(self)
 
+
+    def OnConsoleOutKeyPressed(self, event):
+        key_code = event.GetKeyCode()
+
+        if key_code != wx.WXK_TAB:
+            return
+            
+        forward = not event.ShiftDown()            
+        ne = wx.NavigationKeyEvent()
+        ne.SetDirection(forward)
+        ne.SetCurrentFocus(self.m_console_out)
+        ne.SetEventObject(self.m_console_out)
+        self.GetEventHandler().ProcessEvent(ne)
+        event.Skip()
+        return
+            
+        
     def set_focus(self):
         self.m_console_in.SetFocus()
+
         
     def set_filename(self, filename):
         self.m_console.set_filename(filename)
+
 
     def set_font(self, ctrl):
         font = ctrl.GetFont()
@@ -2393,6 +2421,7 @@ class CConsole(wx.Panel, CCaptionManager):
             
         new_font = wx.Font(pointSize = point_size, family = font.GetFamily(), style = font.GetStyle(), weight = font.GetWeight(), face = face)
         ctrl.SetFont(new_font)
+
         
     def start(self, parent, session_manager, fchdir, command_line, fAttach):
         self.m_parent = parent
@@ -2403,10 +2432,12 @@ class CConsole(wx.Panel, CCaptionManager):
             session_manager.attach_nothrow(command_line)
         elif command_line != '':
             session_manager.launch_nothrow(fchdir, command_line)
+
         
     def stop(self):
         self.m_queue.put('exit\n')
         self.m_console.join()
+
 
     def write(self, str):
         sl = str.split('\n')
@@ -2422,12 +2453,15 @@ class CConsole(wx.Panel, CCaptionManager):
             
         wx.CallAfter(self.m_console_out.write, _str[1:])    
 
+
     def flush(self):
         pass
+
 
     def readline(self):
         str = self.m_queue.get()
         return str
+
 
     def OnChar(self, event):
         key = event.GetKeyCode()
@@ -2461,6 +2495,7 @@ class CConsole(wx.Panel, CCaptionManager):
             
         self.m_history_index = (self.m_history_index + [-1, 1][fBack]) % len(self.m_history)
         return self.m_history[self.m_history_index]
+
         
     def set_history(self, value):
         self.m_history[0] = ''
@@ -2494,7 +2529,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         sizerv.Add(self.m_threads, 1, wx.EXPAND | wx.ALL, 0)
 
         if self.m_select_command:
-            self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnThreadSelected, self.m_threads)
+            self.m_threads.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnThreadSelected)
                     
         self.SetSizer(_sizerv)
         _sizerv.Fit(self)
@@ -3080,7 +3115,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
         sizerv.Add(self.m_stack, 1, wx.EXPAND | wx.ALL, 0)
 
         if self.m_select_command:
-            self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnFrameSelected, self.m_stack)
+            self.m_stack.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnFrameSelected)
                     
         self.SetSizer(_sizerv)
         _sizerv.Fit(self)
@@ -3513,6 +3548,7 @@ class COpenDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         self.m_entry = wx.TextCtrl(self, size = (200, -1))
+        self.m_entry.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry)
         sizerh.Add(self.m_entry, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
@@ -3599,6 +3635,7 @@ class CLaunchDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         self.m_entry_commandline = wx.TextCtrl(self, value = command_line, size = (200, -1))
+        self.m_entry_commandline.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_commandline)
         sizerh.Add(self.m_entry_commandline, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         
