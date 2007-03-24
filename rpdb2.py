@@ -257,6 +257,12 @@ END OF TERMS AND CONDITIONS
 """
 
 
+
+if '.' in __name__:
+    raise ImportError('rpdb2 must not be imported as part of a package!')
+
+
+    
 import SimpleXMLRPCServer 
 import SocketServer
 import xmlrpclib
@@ -1609,6 +1615,8 @@ PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo', '.so']
 
 MODULE_SCOPE = '?'
 MODULE_SCOPE2 = '<module>'
+BLENDER_NO_SOURCE_FILENAME = '<string>'
+ERROR_NO_BLENDER_SOURCE = 'Blender script source not available.'
 
 SCOPE_SEP = '.'
 
@@ -1714,6 +1722,12 @@ g_initial_cwd = []
 #
             
 
+
+def class_name(c):
+    name = str(c).split("'")[1]
+    return name
+
+    
 
 def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
     suffix = calc_suffix(path, n)
@@ -2241,7 +2255,10 @@ def is_blender_file(filename):
     
     if not 'Blender.Text' in sys.modules:
         return False
-        
+
+    if filename == BLENDER_NO_SOURCE_FILENAME:
+        return True
+    
     _filename = os.path.basename(filename)
 
     try:
@@ -2269,7 +2286,10 @@ def get_blender_source(filename):
     source has to be queried directly from the Blender API.
     http://www.blender.org
     """
-    
+
+    if filename.startswith('<'):
+        raise IOError(ERROR_NO_BLENDER_SOURCE)
+        
     _filename = os.path.basename(filename)
 
     lines = g_blender_text.get(_filename, None)
@@ -6483,28 +6503,28 @@ class CPwdServerProxy:
                 continue
 
             except xmlrpclib.Fault, fault:
-                if str(BadVersion) in fault.faultString:
+                if class_name(BadVersion) in fault.faultString:
                     s = fault.faultString.split("'")
                     version = ['', s[1]][len(s) > 0]
                     raise BadVersion(version)
                     
-                if str(EncryptionExpected) in fault.faultString:
+                if class_name(EncryptionExpected) in fault.faultString:
                     raise EncryptionExpected
                     
-                elif str(EncryptionNotSupported) in fault.faultString:
+                elif class_name(EncryptionNotSupported) in fault.faultString:
                     if self.m_crypto.m_fAllowUnencrypted:
                         self.__set_encryption(False)
                         continue
                         
                     raise EncryptionNotSupported
                     
-                elif str(DecryptionFailure) in fault.faultString:
+                elif class_name(DecryptionFailure) in fault.faultString:
                     raise DecryptionFailure
                     
-                elif str(AuthenticationBadData) in fault.faultString:
+                elif class_name(AuthenticationBadData) in fault.faultString:
                     raise AuthenticationBadData
                     
-                elif str(AuthenticationFailure) in fault.faultString:
+                elif class_name(AuthenticationFailure) in fault.faultString:
                     raise AuthenticationFailure
                     
                 else:
@@ -7019,8 +7039,7 @@ class CServerList:
                 #print >> sys.__stderr__, s.m_exc_info[0]
 
                 if issubclass(s.m_exc_info[0], CException):
-                    _i = self.m_errors.get(s.m_exc_info[0], 0)
-                    self.m_errors[s.m_exc_info[0]] = _i + 1
+                    self.m_errors.setdefault(s.m_exc_info[0], []).append(s.m_exc_info[1])
 
                 continue
 
@@ -7397,11 +7416,12 @@ class CSessionManagerInternal:
 
             
     def __report_server_errors(self, errors, fsupress_pwd_warning = False):
-        for k in errors.keys():
+        for k, v in errors.items():
             if fsupress_pwd_warning and k in [AuthenticationBadData, AuthenticationFailure]:
                 continue
-                
-            self.report_exception(k, None, None)
+
+            for e in v: 
+                self.report_exception(k, e, None)
 
         
     def __attach(self, server):
@@ -9045,7 +9065,10 @@ License:
 
 copyright   - Print copyright notice.
 license     - Print license.
-credits     - Print credits information."""
+credits     - Print credits information.
+
+
+type help <topic> for futher information."""
 
             self.print_notice(help_notice)
 

@@ -363,7 +363,9 @@ MSG_ERROR_FILE_NOT_PYTHON = "Only Python files that end with '.py' are accepted.
 
 STR_FILE_LOAD_ERROR = "Failed to load source file '%s' from debuggee."
 STR_FILE_LOAD_ERROR2 = """Failed to load source file '%s' from debuggee.
-You may continue to debug, but you will not see source lines from this file."""
+You may continue to debug, but you will not see 
+source lines from this file."""
+STR_BLENDER_SOURCE_WARNING = "To debug Blender Python scripts you need to load them into the Blender text window and launch them from there."
 
 DLG_EXPR_TITLE = "Enter Expression"
 DLG_PWD_TITLE = "Password"
@@ -1733,7 +1735,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         (filename, lineno) = self.m_code_viewer.get_file_lineno()
         try:
             self.m_session_manager.request_go_breakpoint(filename, '', lineno)
-        except (socket.error, rpdb2.CConnectionException):
+        except (socket.error, IOError, rpdb2.CException):
             pass
 
             
@@ -1958,9 +1960,19 @@ class CSourceManager:
 
         self.m_lock = threading.RLock()
 
+
     def _clear(self):
         self.m_files = {}
 
+
+    def is_in_files(self, filename):
+        for k in self.m_files.keys():
+            if filename in k:
+                return True
+
+        return False
+        
+    
     def get_source(self, filename):
         for k, v in self.m_files.items():
             if not filename in k:
@@ -1973,13 +1985,15 @@ class CSourceManager:
             if t - v[0] < BAD_FILE_WARNING_TIMEOUT_SEC:
                 return (k, v[1])    
 
-            del self.m_files[k]
+            #del self.m_files[k]
             raise KeyError
 
         raise KeyError
+
         
     def load_source(self, filename, callback, args, fComplain): 
         self.m_job_manager.job_post(self.job_load_source, (filename, callback, args, fComplain))
+
         
     def job_load_source(self, filename, callback, args, fComplain):
         try:
@@ -1997,11 +2011,14 @@ class CSourceManager:
             source = u.encode(de, 'ignore')
             t = 0
 
-        except (IOError, socket.error, rpdb2.CConnectionException):
+        except (IOError, socket.error, rpdb2.CConnectionException), e:
             if fComplain:
-                wx.CallAfter(self.load_error, filename)
+                wx.CallAfter(self.load_warning, STR_FILE_LOAD_ERROR % (filename, ))
                 return
 
+            if type(e) == IOError and rpdb2.ERROR_NO_BLENDER_SOURCE in e.args and not self.is_in_files(filename):
+                wx.CallAfter(self.load_warning, STR_BLENDER_SOURCE_WARNING)
+            
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
             t = time.time()
@@ -2009,7 +2026,7 @@ class CSourceManager:
         try:    
             self.m_lock.acquire()
 
-            fNotify = not (_filename in self.m_files)
+            fNotify = not self.is_in_files(_filename)
             self.m_files[_filename] = (t, source)
 
         finally:
@@ -2019,8 +2036,9 @@ class CSourceManager:
 
         wx.CallAfter(callback, *_args)
 
-    def load_error(self, filename):
-        dlg = wx.MessageDialog(None, STR_FILE_LOAD_ERROR % (filename, ), MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+
+    def load_warning(self, warning):
+        dlg = wx.MessageDialog(None, warning, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
         dlg.ShowModal()
         dlg.Destroy()
 
@@ -2118,9 +2136,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
     def job_set_breakpoint(self, filename, lineno):
         try:
             self.m_session_manager.set_breakpoint(filename, '', lineno, True, '')
-        except (socket.error, rpdb2.CConnectionException):
-            pass
-        except rpdb2.BadArgument:
+        except (socket.error, IOError, rpdb2.CException):
             pass
 
         
@@ -3290,7 +3306,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         sizerh.Add(btn, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         self.m_listbox_scripts = CListCtrl(parent = self, style = wx.LC_REPORT | wx.LC_SINGLE_SEL, size = (-1, 300))
-        self.m_listbox_scripts.InsertColumn(0, HLIST_HEADER_PID)
+        self.m_listbox_scripts.InsertColumn(0, HLIST_HEADER_PID + '    ')
         self.m_listbox_scripts.InsertColumn(1, HLIST_HEADER_FILENAME)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected, self.m_listbox_scripts)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnItemDeselected, self.m_listbox_scripts)
