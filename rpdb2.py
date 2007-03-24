@@ -459,7 +459,7 @@ class CSimpleSessionManager:
     """
     
     def __init__(self, fAllowUnencrypted = True):
-        self.__sm = CSessionManager(
+        self.__sm = CSessionManagerInternal(
                             pwd = None, 
                             fAllowUnencrypted = fAllowUnencrypted, 
                             fAllowRemote = False, 
@@ -469,6 +469,9 @@ class CSimpleSessionManager:
         self.m_fRunning = False
         self.m_termination_lineno = None
         
+        event_type_dict = {CEventUnhandledException: {}}
+        self.__sm.register_callback(self.__unhandled_exception, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventState: {}}
         self.__sm.register_callback(self.__state_calback, event_type_dict, fSingleUse = False)
 
@@ -479,7 +482,7 @@ class CSimpleSessionManager:
     def launch(self, fchdir, command_line):
         self.m_fRunning = False
         self.m_termination_lineno = None
-        self.__sm.launch(fchdir, command_line)
+        self.__sm.launch(fchdir, command_line, fload_breakpoints = False)
 
 
     def request_go(self):
@@ -543,6 +546,10 @@ class CSimpleSessionManager:
     # Private Methods
     #
     
+    def __unhandled_exception(self, event):   
+        self.unhandled_exception_callback()
+
+        
     def __state_calback(self, event):   
         """
         Handle state change notifications from the debugge.
@@ -576,15 +583,8 @@ class CSimpleSessionManager:
         path = e[0]
         filename = os.path.basename(e[0])
 
-        if filename != DEBUGGER_FILENAME:
-            self.unhandled_exception_callback()
-            return
-
-        if lineno != self.__get_termination_lineno(path):
-            self.unhandled_exception_callback()
-            return
-            
-        self.script_about_to_terminate_callback()
+        if filename == DEBUGGER_FILENAME and lineno == self.__get_termination_lineno(path):
+            self.script_about_to_terminate_callback()
 
     
     def __termination_callback(self, event):
@@ -5464,7 +5464,7 @@ class CDebuggerEngine(CDebuggerCore):
             fSendUnhandled = False
 
         try:
-            if not fException:
+            if isinstance(event, CEventSync) and not fException:
                 self.m_state_manager.set_state()
                 
             self.send_stack_depth()
@@ -7162,7 +7162,7 @@ class CSessionManagerInternal:
             pass
 
 
-    def launch(self, fchdir, command_line):
+    def launch(self, fchdir, command_line, fload_breakpoints = True):
         self.__verify_unattached()
 
         if not os.name in [POSIX, 'nt']:
@@ -7219,7 +7219,8 @@ class CSessionManagerInternal:
                 raise
 
             try:
-                self.load_breakpoints()
+                if fload_breakpoints:
+                    self.load_breakpoints()
             except:
                 pass
 
@@ -7417,12 +7418,12 @@ class CSessionManagerInternal:
         
         self.m_server_info = self.get_server_info()
 
-        self.refresh(True)
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
+        self.request_break()
+        self.refresh(True)
         
         self.__start_event_monitor()
 
-        self.request_break()
         self.enable_breakpoint([], fAll = True)
 
         
