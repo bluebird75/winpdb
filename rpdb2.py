@@ -539,7 +539,6 @@ class CSimpleSessionManager:
 
     def script_terminated_callback(self):
         print 'script_terminated_callback'
-        self.detach()
 
 
     #
