@@ -8978,6 +8978,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             except CException:
                 self.m_session_manager.report_exception(*sys.exc_info())
             except:
+                self.m_session_manager.report_exception(*sys.exc_info())
                 print_debug(True)
 
         print >> self.stdout, ''
