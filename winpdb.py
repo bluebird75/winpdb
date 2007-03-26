@@ -1117,6 +1117,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_state = rpdb2.STATE_DETACHED
                 
         self.SetMinSize(WINPDB_SIZE_MIN)
+        self.SetSize(settings[WINPDB_SIZE])
         self.Centre(wx.BOTH)
 
         self.init_jobs()
