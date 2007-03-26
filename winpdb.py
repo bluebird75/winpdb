@@ -316,6 +316,7 @@ import xmlrpclib
 import tempfile
 import cPickle
 import keyword
+import weakref
 import base64
 import socket
 import string
@@ -977,18 +978,19 @@ class CJobs:
         finally:        
             self.__m_jobs_lock.release()
 
+        r = None
+        exc_info = (None, None, None)
+        
         try:
             r = job(*args)
-            if r is None:
-                r = ()
-            elif type(r) != tuple:
-                r = (r)
         except:
-            rpdb2.print_debug()
-            callback = None
+            exc_info = sys.exc_info()
+
+            if callback == None:
+                rpdb2.print_debug()
 
         if callback is not None:
-            wx.CallAfter(callback, *r)
+            wx.CallAfter(callback, r, exc_info)
             
         try:
             self.__m_jobs_lock.acquire()
@@ -1017,6 +1019,73 @@ class CMainWindow(CMenuBar, CToolBar, CStatusBar, CJobs):
 
 
 
+class CAsyncSessionManagerCall:
+    def __init__(self, session_manager, job_manager, f, callback):
+        self.m_session_manager = session_manager
+        self.m_job_manager = job_manager
+        self.m_f = f
+        self.m_callback = callback
+
+
+    def __wrapper(self, *args):
+        if self.m_callback != None:
+            return self.m_f(*args)
+            
+        try:
+            self.m_f(*args)
+            
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
+        except CException:
+            self.m_session_manager.report_exception(*sys.exc_info())
+        except:
+            self.m_session_manager.report_exception(*sys.exc_info())
+            rpdb2.print_debug(True)
+
+    
+    def __call__(self, *args):
+        if self.m_job_manager == None:
+            return
+            
+        self.m_job_manager.job_post(self.__wrapper, args, self.m_callback)
+
+
+
+class CAsyncSessionManager:
+    def __init__(self, session_manager, job_manager, callback = None):
+        self.m_session_manager = session_manager
+        self.m_callback = callback
+
+        self.m_weakref_job_manager = None
+        
+        if job_manager != None:
+            self.m_weakref_job_manager = weakref.ref(job_manager)
+
+
+    def with_callback(self, callback):
+        if self.m_weakref_job_manager != None:
+            job_manager = self.m_weakref_job_manager()
+        else:
+            job_manager = None
+        
+        asm = CAsyncSessionManager(self.m_session_manager, job_manager, callback)
+        return asm
+
+
+    def __getattr__(self, name):
+        f = getattr(self.m_session_manager, name)
+        if not hasattr(f, '__call__'):
+            raise TypeError(repr(type(f)) + ' object is not callable')
+
+        if self.m_weakref_job_manager != None:
+            job_manager = self.m_weakref_job_manager()
+        else:
+            job_manager = None
+        
+        return CAsyncSessionManagerCall(self.m_session_manager, job_manager, f, self.m_callback)
+
+    
+        
 class CWinpdbWindow(wx.Frame, CMainWindow):
     def __init__(self, session_manager, fchdir, command_line, fAttach, settings):
         CMainWindow.__init__(self)
@@ -1034,6 +1103,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.Maximize(settings[WINPDB_MAXIMIZE])
         
         self.m_session_manager = session_manager
+        self.m_async_sm = CAsyncSessionManager(session_manager, self)
+        
         self.m_source_manager = CSourceManager(self, session_manager)
 
         self.m_fchdir = fchdir
@@ -1199,17 +1270,11 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #
     #----------------- Thread list logic --------------
     #
-    
+
+
     def OnThreadSelected(self, tid):
-        self.job_post(self.job_thread_select, (tid, ))        
-
-
-    def job_thread_select(self, tid):   
-        try:
-            self.m_session_manager.set_thread(tid)
-        except (socket.error, rpdb2.CConnectionException):
-            pass
-
+        self.m_async_sm.set_thread(tid)
+        
 
     def update_threads(self, event):
         wx.CallAfter(self.m_threads_viewer.update_threads_list, event.m_current_thread, event.m_thread_list)
@@ -1247,15 +1312,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #
     
     def OnFrameSelected(self, event):    
-        self.job_post(self.job_frame_select, (event.m_itemIndex, ))
-
+        self.m_async_sm.set_frame_index(event.m_itemIndex)
         
-    def job_frame_select(self, index):
-        try:
-            self.m_session_manager.set_frame_index(index)
-        except (socket.error, rpdb2.CConnectionException, rpdb2.DebuggerNotBroken):
-            pass
-
 
     def update_frame(self, event):
         wx.CallAfter(self.do_update_frame, event.m_frame_index)
@@ -1304,22 +1362,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         state = self.m_session_manager.get_state()
         f = (state != rpdb2.STATE_ANALYZE)
 
-        self.job_post(self.job_analyze, (f, ))
+        self.m_async_sm.set_analyze(f)
 
 
     def do_analyze(self, event):
         f = event.IsChecked()
 
-        self.job_post(self.job_analyze, (f, ))
+        self.m_async_sm.set_analyze(f)
 
-
-    def job_analyze(self, f):
-        try:
-            self.m_session_manager.set_analyze(f)
-
-        except (socket.error, rpdb2.CException):
-            pass    
-    
 
     def update_trap(self, event):
         wx.CallAfter(self.set_toggle, TB_TRAP, event.m_ftrap)
@@ -1337,17 +1387,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
                 self.set_toggle(TB_TRAP, True)
                 return
 
-        self.job_post(self.job_trap, (f, ))
+        self.m_async_sm.set_trap_unhandled_exceptions(f)
 
 
-    def job_trap(self, f):
-        try:
-            self.m_session_manager.set_trap_unhandled_exceptions(f)
-
-        except (socket.error, rpdb2.CException):
-            pass    
-
-        
     def update_namespace(self, event):
         wx.CallAfter(self.m_namespace_viewer.update_namespace, self.m_stack)
 
@@ -1364,11 +1406,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         if res != wx.ID_YES:
             return
 
-        try:
-            self.m_session_manager.set_analyze(True)
-
-        except (socket.error, rpdb2.CException):
-            pass    
+        self.m_async_sm.set_analyze(True)
         
     
     def do_filter(self, event):
@@ -1464,7 +1502,11 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_console.set_focus()
             
         elif (old_state in [rpdb2.STATE_DETACHED, rpdb2.STATE_DETACHING, rpdb2.STATE_SPAWNING, rpdb2.STATE_ATTACHING]) and (self.m_state not in [rpdb2.STATE_DETACHED, rpdb2.STATE_DETACHING, rpdb2.STATE_SPAWNING, rpdb2.STATE_ATTACHING]):
-            f = self.m_session_manager.get_encryption()
+            try:
+                f = self.m_session_manager.get_encryption()
+            except rpdb2.NotAttached:
+                f = False
+                
             data = [BASE64_UNLOCKED, BASE64_LOCKED][f] 
             tooltip = [TOOLTIP_UNLOCKED, TOOLTIP_LOCKED][f]
             self.set_statusbar_data({SB_ENCRYPTION: (data, tooltip)})
@@ -1528,20 +1570,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         r = pwd_dialog.ShowModal()
         if r == wx.ID_OK:
             pwd = pwd_dialog.get_password()
-            self.job_post(self.job_pwd, (pwd, ))
-            
+
+            try:
+                self.m_session_manager.set_password(pwd)
+            except rpdb2.AlreadyAttached:    
+                assert(0)
+
         pwd_dialog.Destroy()
 
 
-    def job_pwd(self, pwd):
-        try:
-            self.m_session_manager.set_password(pwd)
-            return
-            
-        except rpdb2.AlreadyAttached:
-            pass
-
-        
     def do_launch(self, event):
         (fchdir, command_line) = self.m_session_manager.get_launch_args()
 
@@ -1552,21 +1589,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         r = launch_dialog.ShowModal()
         if r == wx.ID_OK:
             (command_line, fchdir) = launch_dialog.get_command_line()
-            self.job_post(self.job_launch, (fchdir, command_line, ))
+            self.m_async_sm.launch(fchdir, command_line)
             
         launch_dialog.Destroy()
-
-
-    def job_launch(self, fchdir, path):
-        try:
-            self.m_session_manager.launch(fchdir, path)
-            
-        except (socket.error, rpdb2.CConnectionException):
-            pass
-        except rpdb2.BadArgument:
-            pass
-        except IOError:
-            pass
 
 
     def do_open(self, event):
@@ -1586,110 +1611,65 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         r = attach_dialog.ShowModal()
         if r == wx.ID_OK:
             server = attach_dialog.get_server()
-            self.job_post(self.job_attach, (server, ))
+            self.m_async_sm.attach(server.m_rid, server.m_filename)
 
         attach_dialog.Destroy()
 
 
-    def job_attach(self, server):    
-        try:
-            self.m_session_manager.attach(server.m_rid, server.m_filename)
-            return
-            
-        except (socket.error, rpdb2.CConnectionException):
-            pass
-        except rpdb2.BadArgument:
-            pass
-
-    
     def do_detach(self, event):
-        self.job_post(self.job_detach, ())
-
-
-    def job_detach(self):    
-        try:
-            self.m_session_manager.detach()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.detach()
 
 
     def do_stop(self, event):
-        self.job_post(self.job_stop, ())
+        self.m_async_sm.stop_debuggee()
 
         
-    def job_stop(self):    
-        try:    
-            self.m_session_manager.stop_debuggee()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
-
-
     def do_restart(self, event):
-        self.job_post(self.job_restart, ())
+        self.m_async_sm.restart()
 
         
-    def job_restart(self):    
-        try:
-            self.m_session_manager.restart()
-            
-        except (socket.error, rpdb2.CConnectionException):
-            pass
-        except rpdb2.BadArgument:
-            pass
-        except IOError:
-            pass
-
-
     def do_disable(self, event):
-        try:
-            self.m_session_manager.disable_breakpoint([], fAll = True)
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.disable_breakpoint([], fAll = True)
 
         
     def do_enable(self, event):
-        try:
-            self.m_session_manager.enable_breakpoint([], fAll = True)
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.enable_breakpoint([], fAll = True)
 
         
     def do_clear(self, event):
-        try:
-            self.m_session_manager.delete_breakpoint([], fAll = True)
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.delete_breakpoint([], fAll = True)
 
         
     def do_load(self, event):
-        try:
-            self.m_session_manager.load_breakpoints()
+        self.m_async_sm.with_callback(self.callback_load).load_breakpoints()
+
+
+    def callback_load(self, r, exc_info):
+        (t, v, tb) = exc_info
+           
+        if t in (socket.error, rpdb2.CException):    
+            error = rpdb2.STR_BREAKPOINTS_LOAD_PROBLEM
+        elif t == IOError:     
+            error = rpdb2.STR_BREAKPOINTS_NOT_FOUND
+        else:
             return
 
-        except rpdb2.NotAttached:
-            return
-            
-        except (socket.error, rpdb2.CException):
-            error = rpdb2.STR_BREAKPOINTS_LOAD_PROBLEM
-            
-        except IOError:
-            error = rpdb2.STR_BREAKPOINTS_NOT_FOUND
-            
         dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
         dlg.ShowModal()
         dlg.Destroy()
 
         
     def do_save(self, event):
-        try:
-            self.m_session_manager.save_breakpoints()
-            return
-            
-        except rpdb2.NotAttached:
-            return
-            
-        except (socket.error, rpdb2.CException, IOError):
+        self.m_async_sm.with_callback(self.callback_save).load_breakpoints()
+
+
+    def callback_save(self, r, exc_info):
+        (t, v, tb) = exc_info
+           
+        if t in (socket.error, rpdb2.CException, IOError):    
             error = rpdb2.STR_BREAKPOINTS_SAVE_PROBLEM
+        else:
+            return
             
         dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
         dlg.ShowModal()
@@ -1697,46 +1677,28 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         
     def do_go(self, event):
-        try:
-            self.m_session_manager.request_go()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.request_go()
 
         
     def do_break(self, event):
-        try:
-            self.m_session_manager.request_break()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.request_break()
 
         
     def do_step(self, event):
-        try:
-            self.m_session_manager.request_step()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.request_step()
 
         
     def do_next(self, event):
-        try:
-            self.m_session_manager.request_next()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.request_next()
 
         
     def do_return(self, event):
-        try:
-            self.m_session_manager.request_return()
-        except (socket.error, rpdb2.CConnectionException):
-            pass
+        self.m_async_sm.request_return()
 
             
     def do_goto(self, event):
         (filename, lineno) = self.m_code_viewer.get_file_lineno()
-        try:
-            self.m_session_manager.request_go_breakpoint(filename, '', lineno)
-        except (socket.error, IOError, rpdb2.CException):
-            pass
+        self.m_async_sm.request_go_breakpoint(filename, '', lineno)
 
             
     def do_exit(self, event = None):
@@ -1757,6 +1719,7 @@ class CWinpdbApp(wx.App):
 
         wx.App.__init__(self, redirect = False)
 
+
     def OnInit(self):
         wx.SystemOptions.SetOptionInt("mac.window-plain-transition", 1)
 
@@ -1774,6 +1737,7 @@ class CWinpdbApp(wx.App):
         self.SetTopWindow(self.m_frame)
 
         return True
+
 
     def OnExit(self):
         self.m_settings.save_settings()
@@ -1956,6 +1920,8 @@ class CSourceManager:
     def __init__(self, job_manager, session_manager):
         self.m_job_manager = job_manager
         self.m_session_manager = session_manager
+        self.m_async_sm = CAsyncSessionManager(session_manager, self.m_job_manager)
+
         self.m_files = {}
 
         self.m_lock = threading.RLock()
@@ -1992,12 +1958,15 @@ class CSourceManager:
 
         
     def load_source(self, filename, callback, args, fComplain): 
-        self.m_job_manager.job_post(self.job_load_source, (filename, callback, args, fComplain))
+        f = lambda r, exc_info: self.callback_load_source(r, exc_info, filename, callback, args, fComplain)        
+
+        self.m_async_sm.with_callback(f).get_source_file(filename, -1, -1)
 
         
-    def job_load_source(self, filename, callback, args, fComplain):
-        try:
-            r = self.m_session_manager.get_source_file(filename, -1, -1)
+    def callback_load_source(self, r, exc_info, filename, callback, args, fComplain):
+        (t, v, tb) = exc_info
+
+        if t == None:
             _filename = r[rpdb2.DICT_KEY_FILENAME]
             source_lines = r[rpdb2.DICT_KEY_LINES]
             _source = string.join(source_lines, '')
@@ -2009,40 +1978,38 @@ class CSourceManager:
                 
             u = _source.decode(se, 'ignore')
             source = u.encode(de, 'ignore')
-            t = 0
-
-        except (IOError, socket.error, rpdb2.CConnectionException), e:
+            _time = 0
+            
+        elif t in (IOError, socket.error, rpdb2.CConnectionException):
             if fComplain:
-                wx.CallAfter(self.load_warning, STR_FILE_LOAD_ERROR % (filename, ))
+                dlg = wx.MessageDialog(None, STR_FILE_LOAD_ERROR % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+                dlg.ShowModal()
+                dlg.Destroy()
                 return
 
-            if type(e) == IOError and rpdb2.ERROR_NO_BLENDER_SOURCE in e.args and not self.is_in_files(filename):
-                wx.CallAfter(self.load_warning, STR_BLENDER_SOURCE_WARNING)
+            if t == IOError and rpdb2.ERROR_NO_BLENDER_SOURCE in v.args and not self.is_in_files(filename):
+                dlg = wx.MessageDialog(None, STR_BLENDER_SOURCE_WARNING, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+                dlg.ShowModal()
+                dlg.Destroy()
             
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
-            t = time.time()
-        
+            _time = time.time()
+                    
         try:    
             self.m_lock.acquire()
 
             fNotify = not self.is_in_files(_filename)
-            self.m_files[_filename] = (t, source)
+            self.m_files[_filename] = (_time, source)
 
         finally:
             self.m_lock.release()
 
         _args = (_filename, ) + args + (fNotify, )
 
-        wx.CallAfter(callback, *_args)
+        callback(*_args)
 
 
-    def load_warning(self, warning):
-        dlg = wx.MessageDialog(None, warning, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    
         
 class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
     def __init__(self, *args, **kwargs):
@@ -2054,6 +2021,8 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         CJobs.__init__(self)
         
         self.init_jobs()
+
+        self.m_async_sm = CAsyncSessionManager(self.m_session_manager, self)
 
         self.m_history = []
         self.m_history_index = 0
@@ -2121,32 +2090,20 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         
     def __toggle_breakpoint(self, lineno):
-        bpl = self.m_session_manager.get_breakpoints()
+        try:
+            bpl = self.m_session_manager.get_breakpoints()
+        except rpdb2.NotAttached:
+            return
+            
         id = self.m_breakpoint_lines.get(lineno, None)
         if id is not None:
             bp = bpl.get(id, None)
             
         if (id is None) or (bp is None):
-            self.job_post(self.job_set_breakpoint, (self.m_cur_filename, lineno))
+            self.m_async_sm.set_breakpoint(self.m_cur_filename, '', lineno, True, '')            
             return
 
-        self.job_post(self.job_delete_breakpoint, (id, )) 
-
-
-    def job_set_breakpoint(self, filename, lineno):
-        try:
-            self.m_session_manager.set_breakpoint(filename, '', lineno, True, '')
-        except (socket.error, IOError, rpdb2.CException):
-            pass
-
-        
-    def job_delete_breakpoint(self, id):
-        try:
-            self.m_session_manager.delete_breakpoint([id], False)
-        except (socket.error, rpdb2.CConnectionException):
-            pass
-        except rpdb2.BadArgument:
-            pass
+        self.m_async_sm.delete_breakpoint([id], False)
 
 
     def _disable(self):
@@ -2626,10 +2583,14 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         
 class CNamespacePanel(wx.Panel, CJobs):
     def __init__(self, *args, **kwargs):
+        self.m_session_manager = kwargs.pop('session_manager')
+
         wx.Panel.__init__(self, *args, **kwargs)
         CJobs.__init__(self)
         
         self.init_jobs()
+
+        self.m_async_sm = CAsyncSessionManager(self.m_session_manager, self)
 
         self.m_lock = threading.RLock()
         self.m_jobs = []
@@ -2699,31 +2660,34 @@ class CNamespacePanel(wx.Panel, CJobs):
         expr = expr_dialog.get_expression()
         expr_dialog.Destroy()
 
-        try:
-            _expr = self.m_tree.GetPyData(item)
-            _suite = "%s = %s" % (_expr, expr)
-            rl = self.m_session_manager.execute(_suite)
+        _expr = self.m_tree.GetPyData(item)
+        _suite = "%s = %s" % (_expr, expr)
+        
+        self.m_async_sm.with_callback(self.callback_execute).execute(_suite)
 
-            error = rl[1]
-            if error != '':
-                dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
-                dlg.ShowModal()
-                dlg.Destroy()
 
-            warning = rl[0]
-            if not warning in g_ignored_warnings:
-                dlg = wx.MessageDialog(self, MSG_WARNING_TEMPLATE % (warning, ), MSG_WARNING_TITLE, wx.OK | wx.CANCEL | wx.YES_DEFAULT | wx.ICON_WARNING)
-                res = dlg.ShowModal()
-                dlg.Destroy()
+    def callback_execute(self, r, exc_info):
+        (t, v, tb) = exc_info
 
-                if res == wx.ID_CANCEL:
-                    g_ignored_warnings[warning] = True
-                               
-        except:
-            rpdb2.print_debug()
+        if t != None:
+            rpdb2.print_exception(t, b, tb)
+            return
 
-        return
+        (warning, error) = r
+        
+        if error != '':
+            dlg = wx.MessageDialog(self, error, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+            dlg.ShowModal()
+            dlg.Destroy()
 
+        if not warning in g_ignored_warnings:
+            dlg = wx.MessageDialog(self, MSG_WARNING_TEMPLATE % (warning, ), MSG_WARNING_TITLE, wx.OK | wx.CANCEL | wx.YES_DEFAULT | wx.ICON_WARNING)
+            res = dlg.ShowModal()
+            dlg.Destroy()
+
+            if res == wx.ID_CANCEL:
+                g_ignored_warnings[warning] = True
+        
         
     def OnItemToolTip(self, event):
         item = event.GetItem()
@@ -2737,71 +2701,6 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         event.Skip()
 
-
-    def get_namespace(self, expr, _map):
-        if _map is not None:
-            l = [e for e in _map if e.get(rpdb2.DICT_KEY_EXPR, None) == expr]
-            if l == []:
-                return None
-
-            return l[0]               
-            
-        try:
-            rl = self.m_session_manager.get_namespace([(expr, True)], self.m_fFilter)
-        except:
-            rpdb2.print_debug()
-            return None
-
-        if len(rl) == 0:
-            return None
-
-        _r = rl[0]
-        if rpdb2.DICT_KEY_ERROR in _r:
-            return None            
-        
-        return _r
-
-
-    def job_expand_item(self, expr):
-        _r = self.m_session_manager.get_namespace([(expr, True)], self.m_fFilter)
-        if _r is None or len(_r) == 0:
-            wx.CallAfter(self.expand_error, expr)
-            return
-            
-        wx.CallAfter(self.expand_by_expr, expr, _r)  
-
-
-    def expand_error(self, expr):
-        item = self.find_item(expr)
-        if item == None:
-            return
-            
-        child = self.m_tree.AppendItem(item, STR_NAMESPACE_DEADLOCK)
-        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 2)
-        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 1)
-        self.m_tree.SetItemPyData(child, STR_NAMESPACE_DEADLOCK)
-        self.m_tree.Expand(item)
-
-
-    def expand_by_expr(self, expr, _map):
-        item = self.find_item(expr)
-        if item == None:
-            return
-            
-        self.expand_item(item, _map, False, True)               
-                
-
-    def find_item(self, expr):
-        item = self.m_tree.GetRootItem()
-        while item:
-            expr2 = self.m_tree.GetPyData(item)
-            if expr2 == expr:
-                return item               
-                
-            item = self.m_tree.GetNext(item)
-
-        return None    
-    
 
     def GetChildrenCount(self, item):
         n = self.m_tree.GetChildrenCount(item)
@@ -2817,7 +2716,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         return 1
         
         
-    def expand_item(self, item, _map = None, froot = False, fskip_expansion_check = False):
+    def expand_item(self, item, _map, froot = False, fskip_expansion_check = False):
         if not self.m_tree.ItemHasChildren(item):
             return
         
@@ -2829,7 +2728,11 @@ class CNamespacePanel(wx.Panel, CJobs):
         
         expr = self.m_tree.GetPyData(item)
 
-        _r = self.get_namespace(expr, _map)
+        l = [e for e in _map if e.get(rpdb2.DICT_KEY_EXPR, None) == expr]
+        if l == []:
+            return None
+
+        _r = l[0] 
         if _r is None:
             return   
 
@@ -2876,9 +2779,41 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.DeleteChildren(item)
         expr = self.m_tree.GetPyData(item)
 
-        self.job_post(self.job_expand_item, (expr, ))
+        f = lambda r, exc_info: self.callback_ns(r, exc_info, expr)        
+        self.m_async_sm.with_callback(f).get_namespace([(expr, True)], self.m_fFilter)
+        
         event.Skip()
 
+
+    def callback_ns(self, r, exc_info, expr):
+        (t, v, tb) = exc_info
+
+        item = self.find_item(expr)
+        if item == None:
+            return
+            
+        if t != None or r is None or len(r) == 0:
+            child = self.m_tree.AppendItem(item, STR_NAMESPACE_DEADLOCK)
+            self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 2)
+            self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 1)
+            self.m_tree.SetItemPyData(child, STR_NAMESPACE_DEADLOCK)
+            self.m_tree.Expand(item)
+            return
+            
+        self.expand_item(item, r, False, True)               
+        
+
+    def find_item(self, expr):
+        item = self.m_tree.GetRootItem()
+        while item:
+            expr2 = self.m_tree.GetPyData(item)
+            if expr2 == expr:
+                return item               
+                
+            item = self.m_tree.GetNext(item)
+
+        return None    
+    
 
     def get_children(self, item):
         (child, cookie) = self.m_tree.GetFirstChild(item)
@@ -2978,35 +2913,27 @@ class CNamespacePanel(wx.Panel, CJobs):
             s = items + s
 
 
+    def get_root_expr(self):
+        """
+        Over-ride in derived classes
+        """
+        pass
+
+
 
 class CLocals(CNamespacePanel):
-    def __init__(self, *args, **kwargs):
-        self.m_session_manager = kwargs.pop('session_manager')
-
-        CNamespacePanel.__init__(self, *args, **kwargs)        
-
     def get_root_expr(self):
         return 'locals()'
         
 
     
 class CGlobals(CNamespacePanel):
-    def __init__(self, *args, **kwargs):
-        self.m_session_manager = kwargs.pop('session_manager')
-
-        CNamespacePanel.__init__(self, *args, **kwargs)        
-
     def get_root_expr(self):
         return 'globals()'
         
         
         
 class CException(CNamespacePanel):
-    def __init__(self, *args, **kwargs):
-        self.m_session_manager = kwargs.pop('session_manager')
-
-        CNamespacePanel.__init__(self, *args, **kwargs)        
-
     def get_root_expr(self):
         return rpdb2.RPDB_EXEC_INFO
         
@@ -3088,20 +3015,24 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
 
             
     def update_namespace(self, _stack):
-        key = self.get_local_key(_stack)
-        el = self.m_key_map.get(key, None)
-        (key0, el0) = self.m_locals.update_namespace(key, el)
-        self.m_key_map[key0] = el0
-        
-        key = self.get_global_key(_stack)
-        el = self.m_key_map.get(key, None)
-        (key1, el1) = self.m_globals.update_namespace(key, el)
-        self.m_key_map[key1] = el1
-        
-        key = 'exception'
-        el = self.m_key_map.get(key, None)
-        (key1, el1) = self.m_exception.update_namespace(key, el)
-        self.m_key_map[key] = el1
+        try:
+            key = self.get_local_key(_stack)
+            el = self.m_key_map.get(key, None)
+            (key0, el0) = self.m_locals.update_namespace(key, el)
+            self.m_key_map[key0] = el0
+            
+            key = self.get_global_key(_stack)
+            el = self.m_key_map.get(key, None)
+            (key1, el1) = self.m_globals.update_namespace(key, el)
+            self.m_key_map[key1] = el1
+            
+            key = 'exception'
+            el = self.m_key_map.get(key, None)
+            (key1, el1) = self.m_exception.update_namespace(key, el)
+            self.m_key_map[key] = el1
+
+        except rpdb2.NotAttached:
+            return
 
         
 
@@ -3340,26 +3271,26 @@ class CAttachDialog(wx.Dialog, CJobs):
         pos = self.GetPositionTuple()
         pwd_dialog.SetPosition((pos[0] + 50, pos[1] + 50))
         r = pwd_dialog.ShowModal()
-        if r == wx.ID_OK:
-            pwd = pwd_dialog.get_password()
+        if r != wx.ID_OK:
             pwd_dialog.Destroy()
-            self.job_post(self.job_pwd, (pwd, ), self.do_refresh)
+            self.Close()
             return
 
+        pwd = pwd_dialog.get_password()
         pwd_dialog.Destroy()
-        self.Close()
-        return
 
-                
-    def job_pwd(self, pwd):
         try:
-            self.m_session_manager.set_password(pwd)
+            self.m_session_manager.set_password(pwd)            
+
+        except rpdb2.AlreadyAttached:    
+            assert(0)
+
+            self.Close()
             return
             
-        except rpdb2.AlreadyAttached:
-            pass
+        self.do_refresh()
 
-        
+                
     def set_cursor(self, id):
         cursor = wx.StockCursor(id)
         self.SetCursor(cursor)        
@@ -3401,22 +3332,25 @@ class CAttachDialog(wx.Dialog, CJobs):
             dlg.Destroy()
 
         if len(self.m_errors) > 0:
-            text = ''
-            for k in self.m_errors.keys():
-                if k == rpdb2.AuthenticationBadData:
-                    text += '\n' + rpdb2.STR_ACCESS_DENIED
-                if k == rpdb2.AuthenticationFailure:
-                    text += '\n' + rpdb2.STR_ACCESS_DENIED
-                if k == rpdb2.EncryptionExpected:
-                    text += '\n' + rpdb2.STR_ENCRYPTION_EXPECTED
-                if k == rpdb2.BadVersion:
-                    text += '\n' + rpdb2.STR_BAD_VERSION2
+            for k, el in self.m_errors.items():
+                if k in [rpdb2.AuthenticationBadData, rpdb2.AuthenticationFailure]:
+                    self.report_attach_warning(rpdb2.STR_ACCESS_DENIED)
 
-            text = text[1:]        
-            
-            dlg = wx.MessageDialog(self, text, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
-            dlg.ShowModal()
-            dlg.Destroy()            
+                elif k == rpdb2.EncryptionNotSupported:
+                    self.report_attach_warning(rpdb2.STR_DEBUGGEE_NO_ENCRYPTION)
+                    
+                elif k == rpdb2.EncryptionExpected:
+                    self.report_attach_warning(rpdb2.STR_ENCRYPTION_EXPECTED)
+
+                elif k == rpdb2.BadVersion:
+                    for (t, v, tb) in el:
+                        self.report_attach_warning(rpdb2.STR_BAD_VERSION % (v.m_version, ))
+
+                text = text[1:]        
+                
+                dlg = wx.MessageDialog(self, text, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+                dlg.ShowModal()
+                dlg.Destroy()            
             
         self.m_ok.Disable()
 
@@ -3432,6 +3366,12 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         self.m_listbox_scripts.set_columns_width()
 
+
+    def report_attach_warning(self, warning):
+        dlg = wx.MessageDialog(self, warning, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg.ShowModal()
+        dlg.Destroy()   
+        
 
     def OnItemSelected(self, event):
         self.m_index = event.m_itemIndex
