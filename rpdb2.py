@@ -5418,7 +5418,6 @@ class CDebuggerEngine(CDebuggerCore):
         
         event = CEventExit()
         self.m_event_dispatcher.fire_event(event)
-        time.sleep(1.0)
 
         
     def sync_with_events(self, fException, fSendUnhandled):
@@ -6292,19 +6291,11 @@ class CDebuggerEngine(CDebuggerCore):
         return (current_thread_id, tl)
 
 
-    def __abort(self):
-        sys.exit(0)
-
-        #time.sleep(1.0)
-        #os.abort()
-
-        
     def stop_debuggee(self):
         """
         Notify the client and terminate this proccess.
         """
 
-        #self.atexit()
         thread.start_new_thread(_atexit, (True, ))
 
 
@@ -6636,7 +6627,7 @@ class CIOServer(threading.Thread):
             except (socket.error, CException):
                 pass
             
-            self.join(1)
+            self.join(0.5)
 
         self.m_server.shutdown_work_queue()
 
@@ -7741,7 +7732,10 @@ class CSessionManagerInternal:
         self.m_ftrap = ftrap
 
         if self.__is_attached():
-            self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
+            try:
+                self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
+            except NotAttached:
+                pass
 
         event = CEventTrap(ftrap)
         self.m_event_dispatcher.fire_event(event)
@@ -7819,6 +7813,7 @@ class CSessionManagerInternal:
             self.report_exception(*sys.exc_info())
         except:
             self.report_exception(*sys.exc_info())
+            print_debug(True)
         
 
     def evaluate_async(self, callback, obj, expr):
@@ -7851,6 +7846,7 @@ class CSessionManagerInternal:
         except CException:
             self.report_exception(*sys.exc_info())
         except:
+            self.report_exception(*sys.exc_info())
             print_debug(True)
         
 
@@ -9540,11 +9536,12 @@ def _atexit(fabort = False):
         
     g_debugger.send_event_exit()
 
+    time.sleep(1.0)
+
     g_server.shutdown()
     g_debugger.shutdown()
 
     if fabort:
-        time.sleep(1.0)
         os.abort()
         
 
