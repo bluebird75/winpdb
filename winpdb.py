@@ -1034,9 +1034,9 @@ class CAsyncSessionManagerCall:
         try:
             self.m_f(*args)
             
-        except (socket.error, CConnectionException):
+        except (socket.error, rpdb2.CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
-        except CException:
+        except rpdb2.CException:
             self.m_session_manager.report_exception(*sys.exc_info())
         except:
             self.m_session_manager.report_exception(*sys.exc_info())
@@ -1518,6 +1518,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_namespace_viewer._enable()
             self.m_stack_viewer._enable()
             self.m_threads_viewer._enable()
+
+            self.Raise()
             
         elif self.m_state == rpdb2.STATE_ANALYZE:
             self.set_toggle(TB_EXCEPTION, True)
@@ -2293,7 +2295,10 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         f_current_line = False
 
-        bpl = self.m_session_manager.get_breakpoints()
+        try:
+            bpl = self.m_session_manager.get_breakpoints()
+        except rpdb2.NotAttached:
+            return
 
         self.m_breakpoint_lines = {}
         
@@ -3319,7 +3324,7 @@ class CAttachDialog(wx.Dialog, CJobs):
             (self.m_server_list, self.m_errors) = self.m_session_manager.calc_server_list()
             return (True, host)
             
-        except rpdb2.UnsetPassword:
+        except (rpdb2.UnsetPassword, rpdb2.AlreadyAttached):
             return
         except socket.gaierror, e:
             return (False, host)
@@ -3344,13 +3349,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
                 elif k == rpdb2.BadVersion:
                     for (t, v, tb) in el:
-                        self.report_attach_warning(rpdb2.STR_BAD_VERSION % (v.m_version, ))
-
-                text = text[1:]        
-                
-                dlg = wx.MessageDialog(self, text, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
-                dlg.ShowModal()
-                dlg.Destroy()            
+                        self.report_attach_warning(rpdb2.STR_BAD_VERSION % {'value': v})
             
         self.m_ok.Disable()
 
@@ -3655,6 +3654,7 @@ class CLaunchDialog(wx.Dialog):
         try:
             _filename = os.path.join(_path, filename)
             abs_path = rpdb2.FindFile(_filename)
+
         except IOError:                    
             dlg = wx.MessageDialog(self, MSG_ERROR_FILE_NOT_FOUND, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()

@@ -4403,7 +4403,10 @@ class CDebuggerCoreThread:
 
             (f, lineno) = self.get_frame(base_frame, frame_index, fException)
 
-            gc = f.f_globals
+            if fReadOnly:
+                gc = copy.copy(f.f_globals)
+            else:    
+                gc = f.f_globals
 
             try:
                 (lc, olc) = self.m_locals_copy[f]
@@ -4442,8 +4445,11 @@ class CDebuggerCoreThread:
         (lc, base) = lct
         cr = copy.copy(self.m_frame.f_locals)
         
-        sb = sets.Set(base.items())
-        sc = sets.Set(cr.items())
+        b = [(k, repr(v)) for k, v in base.items()]
+        sb = sets.Set(b)
+
+        c = [(k, repr(v)) for k, v in cr.items()]
+        sc = sets.Set(c)
 
         nsc = [k for (k, v) in sc - sb]
 
@@ -6070,7 +6076,13 @@ class CDebuggerEngine(CDebuggerCore):
                     continue
                     
                 e = {}
-                e[DICT_KEY_EXPR] = '%s[%s]' % (expr, repr(k))
+
+                rk = repr(k)
+                if rk.startswith('<'):
+                    e[DICT_KEY_EXPR] = '[v for k, v in (%s).items() if repr(k) == "%s"][0]' % (expr, rk)
+                else:    
+                    e[DICT_KEY_EXPR] = '%s[%s]' % (expr, rk)
+                    
                 e[DICT_KEY_NAME] = [repr(k), k][fForceNames]
                 e[DICT_KEY_REPR] = safe_repr_limited(v)
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
@@ -6144,7 +6156,7 @@ class CDebuggerEngine(CDebuggerCore):
                 rpdb_exception_info = self.get_exception(frame_index, fException)
                 __globals = globals()
                 __locals = locals()
-                
+
             r = eval(expr, __globals, __locals)
 
             e[DICT_KEY_EXPR] = expr
@@ -6247,8 +6259,11 @@ class CDebuggerEngine(CDebuggerCore):
             e = "%s, %s" % (str(exc_info[0]), str(exc_info[1]))
 
         if frame_index > 0 and (not _globals is _locals) and _locals != _locals_copy:
-            sl = sets.Set(_locals.items())
-            slc = sets.Set(_locals_copy.items())
+            l = [(k, repr(v)) for k, v in _locals.items()]
+            sl = sets.Set(l)
+
+            lc = [(k, repr(v)) for k, v in _locals_copy.items()]
+            slc = sets.Set(lc)
 
             nsc = [k for (k, v) in sl - slc if k in _original_locals_copy]
             if len(nsc) != 0:
@@ -7432,7 +7447,7 @@ class CSessionManagerInternal:
             
     def __report_server_errors(self, errors, fsupress_pwd_warning = False):
         for k, el in errors.items():
-            if fsupress_pwd_warning and k in [AuthenticationBadData, AuthenticationFailure]:
+            if fsupress_pwd_warning and k in [BadVersion, AuthenticationBadData, AuthenticationFailure]:
                 continue
 
             if k in [BadVersion]:
