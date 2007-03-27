@@ -368,6 +368,8 @@ You may continue to debug, but you will not see
 source lines from this file."""
 STR_BLENDER_SOURCE_WARNING = "You attached to a Blender Python script. To be able to see the script's source you need to load it into the Blender text window and launch the script from there."
 STR_EMBEDDED_WARNING = "You attached to an embedded debugger. Winpdb may become unresponsive during periods in which the Python interpreter is inactive."
+STR_EXIT_WARNING = """The debugger is attached to a script. Would you like to stop the script? 
+If you click 'No' the debugger will attempt to detach before exiting."""
 
 DLG_EXPR_TITLE = "Enter Expression"
 DLG_PWD_TITLE = "Password"
@@ -376,9 +378,9 @@ DLG_LAUNCH_TITLE = "Launch"
 DLG_ATTACH_TITLE = "Attach"
 STATIC_EXPR = """The new expression will be evaluated at the debuggee
 and its value will be set to the item."""
-STATIC_PWD = """The password is used to secure communitcation between
+STATIC_PWD = """The password is used to secure communication between
 the debugger console and the debuggee. Debuggees with
-unmatching passwords will not appear in the attach
+un-matching passwords will not appear in the attach
 query list."""
 STATIC_OPEN = """The source file entered will be fetched from the debugee."""
 LABEL_EXPR = "New Expression:"
@@ -507,7 +509,7 @@ WIDTH = "width"
 PWD_TIP = "Set connection password."
 LAUNCH_TIP = "Launch a new debugged script."
 ATTACH_TIP = "Attach to a debugged script."
-DETACH_TIP = "Detach from debugged sctipt."
+DETACH_TIP = "Detach from debugged script."
 STOP_TIP = "Shutdown the debugged script."
 RESTART_TIP = "Restart the debugged script."
 OPEN_TIP = "Open source file in the source viewer."
@@ -1448,13 +1450,31 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         
         
     def OnCloseWindow(self, event):
+        if event.CanVeto() and self.m_session_manager.get_state() != rpdb2.STATE_DETACHED:    
+            dlg = wx.MessageDialog(self, STR_EXIT_WARNING, MSG_WARNING_TITLE, wx.YES_NO | wx.CANCEL | wx.YES_DEFAULT | wx.ICON_WARNING)
+            res = dlg.ShowModal()
+            dlg.Destroy()
+
+            if res == wx.ID_CANCEL:
+                event.Veto()
+                return
+
+            if res == wx.ID_NO:
+                f = lambda r, exc_info: self.Close()
+                self.m_async_sm.with_callback(f).detach()                
+                event.Veto()
+                return
+                
+        try:
+            self.m_session_manager.stop_debuggee()    
+        except:
+            pass            
+            
         self.m_settings[WINPDB_MAXIMIZE] = self.IsMaximized()
         self.m_settings[SPLITTER_1_POS] = self.m_splitterh2.GetSashPosition()
         self.m_settings[SPLITTER_2_POS] = self.m_splitterh1.GetSashPosition()
         self.m_settings[SPLITTER_3_POS] = self.m_splitterv.GetSashPosition()
         self.m_settings[SPLITTER_4_POS] = self.m_splitterh3.GetSashPosition()
-
-        #print self.m_settings[SPLITTER_1_POS], self.m_settings[SPLITTER_2_POS], self.m_settings[SPLITTER_3_POS], self.m_settings[SPLITTER_4_POS] 
         
         self.m_console.stop()
         self.shutdown_jobs()
@@ -2481,10 +2501,12 @@ class CConsole(wx.Panel, CCaptionManager):
         
         self.m_console_out.write(CONSOLE_PROMPT + value + '\n') 
         self.m_console_in.Clear()
-        self.m_queue.put(value + '\n')
 
         if value in ['exit', 'EOF']:
             self.m_exit_command()
+            return
+
+        self.m_queue.put(value + '\n')
 
             
     def get_history(self, fBack, value = None):

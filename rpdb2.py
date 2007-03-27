@@ -1020,7 +1020,7 @@ class CSessionManager:
 
         Return value is a tuple (v, w, e) where v is a repr of the evaluated
         expression value, w is always '', and e is an error string if an error
-        occured.
+        occurred.
 
         NOTE: This call might not return since debugged script logic can lead
         to tmporary locking or even deadlocking.
@@ -1035,7 +1035,7 @@ class CSessionManager:
         and frame.
 
         Return value is a tuple (w, e) where w and e are warning and 
-        error strings (respectively) if an error occured.
+        error strings (respectively) if an error occurred.
 
         NOTE: This call might not return since debugged script logic can lead
         to tmporary locking or even deadlocking.
@@ -1442,20 +1442,19 @@ PRINT_NOTICE_PROMPT = "Hit Return for more, or q (and Return) to quit:"
 PRINT_NOTICE_LINES_PER_SECTION = 20
 
 STR_NO_THREADS = "Operation failed since no traced threads were found."
-STR_AUTOMATIC_LAUNCH_UNKNOWN = "RPDB doesn't know how to launch a new terminal on this platform. Please start the debuggee manually with the -d flag on a seperate console and then use the 'attach' command to attach to it."
+STR_AUTOMATIC_LAUNCH_UNKNOWN = "RPDB doesn't know how to launch a new terminal on this platform. Please start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
 STR_STARTUP_NOTICE = "Attaching to debuggee..."
-STR_SPAWN_UNSUPPORTED = "Launch command supported on 'posix' and 'nt', systems only. Please start the debuggee manually with the -d flag on a seperate console and then use the 'attach' command to attach to it."
+STR_SPAWN_UNSUPPORTED = "Launch command supported on 'posix' and 'nt', systems only. Please start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
 STR_STARTUP_SPAWN_NOTICE = "Spawning debuggee..."
 STR_KILL_NOTICE = "Stopping debuggee..."
 STR_STARTUP_FAILURE = "Debuggee failed to start in a timely manner."
 STR_OUTPUT_WARNING = "Textual output will be done at the debuggee."
 STR_OUTPUT_WARNING_ASYNC = "The operation will continue to run in the background."
 STR_ANALYZE_GLOBALS_WARNING = "In analyze mode the globals and locals dictionaries are read only."
-STR_GLOBALS_WARNING = "Any changes made to the globals dictionay at this frame will be discarded."
 STR_BREAKPOINTS_LOADED = "Breakpoints were loaded."
 STR_BREAKPOINTS_SAVED = "Breakpoints were saved."
-STR_BREAKPOINTS_SAVE_PROBLEM = "A problem occured while saving the breakpoints."
-STR_BREAKPOINTS_LOAD_PROBLEM = "A problem occured while loading the breakpoints."
+STR_BREAKPOINTS_SAVE_PROBLEM = "A problem occurred while saving the breakpoints."
+STR_BREAKPOINTS_LOAD_PROBLEM = "A problem occurred while loading the breakpoints."
 STR_BREAKPOINTS_NOT_SAVED = "Breakpoints were not saved."
 STR_BREAKPOINTS_NOT_LOADED = "Breakpoints were not loaded."
 STR_BREAKPOINTS_FILE_NOT_FOUND = "Breakpoints file was not found." 
@@ -1830,7 +1829,7 @@ def split_path(path):
     (_path, filename) = os.path.split(path)
 
     #
-    # Make sure path seperater (e.g. '/') ends the splitted path if it was in
+    # Make sure path separator (e.g. '/') ends the splitted path if it was in
     # the original path.
     #
     if (_path[-1:] not in [os.path.sep, os.path.altsep]) and \
