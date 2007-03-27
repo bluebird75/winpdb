@@ -366,7 +366,8 @@ STR_FILE_LOAD_ERROR = "Failed to load source file '%s' from debuggee."
 STR_FILE_LOAD_ERROR2 = """Failed to load source file '%s' from debuggee.
 You may continue to debug, but you will not see 
 source lines from this file."""
-STR_BLENDER_SOURCE_WARNING = "To debug Blender Python scripts you need to load them into the Blender text window and launch them from there."
+STR_BLENDER_SOURCE_WARNING = "You attached to a Blender Python script. To be able to see the script's source you need to load it into the Blender text window and launch the script from there."
+STR_EMBEDDED_WARNING = "You attached to an embedded debugger. Winpdb may become unresponsive during periods in which the Python interpreter is inactive."
 
 DLG_EXPR_TITLE = "Enter Expression"
 DLG_PWD_TITLE = "Password"
@@ -1113,7 +1114,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_stack = None
         
         self.m_state = rpdb2.STATE_DETACHED
-                
+        self.m_fembedded_warning = True
+        
         self.SetMinSize(WINPDB_SIZE_MIN)
         self.SetSize(settings[WINPDB_SIZE])
         self.Centre(wx.BOTH)
@@ -1500,6 +1502,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.set_statusbar_data({SB_STATE: state_text.upper()}) 
 
         if self.m_state == rpdb2.STATE_DETACHED:
+            self.m_fembedded_warning = True
+            
             self.set_statusbar_data({SB_ENCRYPTION: (None, None)})
             self.clear_menu_items(ML_WINDOW)
             self.m_source_manager._clear()
@@ -1528,6 +1532,19 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_threads_viewer._enable()
 
             self.Raise()
+
+            if self.m_fembedded_warning and self.m_session_manager.get_server_info().m_fembedded:
+                self.m_fembedded_warning = False
+
+                warning = STR_EMBEDDED_WARNING
+                
+                if not warning in g_ignored_warnings:
+                    dlg = wx.MessageDialog(self, MSG_WARNING_TEMPLATE % (warning, ), MSG_WARNING_TITLE, wx.OK | wx.CANCEL | wx.YES_DEFAULT | wx.ICON_WARNING)
+                    res = dlg.ShowModal()
+                    dlg.Destroy()
+
+                    if res == wx.ID_CANCEL:
+                        g_ignored_warnings[warning] = True
             
         elif self.m_state == rpdb2.STATE_ANALYZE:
             self.set_toggle(TB_EXCEPTION, True)
