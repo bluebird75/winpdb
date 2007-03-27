@@ -3255,6 +3255,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         host = self.m_session_manager.get_host()
         self.m_entry_host = wx.TextCtrl(self, value = host, size = (200, -1))
+        self.m_entry_host.SetFocus()
         sizerh.Add(self.m_entry_host, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         
         btn = wx.Button(self, label = BUTTON_ATTACH_REFRESH)
@@ -3429,6 +3430,7 @@ class CExpressionDialog(wx.Dialog):
         label = wx.StaticText(self, -1, LABEL_EXPR)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         self.m_entry_expr = wx.TextCtrl(self, size = (200, -1))
+        self.m_entry_expr.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_expr)
         sizerh.Add(self.m_entry_expr, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         
@@ -3447,6 +3449,7 @@ class CExpressionDialog(wx.Dialog):
         self.SetSizer(sizerv)
         sizerv.Fit(self)        
 
+
     def OnText(self, event):
         if event.GetString() == '':
             self.m_ok.Disable()
@@ -3454,6 +3457,7 @@ class CExpressionDialog(wx.Dialog):
             self.m_ok.Enable()
 
         event.Skip()        
+
                    
     def get_expression(self):
         return self.m_entry_expr.GetValue()
@@ -3476,6 +3480,7 @@ class CPwdDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         pwd = [current_password, ''][current_password is None]
         self.m_entry_pwd = wx.TextCtrl(self, value = pwd, size = (200, -1))
+        self.m_entry_pwd.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_pwd)
         sizerh.Add(self.m_entry_pwd, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         
@@ -3495,6 +3500,7 @@ class CPwdDialog(wx.Dialog):
         self.SetSizer(sizerv)
         sizerv.Fit(self)        
 
+
     def OnText(self, event):
         if event.GetString() == '':
             self.m_ok.Disable()
@@ -3502,6 +3508,7 @@ class CPwdDialog(wx.Dialog):
             self.m_ok.Enable()
 
         event.Skip()        
+
                    
     def get_password(self):
         return self.m_entry_pwd.GetValue()
@@ -3548,6 +3555,7 @@ class COpenDialog(wx.Dialog):
         self.SetSizer(sizerv)
         sizerv.Fit(self)        
 
+
     def OnText(self, event):
         if event.GetString() == '':
             self.m_ok.Disable()
@@ -3555,6 +3563,7 @@ class COpenDialog(wx.Dialog):
             self.m_ok.Enable()
 
         event.Skip()        
+
             
     def do_browse(self, event = None):
         command_line = self.m_entry.GetValue()
@@ -3574,7 +3583,8 @@ class COpenDialog(wx.Dialog):
         dlg.Destroy()
         
         self.m_entry.SetValue(abs_path)
-        
+
+
     def do_validate(self):
         filename = self.m_entry.GetValue()
         if filename[:1] + filename[-1:] in ['""', "''"]:
@@ -3588,12 +3598,14 @@ class COpenDialog(wx.Dialog):
 
         return True
 
+
     def do_ok(self, event):
         f = self.do_validate()
         if not f:
             return
 
         event.Skip()
+
         
     def get_file_name(self):
         return self.m_entry.GetValue()
@@ -3641,6 +3653,7 @@ class CLaunchDialog(wx.Dialog):
         self.SetSizer(sizerv)
         sizerv.Fit(self)        
 
+
     def OnText(self, event):
         if event.GetString() == '':
             self.m_ok.Disable()
@@ -3648,6 +3661,7 @@ class CLaunchDialog(wx.Dialog):
             self.m_ok.Enable()
 
         event.Skip()        
+
             
     def do_browse(self, event = None):
         command_line = self.m_entry_commandline.GetValue()
@@ -3667,6 +3681,7 @@ class CLaunchDialog(wx.Dialog):
         dlg.Destroy()
         
         self.m_entry_commandline.SetValue(abs_path)
+
         
     def do_validate(self):
         command_line = self.m_entry_commandline.GetValue()
@@ -3691,12 +3706,14 @@ class CLaunchDialog(wx.Dialog):
         
         return True
 
+
     def do_ok(self, event):
         f = self.do_validate()
         if not f:
             return
 
         event.Skip()
+
         
     def get_command_line(self):
         return (self.m_entry_commandline.GetValue(), self.m_cb.GetValue())
