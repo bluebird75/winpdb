@@ -494,7 +494,7 @@ TB_GOTO = "Run to cursor"
 TB_TOGGLE_BP = "Toggle breakpoint"
 TB_FILTER = "Filter modules, classes, and functions from the global and local namespaces"
 TB_EXCEPTION = "Toggle 'analyze exception' mode"
-TB_TRAP = "Trap unhandled exceptions"
+TB_TRAP = "Toggle 'trap unhandled exceptions' mode"
 
 COMMAND = "command"
 TOOLTIP = "tooltip"
