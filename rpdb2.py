@@ -470,7 +470,7 @@ class CSimpleSessionManager:
                             pwd = None, 
                             fAllowUnencrypted = fAllowUnencrypted, 
                             fAllowRemote = False, 
-                            host = LOCAL_HOST
+                            host = LOCALHOST
                             )
 
         self.m_fRunning = False
@@ -1409,7 +1409,9 @@ WAIT_FOR_BREAK_TIMEOUT = 3.0
 STARTUP_TIMEOUT = 3.0
 STARTUP_RETRIES = 3
 
-LOCAL_HOST = "localhost"
+LOOPBACK = '127.0.0.1'
+LOCALHOST = 'localhost'
+
 SERVER_PORT_RANGE_START = 51000
 SERVER_PORT_RANGE_LENGTH = 20
 
@@ -1507,7 +1509,9 @@ STR_ATTEMPTING_TO_DETACH = "Detaching from script..."
 STR_DETACH_SUCCEEDED = "Detached from script."
 STR_DEBUGGEE_UNKNOWN = "Failed to find script."
 STR_MULTIPLE_DEBUGGEES = "WARNING: There is more than one debuggee '%s'."
-STR_HOST_UNKNOWN = "Failed to find '%s'"
+MSG_ERROR_HOST_TEXT = """The debugger was not able to set the host to '%s'.
+The following error was returned:
+%s"""
 STR_SOURCE_NOT_FOUND = "Failed to get source from debuggee."
 STR_SCRIPTS_CONNECTING = "Connecting to '%s'..."
 STR_SCRIPTS_NO_SCRIPTS = "No scripts to debug on '%s'"
@@ -6576,7 +6580,7 @@ class CIOServer(threading.Thread):
 
         while self.isAlive():
             try:
-                proxy = CPwdServerProxy(self.m_crypto, calcURL("localhost", self.m_port), CLocalTimeoutTransport())
+                proxy = CPwdServerProxy(self.m_crypto, calcURL(LOOPBACK, self.m_port), CLocalTimeoutTransport())
                 proxy.null()
             except (socket.error, CException):
                 pass
@@ -6672,7 +6676,7 @@ class CIOServer(threading.Thread):
         Looks for an available tcp port to listen on.
         """
         
-        host = [LOCAL_HOST, ""][self.m_fAllowRemote]
+        host = [LOCALHOST, ""][self.m_fAllowRemote]
         port = SERVER_PORT_RANGE_START
 
         while True:
@@ -7196,7 +7200,7 @@ class CSessionManagerInternal:
         _filename = os.path.join(path, filename) 
            
         ExpandedFilename = FindFile(_filename)
-        self.set_host("localhost")
+        self.set_host(LOCALHOST)
 
         self.m_printer(STR_STARTUP_SPAWN_NOTICE)
 
@@ -7755,8 +7759,18 @@ class CSessionManagerInternal:
 
     def set_host(self, host):
         self.__verify_unattached()
-        
-        socket.getaddrinfo(host, 0)        
+        try:
+            socket.getaddrinfo(host, 0)
+
+        except socket.gaierror:
+            if host.lower() != LOCALHOST:
+                raise
+
+            #
+            # Work-around for gaierror: (-8, 'Servname not supported for ai_socktype')
+            #
+            return self.set_host(LOOPBACK)
+            
         self.m_host = host
         self.m_server_list_object = CServerList(host)
 
@@ -8046,7 +8060,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
 
     def __get_str_wrap(self, _str, max_len):
-        if len(_str) <= max_len:
+        if len(_str) <= max_len and not '\n' in _str:
             return (_str, '')
 
         s = _str[: max_len]
@@ -8230,7 +8244,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.set_host(arg)
 
         except socket.gaierror, e:
-            self.printer(STR_HOST_UNKNOWN % (arg, ))
+            self.printer(MSG_ERROR_HOST_TEXT % (arg, e))
 
         
     def do_break(self, arg):
@@ -9694,7 +9708,7 @@ def main(StartClient_func = StartClient):
         return 2
 
     if host is None:
-        host = LOCAL_HOST    
+        host = LOCALHOST    
 
     fSpawn = (len(args) != 0) and (not fWrap) and (not fAttach)
     fStart = (len(args) == 0)

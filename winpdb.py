@@ -358,7 +358,6 @@ MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you 
 MSG_WARNING_TITLE = "Warning"
 MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in the future."
 MSG_ERROR_TITLE = "Error"
-MSG_ERROR_HOST_TEXT = "Host '%s' not found."
 MSG_ERROR_FILE_NOT_FOUND = "File not found."
 MSG_ERROR_FILE_NOT_PYTHON = "Only Python files that end with '.py' are accepted."
 
@@ -1642,9 +1641,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def do_open(self, event):
-        host = self.m_session_manager.get_host()
-        fLocal = (host == rpdb2.LOCAL_HOST)
-        open_dialog = COpenDialog(self, fLocal = False)
+        host = self.m_session_manager.get_host().lower()
+        flocal = (host in [rpdb2.LOCALHOST, rpdb2.LOOPBACK])
+        
+        open_dialog = COpenDialog(self, flocal)
         r = open_dialog.ShowModal()
         if r == wx.ID_OK:
             file_name = open_dialog.get_file_name()
@@ -3264,6 +3264,8 @@ class CAttachDialog(wx.Dialog, CJobs):
         self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
 
         self.m_session_manager = session_manager
+        self.m_async_sm = CAsyncSessionManager(self.m_session_manager, self)
+
         self.m_server_list = None
         self.m_errors = {}
         self.m_index = None
@@ -3359,27 +3361,41 @@ class CAttachDialog(wx.Dialog, CJobs):
         host = self.m_entry_host.GetValue()
         if host == '':
             host = 'localhost'
-        self.job_post(self.job_calc_scripts, (host, ), self.update_body)
+
+        f = lambda r, exc_info: self.callback_sethost(r, exc_info, host)
+        self.m_async_sm.with_callback(f).set_host(host)
 
         
-    def job_calc_scripts(self, host):
-        try:
-            self.m_session_manager.set_host(host)
-            (self.m_server_list, self.m_errors) = self.m_session_manager.calc_server_list()
-            return (True, host)
-            
-        except (rpdb2.UnsetPassword, rpdb2.AlreadyAttached):
-            return
-        except socket.gaierror, e:
-            return (False, host)
+    def callback_sethost(self, r, exc_info, host):
+        (t, v, tb) = exc_info
 
-
-    def update_body(self, result, host):
-        if result == False:
-            dlg = wx.MessageDialog(self, MSG_ERROR_HOST_TEXT % (host, ), MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+        if t == socket.gaierror:
+            dlg = wx.MessageDialog(self, rpdb2.MSG_ERROR_HOST_TEXT % (host, v), MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
+            
+            host = self.m_session_manager.get_host()
+            self.m_entry_host.SetValue(host)
+            return
 
+        elif t != None:
+            self.m_session_manager.report_exception(t, v, tb)
+            rpdb2.print_debug(True)
+            return
+
+        self.m_async_sm.with_callback(self.update_body).calc_server_list()
+
+        
+    def update_body(self, r, exc_info):
+        (t, v, tb) = exc_info
+
+        if t != None:
+            self.m_session_manager.report_exception(t, v, tb)
+            rpdb2.print_debug(True)
+            return
+
+        (self.m_server_list, self.m_errors) = r
+        
         if len(self.m_errors) > 0:
             for k, el in self.m_errors.items():
                 if k in [rpdb2.AuthenticationBadData, rpdb2.AuthenticationFailure]:
