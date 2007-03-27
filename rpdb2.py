@@ -4779,7 +4779,7 @@ class CDebuggerCore:
     Handles basic debugger functionality.
     """
     
-    def __init__(self):
+    def __init__(self, fembedded = False):
         self.m_ftrace = True
 
         self.m_current_ctx = None 
@@ -4808,10 +4808,16 @@ class CDebuggerCore:
 
         self.m_code_contexts = {None: None}
 
+        self.m_fembedded = fembedded
+        
 
     def shutdown(self):
         self.m_event_dispatcher.shutdown()
         self.m_state_manager.shutdown()
+
+        
+    def is_embedded(self):
+        return self.m_fembedded
 
         
     def send_events(self, event):
@@ -5204,6 +5210,10 @@ class CDebuggerCore:
 
             self.m_fUnhandledException = False
             self.m_state_manager.set_state(STATE_RUNNING, fLock = False)
+
+            if self.m_fembedded:
+                time.sleep(0.33)
+                
             self.set_break_flag()
 
         finally:    
@@ -5382,8 +5392,8 @@ class CDebuggerEngine(CDebuggerCore):
     Adds functionality on top of CDebuggerCore.
     """
     
-    def __init__(self):
-        CDebuggerCore.__init__(self)
+    def __init__(self, fembedded = False):
+        CDebuggerCore.__init__(self, fembedded)
 
         event_type_dict = {
             CEventState: {}, 
@@ -6739,7 +6749,7 @@ class CIOServer(threading.Thread):
 
 
 class CServerInfo:
-    def __init__(self, age, port, pid, filename, rid, state):
+    def __init__(self, age, port, pid, filename, rid, state, fembedded):
         self.m_age = age 
         self.m_port = port
         self.m_pid = pid
@@ -6747,6 +6757,7 @@ class CServerInfo:
         self.m_module_name = CalcModuleName(filename)
         self.m_rid = rid
         self.m_state = state
+        self.m_fembedded = fembedded
 
     def __str__(self):
         return 'age: %d, port: %d, pid: %d, filename: %s, rid: %s' % (self.m_age, self.m_port, self.m_pid, self.m_filename, self.m_rid)
@@ -6778,7 +6789,9 @@ class CDebuggeeServer(CIOServer):
     def export_server_info(self):
         age = time.time() - self.m_time
         state = self.m_debugger.get_state()
-        si = CServerInfo(age, self.m_port, self.m_pid, self.m_filename, self.m_rid, state)
+        fembedded = self.m_debugger.is_embedded()
+        
+        si = CServerInfo(age, self.m_port, self.m_pid, self.m_filename, self.m_rid, state, fembedded)
         return si
 
 
@@ -9580,7 +9593,7 @@ def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDe
             
         atexit.register(_atexit)
         
-        g_debugger = CDebuggerEngine()
+        g_debugger = CDebuggerEngine(fembedded = True)
 
         g_server = CDebuggeeServer(filename, g_debugger, pwd, fAllowUnencrypted, fAllowRemote)
         g_server.start()
