@@ -441,6 +441,7 @@ def setbreak():
 
 
 
+VERSION = (2, 1, 1, 0, '')
 RPDB_VERSION = "RPDB_2_1_1"
 RPDB_COMPATIBILITY_VERSION = "RPDB_2_1_1"
 
@@ -678,10 +679,6 @@ class CSessionManager:
         return self.__smi.refresh()
 
 
-    def launch_nothrow(self, fchdir, command_line):
-        return self.__smi.launch_nothrow(fchdir, command_line)
-        
-
     def launch(self, fchdir, command_line):
         """
         Launch debuggee in a new process and attach.
@@ -711,10 +708,6 @@ class CSessionManager:
         return self.__smi.get_launch_args()
 
         
-    def attach_nothrow(self, key):
-        return self.__smi.attach_nothrow(key)
-
-
     def attach(self, key, name = None):
         """
         Attach to a debuggee (establish communication with the debuggee-server)
@@ -961,16 +954,6 @@ class CSessionManager:
         return self.__smi.get_server_info()
 
 
-    def get_last_debuggee_name_safe(self):
-        """
-        Get file name of the current or last debugged script to which
-        the session manager was attached or '' if it was not yet
-        attached to any scripts at all.
-        """
-        
-        return self.__smi.get_last_debuggee_name_safe()
-
-
     def get_namespace(self, nl, fFilter):
         """
         get_namespace is designed for locals/globals panes that let 
@@ -1038,32 +1021,12 @@ class CSessionManager:
         Return value is a tuple (v, w, e) where v is a repr of the evaluated
         expression value, w is always '', and e is an error string if an error
         occured.
+
+        NOTE: This call might not return since debugged script logic can lead
+        to tmporary locking or even deadlocking.
         """
         
         return self.__smi.evaluate(expr)
-
-
-    def evaluate_async(self, callback, obj, expr):
-        """
-        Evaluate a python expression asynchronously.
-        Returns the thread object handling the operation.
-
-        obj - is a context that will be passed to the callback function as 
-        an argument.
-
-        expr - is a string representing a Python expression.
-
-        callback - is a function accepting two arguments:
-            obj - the same argument passed to evaluate_async()
-            result - a tuple (v, w, e) where v is a repr of the evaluated
-            expression value, w is always '', and e is an error string if an 
-            error occured.
-
-        You can study CConsoleInternal.do_eval() as an example.
-        """
-        
-        return self.__smi.evaluate_async(callback, obj, expr)
-
 
 
     def execute(self, suite):
@@ -1073,30 +1036,12 @@ class CSessionManager:
 
         Return value is a tuple (w, e) where w and e are warning and 
         error strings (respectively) if an error occured.
+
+        NOTE: This call might not return since debugged script logic can lead
+        to tmporary locking or even deadlocking.
         """
         
         return self.__smi.execute(suite)
-
-
-    def execute_async(self, callback, obj, suite):
-        """
-        Execute a python statement asynchronously.
-        Returns the thread object handling the operation.
-
-        obj - is a context that will be passed to the callback function as 
-        an argument.
-
-        suite - is a string representing a Python suite (e.g. statement).
-
-        callback - is a function accepting two arguments:
-            obj - the same argument passed to execute_async()
-            result - a tuple (w, e) where w and e are warning and 
-            error strings (respectively) if an error occured.
-
-        You can study CConsoleInternal.do_eval() as an example.
-        """
-
-        return self.__smi.execute_async(callback, obj, suite)
 
 
     def get_state(self):
@@ -7231,13 +7176,6 @@ class CSessionManagerInternal:
         return self.getSession().get_encryption()
 
     
-    def launch_nothrow(self, fchdir, command_line):
-        try:
-            self.launch(fchdir, command_line)
-        except:
-            pass
-
-
     def launch(self, fchdir, command_line, fload_breakpoints = True):
         self.__verify_unattached()
 
@@ -7387,13 +7325,6 @@ class CSessionManagerInternal:
             os.popen(command)
 
     
-    def attach_nothrow(self, key):
-        try:
-            self.attach(key)
-        except:
-            pass
-
-
     def attach(self, key, name = None, fsupress_pwd_warning = False):
         self.__verify_unattached()
 
@@ -7812,29 +7743,6 @@ class CSessionManagerInternal:
         return (value, warning, error)
 
         
-    def evaluate_job(self, callback, obj, expr):
-        try:
-            r = self.evaluate(expr)
-            callback(obj, r)
-                
-        except (NoExceptionFound, DebuggerNotBroken):
-            self.report_exception(*sys.exc_info())
-                    
-        except (socket.error, CConnectionException):
-            self.report_exception(*sys.exc_info())
-        except CException:
-            self.report_exception(*sys.exc_info())
-        except:
-            self.report_exception(*sys.exc_info())
-            print_debug(True)
-        
-
-    def evaluate_async(self, callback, obj, expr):
-        t = threading.Thread(target = self.evaluate_job, args = (callback, obj, expr))
-        t.start()
-        return t
-
-
     def execute(self, suite):
         self.__verify_attached()
         self.__verify_broken()
@@ -7844,29 +7752,6 @@ class CSessionManagerInternal:
 
         (warning, error) = self.getSession().getProxy().execute(suite, frame_index, fAnalyzeMode)
         return (warning, error)
-
-
-    def execute_job(self, callback, obj, suite):
-        try:
-            r = self.execute(suite)
-            callback(obj, r)
-
-        except (NoExceptionFound, DebuggerNotBroken):
-            self.report_exception(*sys.exc_info())
-                    
-        except (socket.error, CConnectionException):
-            self.report_exception(*sys.exc_info())
-        except CException:
-            self.report_exception(*sys.exc_info())
-        except:
-            self.report_exception(*sys.exc_info())
-            print_debug(True)
-        
-
-    def execute_async(self, callback, obj, suite):
-        t = threading.Thread(target = self.execute_job, args = (callback, obj, suite))
-        t.start()
-        return t
 
 
     def set_host(self, host):
@@ -7894,13 +7779,6 @@ class CSessionManagerInternal:
 
     def get_server_info(self): 
         return self.getSession().getServerInfo()
-
-
-    def get_last_debuggee_name_safe(self):
-        si = self.m_server_info
-        if si is None:
-            return ''
-        return si.m_filename    
 
 
     def _reset_frame_indexes(self, event):
@@ -8819,61 +8697,94 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.report_exception(*sys.exc_info())
 
 
-    def __eval_callback(self, e, r):
-        (value, warning, error) = r 
+    def evaluate_job(self, sync_event, expr):
+        try:
+            (value, warning, error) = self.m_session_manager.evaluate(expr)
 
-        if warning:
-            self.printer(STR_WARNING % (warning, ))
+            if warning:
+                self.printer(STR_WARNING % (warning, ))
 
-        if error:
-            print >> self.stdout, error + '\n'
+            if error:
+                print >> self.stdout, error + '\n'
 
-        print >> self.stdout, value
+            print >> self.stdout, value
 
-        if e.isSet():
-            print >> self.stdout, self.prompt, 
+            if sync_event.isSet():
+                print >> self.stdout, self.prompt, 
+
+            return
+                
+        except (NoExceptionFound, DebuggerNotBroken):
+            self.m_session_manager.report_exception(*sys.exc_info())
                     
-    
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
+        except CException:
+            self.m_session_manager.report_exception(*sys.exc_info())
+        except:
+            self.m_session_manager.report_exception(*sys.exc_info())
+            print_debug(True)
+        
+
     def do_eval(self, arg):
         if arg == '':
             self.printer(STR_BAD_ARGUMENT)
             return
             
-        e = threading.Event()
-        t = self.m_session_manager.evaluate_async(self.__eval_callback, e, arg)
+        sync_event = threading.Event()
+        t = threading.Thread(target = self.evaluate_job, args = (sync_event, arg))
+        t.start()
         t.join(WAIT_FOR_BREAK_TIMEOUT)
+
         if t.isAlive():
             print >> self.stdout, STR_OUTPUT_WARNING_ASYNC
-            e.set()
+            sync_event.set()
                         
     do_v = do_eval
 
     
-    def __exec_callback(self, e, r):
-        (warning, error) = r 
+    def execute_job(self, sync_event, suite):
+        try:
+            (warning, error) = self.m_session_manager.execute(suite)
 
-        if warning:
-            self.printer(STR_WARNING % (warning, ))
+            if warning:
+                self.printer(STR_WARNING % (warning, ))
 
-        if error:
-            print >> self.stdout, error + '\n'
+            if error:
+                print >> self.stdout, error + '\n'
 
-        if e.isSet():
-            print >> self.stdout, self.prompt, 
-            
+            if sync_event.isSet():
+                print >> self.stdout, self.prompt, 
+
+            return    
+                
+        except (NoExceptionFound, DebuggerNotBroken):
+            self.m_session_manager.report_exception(*sys.exc_info())
+                    
+        except (socket.error, CConnectionException):
+            self.m_session_manager.report_exception(*sys.exc_info())
+        except CException:
+            self.m_session_manager.report_exception(*sys.exc_info())
+        except:
+            self.m_session_manager.report_exception(*sys.exc_info())
+            print_debug(True)
         
+
     def do_exec(self, arg):
         if arg == '':
             self.printer(STR_BAD_ARGUMENT)
             return
             
         print >> self.stdout, STR_OUTPUT_WARNING
-        e = threading.Event()
-        t = self.m_session_manager.execute_async(self.__exec_callback, e, arg)
+
+        sync_event = threading.Event()
+        t = threading.Thread(target = self.execute_job, args = (sync_event, arg))
+        t.start()
         t.join(WAIT_FOR_BREAK_TIMEOUT)
+
         if t.isAlive():
             print >> self.stdout, STR_OUTPUT_WARNING_ASYNC
-            e.set()
+            sync_event.set()
         
     do_x = do_exec
 
@@ -9657,11 +9568,15 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRem
     c.start()
 
     time.sleep(0.5)
-    
-    if fAttach:
-        sm.attach_nothrow(command_line)
-    elif command_line != '':
-        sm.launch_nothrow(fchdir, command_line)
+
+    try:
+        if fAttach:
+            sm.attach(command_line)
+        elif command_line != '':
+            sm.launch(fchdir, command_line)
+            
+    except:
+        pass
         
     c.join()
 

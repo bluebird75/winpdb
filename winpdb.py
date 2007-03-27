@@ -408,6 +408,7 @@ TLC_HEADER_TYPE = "Type"
 
 WINPDB_TITLE = "Winpdb 1.1.1"
 WINPDB_VERSION = "WINPDB_1_1_1"
+VERSION = (1, 1, 1, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -1087,7 +1088,7 @@ class CAsyncSessionManager:
     
         
 class CWinpdbWindow(wx.Frame, CMainWindow):
-    def __init__(self, session_manager, fchdir, command_line, fAttach, settings):
+    def __init__(self, session_manager, settings):
         CMainWindow.__init__(self)
 
         wx.Frame.__init__(self, None, -1, WINPDB_TITLE, size = settings[WINPDB_SIZE],
@@ -1107,9 +1108,6 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         
         self.m_source_manager = CSourceManager(self, session_manager)
 
-        self.m_fchdir = fchdir
-        self.m_command_line = command_line
-        self.m_fAttach = fAttach
         self.m_settings = settings
 
         self.m_stack = None
@@ -1208,10 +1206,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_splitterh3.SetMinimumPaneSize(100)
         self.m_splitterh3.SetSashGravity(1.0)
         
-        self.m_code_viewer = CCodeViewer(self.m_splitterh3, style = wx.STATIC_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, source_manager = self.m_source_manager, notify_filename = self.do_notify_filename)
-        
-        self.m_console = CConsole(self.m_splitterh3, style = wx.STATIC_BORDER | wx.TAB_TRAVERSAL)
-        self.job_post(self.m_console.start, (self, self.m_session_manager, self.m_fchdir, self.m_command_line, self.m_fAttach))
+        self.m_code_viewer = CCodeViewer(self.m_splitterh3, style = wx.STATIC_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, source_manager = self.m_source_manager, notify_filename = self.do_notify_filename)        
+
+        self.m_console = CConsole(self.m_splitterh3, style = wx.STATIC_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, exit_command = self.do_exit)
         
         self.m_splitterh2.SplitHorizontally(self.m_namespace_viewer, self.m_threads_viewer)
         self.m_splitterh1.SplitHorizontally(self.m_splitterh2, self.m_stack_viewer)
@@ -1257,6 +1254,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         wx.CallAfter(self.__set_sash_positions)
 
 
+    def start(self, fchdir, command_line, fAttach):
+        self.m_console.start()
+
+        if fAttach:
+            self.m_async_sm.attach(command_line)
+            
+        elif command_line != '':
+            self.m_async_sm.launch(fchdir, command_line)
+
+        
     #
     #--------------------------------------------------
     #
@@ -1734,8 +1741,9 @@ class CWinpdbApp(wx.App):
             dlg.Destroy()
             return True
         
-        self.m_frame = CWinpdbWindow(self.m_session_manager, self.m_fchdir, self.m_command_line, self.m_fAttach, self.m_settings)
+        self.m_frame = CWinpdbWindow(self.m_session_manager, self.m_settings)
         self.m_frame.Show()
+        self.m_frame.start(self.m_fchdir, self.m_command_line, self.m_fAttach)
 
         self.SetTopWindow(self.m_frame)
 
@@ -2323,13 +2331,15 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
 class CConsole(wx.Panel, CCaptionManager):
     def __init__(self, *args, **kwargs):
+        self.m_session_manager = kwargs.pop('session_manager')
+        self.m_exit_command = kwargs.pop('exit_command')
+
         wx.Panel.__init__(self, *args, **kwargs)
 
         self.m_history = ['']
         self.m_history_index = 0
         
-        self.m_parent = None
-        self.m_console = None
+        self.m_console = rpdb2.CConsole(self.m_session_manager, stdin = self, stdout = self, fSplit = True)
 
         self.m_queue = Queue.Queue()
         
@@ -2402,15 +2412,8 @@ class CConsole(wx.Panel, CCaptionManager):
         ctrl.SetFont(new_font)
 
         
-    def start(self, parent, session_manager, fchdir, command_line, fAttach):
-        self.m_parent = parent
-        self.m_console = rpdb2.CConsole(session_manager, stdin = self, stdout = self, fSplit = True)
+    def start(self):
         self.m_console.start()
-
-        if fAttach:
-            session_manager.attach_nothrow(command_line)
-        elif command_line != '':
-            session_manager.launch_nothrow(fchdir, command_line)
 
         
     def stop(self):
@@ -2464,7 +2467,7 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_queue.put(value + '\n')
 
         if value in ['exit', 'EOF']:
-            self.m_parent.do_exit()
+            self.m_exit_command()
 
             
     def get_history(self, fBack, value = None):
