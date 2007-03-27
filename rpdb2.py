@@ -4605,7 +4605,7 @@ class CDebuggerCoreThread:
                 self.update_locals()
                 self.set_local_trace(frame)
 
-            if frame.f_exc_traceback is None:
+            if not frame.f_exc_traceback is arg[2]:
                 (frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback) = arg
 
             return frame.f_trace     
@@ -4673,7 +4673,7 @@ class CDebuggerCoreThread:
                 self.update_locals()
                 self.set_local_trace(frame)
 
-            if frame.f_exc_traceback is None:
+            if not frame.f_exc_traceback is arg[2]:
                 (frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback) = arg
 
             return frame.f_trace     
