@@ -25,7 +25,7 @@ Installation
 
     From a console type:
 
-        python setup.py install
+        python setup.py install -f
 
 
     Where did the files go? 

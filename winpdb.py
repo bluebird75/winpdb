@@ -3736,13 +3736,18 @@ class CLaunchDialog(wx.Dialog):
         event.Skip()        
 
             
-    def do_browse(self, event = None):
+    def do_browse(self, event = None):        
         command_line = self.m_entry_commandline.GetValue()
         (_path, filename, args) = rpdb2.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
+        cwd = os.getcwdu()
+            
         dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WINPDB_WILDCARD, style = wx.OPEN | wx.CHANGE_DIR)
         r = dlg.ShowModal()
+
+        os.chdir(cwd)
+
         if r == wx.ID_OK:
             path = dlg.GetPaths()[0]
             abs_path = os.path.abspath(path)
