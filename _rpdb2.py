@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    _rpdb2.py
+    rpdb2
 
     A wrapper for rpdb2.py
 

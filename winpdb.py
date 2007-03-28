@@ -351,7 +351,7 @@ CONSOLE_PROMPT = "\n> "
 ENABLED = True
 DISABLED = False
 
-WINPDB_WILDCARD = "Python source (*.py)|*.py|All files (*.*)|*.*"
+WINPDB_WILDCARD = "Python source (*.py;*.pyw)|*.py;*.pyw|All files (*)|*"
 
 MSG_WARNING_TRAP = "Are you sure that you want to disable the trapping of unhandled exceptions? If you click Yes unhandled exceptions will not be caught."
 MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you like to analyze it?"

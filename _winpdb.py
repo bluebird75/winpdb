@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    _winpdb.py
+    winpdb
 
     A wrapper for winpdb.py
 

@@ -291,6 +291,7 @@ import sets
 import sys
 import cmd
 import md5
+import imp
 import os
 
 try:
@@ -9548,12 +9549,6 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     sys.argv = args
 
-    d = {}
-    d['__builtins__'] = __main__.__dict__['__builtins__']
-    d['__name__'] = '__main__'
-    d['__file__'] = ExpandedFilename
-    d['__doc__'] = None
-    
     atexit.register(_atexit)
 
     g_debugger = CDebuggerEngine()
@@ -9564,11 +9559,9 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
     g_debugger.m_bp_manager.set_temp_breakpoint(ExpandedFilename, '', 1, fhard = True)
     g_debugger.settrace()
 
-    execfile(ExpandedFilename, d, d)
-    
-    #g_debugger.stoptrace()
-    #g_server.stop()
-    
+    del sys.modules['__main__']
+    imp.load_source('__main__', ExpandedFilename)    
+        
 
 
 def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRemote, host):
