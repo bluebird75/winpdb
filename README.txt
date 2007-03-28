@@ -16,7 +16,7 @@ Requirements
     compatible with Jython or IronPython. (http://www.python.org/download/)
 
     wxPython - To use the Winpdb GUI you need wxPython 2.6.x or later 
-    installed. You can still use _rpdb2.py which is the console version of the 
+    installed. You can still use rpdb2 which is the console version of the 
     debugger without wxPython. (http://www.wxpython.org/)
 
 
@@ -30,8 +30,8 @@ Installation
 
     Where did the files go? 
 
-    The setup script copies rpdb2 and winpdb modules to the Python 
-    site-packages folder. The scripts _rpdb2.py, _winpdb.py are copied to the 
+    The setup script copies rpdb2.py and winpdb.py modules to the Python 
+    site-packages folder. The scripts rpdb2, winpdb are copied to the 
     Python binaries (scripts) folder:
 
     On Linux this folder is usually /usr/bin and is in the path by default. 
@@ -56,11 +56,11 @@ Launch Time
 
     On Linux systems start the debugger from a console with:
 
-        _winpdb.py
+        winpdb
 
     On Windows systems start the debugger with:
 
-        python %PYTHONHOME%\Scripts\_winpdb.py
+        python %PYTHONHOME%\Scripts\winpdb
 
 
 

@@ -22,12 +22,28 @@
 
 
 
+from distutils.file_util import write_file
+from distutils.file_util import copy_file
 from distutils.core import setup
+
+import os
 
 
 
 LONG_DESC = """Winpdb is an advanced Python debugger with smart breakpoints, 
 thread support, modifiable namespace, and password secured connections."""
+
+
+
+if os.name == 'nt':
+    write_file('rpdb2.bat', ['@python -c "import rpdb2;rpdb2.main()" %*'])
+    write_file('winpdb.bat', ['@python -c "import winpdb;winpdb.main()" %*'])
+    copy_file('winpdb', 'winpdb_.pyw')
+    
+    _scripts = ['winpdb_.pyw', 'winpdb.bat', 'rpdb2.bat']
+
+else:
+    _scripts = ['winpdb', 'rpdb2']
 
 
 
@@ -42,7 +58,7 @@ setup(
     license = 'GNU GPL',
     platforms = ["any"],
     py_modules = ['winpdb', 'rpdb2'],
-    scripts = ['_winpdb.py', '_rpdb2.py']
+    scripts = _scripts
     )
 
 

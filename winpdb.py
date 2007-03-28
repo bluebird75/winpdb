@@ -353,6 +353,14 @@ DISABLED = False
 
 WINPDB_WILDCARD = "Python source (*.py;*.pyw)|*.py;*.pyw|All files (*)|*"
 
+PYTHON_WARNING_TITLE = "Python Interpreter Warning"
+PYTHON_WARNING_MSG = """Winpdb was started with the wrong Python interpreter version.
+
+Winpdb path is: 
+%s
+
+Python interpreter path is:
+%s"""
 MSG_WARNING_TRAP = "Are you sure that you want to disable the trapping of unhandled exceptions? If you click Yes unhandled exceptions will not be caught."
 MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you like to analyze it?"
 MSG_WARNING_TITLE = "Warning"
@@ -1254,7 +1262,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         event_type_dict = {rpdb2.CEventTrap: {}}
         self.m_session_manager.register_callback(self.update_trap, event_type_dict, fSingleUse = False)
 
-        wx.CallAfter(self.__set_sash_positions)
+        wx.CallAfter(self.__init2)
 
 
     def start(self, fchdir, command_line, fAttach):
@@ -1271,11 +1279,38 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #--------------------------------------------------
     #
 
-    def __set_sash_positions(self):
+    def __init2(self):
         self.m_splitterh1.SetSashPosition(self.m_settings[SPLITTER_2_POS])
         self.m_splitterh2.SetSashPosition(self.m_settings[SPLITTER_1_POS])
         self.m_splitterv.SetSashPosition(self.m_settings[SPLITTER_3_POS])
         self.m_splitterh3.SetSashPosition(self.m_settings[SPLITTER_4_POS])
+
+        self.CheckInterpreterConflict()
+
+
+    def CheckInterpreterConflict(self): 
+        """
+        On Windows, Winpdb can be started with a double click.
+        The Python interpreter is chosen according to extension binding.
+        With multiple Python installations it is possible that a winpdb
+        version installed on one Python installation will be launched with
+        the wrong python interpreter. This can lead to confusion and is
+        prevented with this code.
+        """
+        
+        if os.name != 'nt':
+            return
+            
+        path_m = sys.modules['__main__'].__file__.lower()
+        if not os.path.dirname(path_m)[1:] in [r':\python23\scripts', r':\python24\scripts', r':\python25\scripts']:
+            return
+        
+        path_e = sys.executable.lower()
+        if path_m[: 12] != path_e[: 12]:
+            dlg = wx.MessageDialog(self, PYTHON_WARNING_MSG % (path_m, path_e), PYTHON_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+            dlg.ShowModal()
+            dlg.Destroy()
+            
 
 
     #
