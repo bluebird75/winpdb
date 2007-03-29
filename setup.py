@@ -49,7 +49,7 @@ else:
 
 setup(
     name = 'winpdb',
-    version = '1.1.1',
+    version = '1.1.2',
     description = 'An advanced Python debugger.',
     long_description = LONG_DESC,
     author = 'Nir Aides',
