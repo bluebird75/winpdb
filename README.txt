@@ -60,7 +60,7 @@ Launch Time
 
     On Windows systems start the debugger with:
 
-        python %PYTHONHOME%\Scripts\winpdb
+        %PYTHONHOME%\Scripts\winpdb
 
 
 
