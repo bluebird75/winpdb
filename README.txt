@@ -28,7 +28,7 @@ Installation
         python setup.py install -f
 
 
-    Where did the files go? 
+    Where do the files go? 
 
     The setup script copies rpdb2.py and winpdb.py modules to the Python 
     site-packages folder. The scripts rpdb2, winpdb are copied to the 
