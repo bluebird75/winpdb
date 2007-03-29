@@ -7321,7 +7321,8 @@ class CSessionManagerInternal:
             command = osSpawn[name] % (python_exec, options)
 
         if name == DARWIN:
-            command = CalcMacTerminalCommand(command)
+            s = 'cd "%s" ; %s' % (os.getcwdu(), command)
+            command = CalcMacTerminalCommand(s)
 
         if name == MAC:
             terminalcommand.run(command)

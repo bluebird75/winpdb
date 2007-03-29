@@ -1300,11 +1300,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         
         if os.name != 'nt':
             return
-            
-        path_m = sys.modules['__main__'].__file__.lower()
-        if not os.path.dirname(path_m)[1:] in [r':\python23\scripts', r':\python24\scripts', r':\python25\scripts']:
+
+        try:
+            path_m = sys.modules['__main__'].__file__.lower()
+            if not os.path.dirname(path_m)[1:] in [r':\python23\scripts', r':\python24\scripts', r':\python25\scripts']:
+                return
+                
+        except:
             return
-        
+            
         path_e = sys.executable.lower()
         if path_m[: 12] != path_e[: 12]:
             dlg = wx.MessageDialog(self, PYTHON_WARNING_MSG % (path_m, path_e), PYTHON_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
