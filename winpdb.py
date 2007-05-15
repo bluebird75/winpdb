@@ -1715,15 +1715,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         
     def do_disable(self, event):
-        self.m_async_sm.disable_breakpoint([], fAll = True)
+        self.m_async_sm.disable_breakpoint([], True)
 
         
     def do_enable(self, event):
-        self.m_async_sm.enable_breakpoint([], fAll = True)
+        self.m_async_sm.enable_breakpoint([], True)
 
         
     def do_clear(self, event):
-        self.m_async_sm.delete_breakpoint([], fAll = True)
+        self.m_async_sm.delete_breakpoint([], True)
 
         
     def do_load(self, event):
