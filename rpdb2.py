@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-rpdb2.py - version 2.1.2
+rpdb2.py - version 2.1.3
 
 A remote Python debugger for CPython
 
@@ -442,9 +442,9 @@ def setbreak():
 
 
 
-VERSION = (2, 1, 2, 0, '')
-RPDB_VERSION = "RPDB_2_1_2"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_1_2"
+VERSION = (2, 1, 3, 0, '')
+RPDB_VERSION = "RPDB_2_1_3"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_1_3"
 
 
 
@@ -9541,9 +9541,10 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
         print 'File', args[0], ' not found.'
 
     #
-    # Insert script directory in front of file search path
+    # Replace the rpdb2.py directory with the script directory in 
+    # the search path
     #
-    sys.path.insert(0, os.path.dirname(ExpandedFilename))
+    sys.path[0] = os.path.dirname(ExpandedFilename)
 
     if fchdir:   
         os.chdir(os.path.dirname(ExpandedFilename))

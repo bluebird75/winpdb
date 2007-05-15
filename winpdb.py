@@ -287,7 +287,7 @@ To use the debugger without a GUI, run rpdb2.py or _rpdb2.py"""
 
 
 
-if 'wx' not in sys.modules:
+if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
     try:
         import wxversion   
         wxversion.ensureMinimal(WXVER)
@@ -416,9 +416,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.1.2"
-WINPDB_VERSION = "WINPDB_1_1_2"
-VERSION = (1, 1, 2, 0, '')
+WINPDB_TITLE = "Winpdb 1.1.3"
+WINPDB_VERSION = "WINPDB_1_1_3"
+VERSION = (1, 1, 3, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -3810,8 +3810,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_1_2":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_1_2", rpdb2.get_version())
+    if rpdb2.get_version() != "RPDB_2_1_3":
+        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_1_3", rpdb2.get_version())
         return
         
     return rpdb2.main(StartClient)
