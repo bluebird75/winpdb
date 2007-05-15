@@ -4734,6 +4734,7 @@ class CDebuggerCore:
         self.m_current_ctx = None 
         self.m_f_first_to_break = True
         self.m_f_break_on_init = False
+        self.m_f_pull_builtins_hack = False
 
         self.m_timer_embedded_giveup = None
         
@@ -4805,7 +4806,7 @@ class CDebuggerCore:
         self.m_next_frame = f
 
         
-    def settrace(self, f = None, f_break_on_init = True, timeout = None):
+    def settrace(self, f = None, f_break_on_init = True, timeout = None, f_pull_builtins_hack = False):
         """
         Start tracing mechanism for thread.
         """
@@ -4820,6 +4821,7 @@ class CDebuggerCore:
         self.set_request_go_timer(timeout)
             
         self.m_f_break_on_init = f_break_on_init
+        self.m_f_pull_builtins_hack = f_pull_builtins_hack
         
         threading.settrace(self.trace_dispatch_init)
         sys.settrace(self.trace_dispatch_init)
@@ -4921,6 +4923,10 @@ class CDebuggerCore:
         if code_context.is_untraced():
             return None
         
+        if self.m_f_pull_builtins_hack:
+            self.m_f_pull_builtins_hack = False
+            frame.f_globals['__builtins__'] = sys.modules['__builtin__']
+
         self.set_exception_trap_frame(frame)
 
         try:
@@ -9559,7 +9565,7 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
     g_server.start()
 
     g_debugger.m_bp_manager.set_temp_breakpoint(ExpandedFilename, '', 1, fhard = True)
-    g_debugger.settrace()
+    g_debugger.settrace(f_pull_builtins_hack = True)
 
     del sys.modules['__main__']
     imp.load_source('__main__', ExpandedFilename)    
