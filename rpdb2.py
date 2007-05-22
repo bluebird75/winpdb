@@ -1576,7 +1576,6 @@ BP_EVAL_SEP = ','
 
 DEBUGGER_FILENAME = 'rpdb2.py'
 THREADING_FILENAME = 'threading.py'
-CODECS_FILENAME = 'codecs.py'
 
 STR_STATE_BROKEN = 'waiting at break point'
 
@@ -4158,21 +4157,13 @@ class CCodeContext:
 
         self.m_fExceptionTrap = False
 
-        self.m_encodings_path = winlower(os.path.dirname(sys.modules['encodings'].__file__))
-
 
     def is_untraced(self):
         """
         Return True if this code object should not be traced.
         """
         
-        if self.m_basename in [THREADING_FILENAME, DEBUGGER_FILENAME, CODECS_FILENAME]:
-            return True
-        
-        if self.m_filename.startswith(self.m_encodings_path):
-            return True
-
-        return False
+        return self.m_basename in [THREADING_FILENAME, DEBUGGER_FILENAME]
 
 
     def is_exception_trap_frame(self):
@@ -4743,7 +4734,8 @@ class CDebuggerCore:
         self.m_current_ctx = None 
         self.m_f_first_to_break = True
         self.m_f_break_on_init = False
-        self.m_f_pull_builtins_hack = False
+        
+        self.m_builtins_hack = None
 
         self.m_timer_embedded_giveup = None
         
@@ -4815,7 +4807,7 @@ class CDebuggerCore:
         self.m_next_frame = f
 
         
-    def settrace(self, f = None, f_break_on_init = True, timeout = None, f_pull_builtins_hack = False):
+    def settrace(self, f = None, f_break_on_init = True, timeout = None, builtins_hack = None):
         """
         Start tracing mechanism for thread.
         """
@@ -4830,7 +4822,7 @@ class CDebuggerCore:
         self.set_request_go_timer(timeout)
             
         self.m_f_break_on_init = f_break_on_init
-        self.m_f_pull_builtins_hack = f_pull_builtins_hack
+        self.m_builtins_hack = builtins_hack
         
         threading.settrace(self.trace_dispatch_init)
         sys.settrace(self.trace_dispatch_init)
@@ -4863,6 +4855,11 @@ class CDebuggerCore:
         try:
             return self.m_code_contexts[frame.f_code]
         except KeyError:
+            if self.m_builtins_hack != None:
+                if calc_frame_path(frame) == self.m_builtins_hack:
+                    self.m_builtins_hack = None
+                    frame.f_globals['__builtins__'] = sys.modules['__builtin__']
+
             code_context = CCodeContext(frame, self.m_bp_manager)
             return self.m_code_contexts.setdefault(frame.f_code, code_context)
 
@@ -4929,12 +4926,8 @@ class CDebuggerCore:
             return None
 
         code_context = self.get_code_context(frame)
-        if code_context.is_untraced():
+        if event == 'call' and code_context.is_untraced():
             return None
-        
-        if self.m_f_pull_builtins_hack:
-            self.m_f_pull_builtins_hack = False
-            frame.f_globals['__builtins__'] = sys.modules['__builtin__']
 
         self.set_exception_trap_frame(frame)
 
@@ -9578,9 +9571,19 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
     except:
         pass
 
-    g_debugger.settrace(f_pull_builtins_hack = True)
+    f = sys._getframe(0)
+    g_debugger.settrace(f, f_break_on_init = False, builtins_hack = ExpandedFilename)
 
     del sys.modules['__main__']
+
+    #
+    # An exception in this line occurs if
+    # there is a syntax error in the debugged script or if
+    # there was a problem loading the debugged script.
+    #
+    # Use analyze mode for post mortem.
+    # type 'help analyze' for more information.
+    #
     imp.load_source('__main__', ExpandedFilename)    
         
 
