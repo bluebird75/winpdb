@@ -1576,6 +1576,7 @@ BP_EVAL_SEP = ','
 
 DEBUGGER_FILENAME = 'rpdb2.py'
 THREADING_FILENAME = 'threading.py'
+CODECS_FILENAME = 'codecs.py'
 
 STR_STATE_BROKEN = 'waiting at break point'
 
@@ -4165,7 +4166,7 @@ class CCodeContext:
         Return True if this code object should not be traced.
         """
         
-        if self.m_basename in [THREADING_FILENAME, DEBUGGER_FILENAME]:
+        if self.m_basename in [THREADING_FILENAME, DEBUGGER_FILENAME, CODECS_FILENAME]:
             return True
         
         if self.m_filename.startswith(self.m_encodings_path):
