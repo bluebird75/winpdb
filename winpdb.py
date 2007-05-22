@@ -283,7 +283,7 @@ WXVER = "2.6"
 STR_WXPYTHON_ERROR = """wxPython was not found.
 wxPython 2.6 or higher is required to run the winpdb GUI.
 You can get more information on wxPython in http://www.wxpython.org/
-To use the debugger without a GUI, run rpdb2.py or _rpdb2.py"""
+To use the debugger without a GUI, run rpdb2."""
 
 
 

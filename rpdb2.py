@@ -1576,6 +1576,7 @@ BP_EVAL_SEP = ','
 DEBUGGER_FILENAME = 'rpdb2.py'
 THREADING_FILENAME = 'threading.py'
 CODECS_FILENAME = 'codecs.py'
+ENCODINGS_FILENAME = '/encodings/__init__.py'
 
 STR_STATE_BROKEN = 'waiting at break point'
 
@@ -4163,7 +4164,13 @@ class CCodeContext:
         Return True if this code object should not be traced.
         """
         
-        return self.m_basename in [THREADING_FILENAME, DEBUGGER_FILENAME, CODECS_FILENAME]
+        if self.m_basename in [THREADING_FILENAME, DEBUGGER_FILENAME, CODECS_FILENAME]:
+            return True
+
+        if ENCODINGS_FILENAME in self.m_filename:
+            return True
+
+        return False
 
 
     def is_exception_trap_frame(self):
@@ -6572,7 +6579,7 @@ class CIOServer(threading.Thread):
         self.m_stop = False
         self.m_server = None
         
-        #self.setDaemon(True)
+        self.setDaemon(True)
 
 
     def shutdown(self):
@@ -9564,7 +9571,11 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
     g_server = CDebuggeeServer(ExpandedFilename, g_debugger, pwd, fAllowUnencrypted, fAllowRemote, rid)
     g_server.start()
 
-    g_debugger.m_bp_manager.set_temp_breakpoint(ExpandedFilename, '', 1, fhard = True)
+    try:
+        g_debugger.m_bp_manager.set_temp_breakpoint(ExpandedFilename, '', 1, fhard = True)
+    except:
+        pass
+
     g_debugger.settrace(f_pull_builtins_hack = True)
 
     del sys.modules['__main__']
