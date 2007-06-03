@@ -2837,13 +2837,9 @@ class CNamespacePanel(wx.Panel, CJobs):
         #
 
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
-
-        sorted_snl = [(r[rpdb2.DICT_KEY_NAME], r) for r in snl]
-        if _r[rpdb2.DICT_KEY_TYPE] != 'list':
-            sorted_snl.sort()
-        
-        for (key_name, r) in sorted_snl:
-            child = self.m_tree.AppendItem(item, key_name)
+       
+        for r in snl:
+            child = self.m_tree.AppendItem(item, r[rpdb2.DICT_KEY_NAME])
             self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_REPR], 2)
             self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_TYPE], 1)
             self.m_tree.SetItemPyData(child, r[rpdb2.DICT_KEY_EXPR])

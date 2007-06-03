@@ -1614,6 +1614,8 @@ RPDB_EXEC_INFO = 'rpdb_exception_info'
 MODE_ON = 'ON'
 MODE_OFF = 'OFF'
 
+MAX_NAMESPACE_ITEMS = 1024
+
 MAX_EVENT_LIST_LENGTH = 1000
 
 EVENT_EXCLUDE = 'exclude'
@@ -5978,7 +5980,17 @@ class CDebuggerEngine(CDebuggerCore):
     def __calc_number_of_subnodes(self, r):
         if self.__parse_type(type(r)) in BASIC_TYPES_LIST:
             return 0
-            
+        
+        try:
+            if type(r) == set or isinstance(r, set):
+                return len(r)
+
+        except NameError:
+            pass
+
+        if type(r) == sets.Set or isinstance(r, sets.Set):
+            return len(r)
+
         if type(r) in [dict, list, tuple]:
             return len(r)
 
@@ -6023,8 +6035,28 @@ class CDebuggerEngine(CDebuggerCore):
     def __calc_subnodes(self, expr, r, fForceNames, fFilter):
         snl = []
         
+        try:
+            if type(r) == set or isinstance(r, set) or isinstance(r, sets.Set):
+                g = [i for i in r]
+                g.sort()
+
+                for i in g[0: MAX_NAMESPACE_ITEMS]:
+                    e = {}
+                    e[DICT_KEY_EXPR] = '[v for v in (%s) if repr(v) == "%s"][0]' % (expr, repr(i))
+                    e[DICT_KEY_NAME] = repr(i)
+                    e[DICT_KEY_REPR] = safe_repr_limited(i)
+                    e[DICT_KEY_TYPE] = self.__parse_type(type(i))
+                    e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
+
+                    snl.append(e)
+
+                return snl
+
+        except NameError:
+            pass
+        
         if (type(r) in [list, tuple]) or isinstance(r, list) or isinstance(r, tuple):
-            for i, v in enumerate(r):
+            for i, v in enumerate(r[0: MAX_NAMESPACE_ITEMS]):
                 e = {}
                 e[DICT_KEY_EXPR] = '%s[%d]' % (expr, i)
                 e[DICT_KEY_NAME] = repr(i)
@@ -6037,7 +6069,12 @@ class CDebuggerEngine(CDebuggerCore):
             return snl
 
         if (type(r) == dict) or isinstance(r, dict):
-            for k, v in r.items():
+            kl = r.keys()
+            kl.sort()
+
+            for k in kl:
+                v = r[k]
+
                 if fFilter and (expr in ['globals()', 'locals()']) and self.__is_filtered_type(v):
                     continue
                     
@@ -6056,9 +6093,14 @@ class CDebuggerEngine(CDebuggerCore):
 
                 snl.append(e)
 
+                if len(snl) > MAX_NAMESPACE_ITEMS:
+                    break
+
             return snl            
 
         al = self.__calc_attribute_list(r)
+        al.sort()
+
         for a in al:
             try:
                 v = getattr(r, a)
@@ -6076,6 +6118,9 @@ class CDebuggerEngine(CDebuggerCore):
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
             snl.append(e)
+
+            if len(snl) > MAX_NAMESPACE_ITEMS:
+                break
 
         return snl                
 
@@ -6164,7 +6209,7 @@ class CDebuggerEngine(CDebuggerCore):
             args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index)
             t = threading.Thread(target = self.calc_expr, args = args)
             t.start()
-            t.join(1)
+            t.join(2)
             
             lock.acquire()
             if len(rl) == index:
