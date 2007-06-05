@@ -4804,6 +4804,10 @@ class CDebuggerCore:
         """
         
         tid = thread.get_ident()
+
+        if not tid in self.m_threads:
+            return self.settrace(f)
+        
         ctx = self.m_threads[tid]
         f.f_trace = ctx.trace_dispatch_break
         self.m_next_frame = f
