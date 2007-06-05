@@ -607,7 +607,7 @@ DOCS_URL = "http://www.digitalpeers.com/pythondebugger/docs.htm"
 UPDATES_URL = "http://www.digitalpeers.com/pythondebugger/download.htm"
 
 STR_ERROR_INTERFACE_COMPATIBILITY = "The rpdb2 module which was found by Winpdb is of unexpected version (version expected: %s, version found: %s). Please upgrade to the latest versions of winpdb.py and rpdb2.py."
-STR_NAMESPACE_DEADLOCK = 'Data Not Available'
+STR_NAMESPACE_DEADLOCK = 'Data Retrieval Timeout'
 
 BAD_FILE_WARNING_TIMEOUT_SEC = 10.0
 POSITION_TIMEOUT = 2.0
