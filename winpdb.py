@@ -2733,7 +2733,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     def OnItemActivated(self, event):
         item = event.GetItem()
         expr = self.m_tree.GetPyData(item)
-        if expr == STR_NAMESPACE_DEADLOCK:
+        if expr in [STR_NAMESPACE_DEADLOCK, rpdb2.STR_MAX_NAMESPACE_WARNING_TITLE]:
             return
 
         expr_dialog = CExpressionDialog(self)

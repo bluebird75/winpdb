@@ -1550,6 +1550,11 @@ STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
 STR_LOCAL_NAMESPACE_WARNING = 'Debugger modifications to the original bindings of the local namespace of this frame will be committed before the execution of the next statement of the frame. Any code using these variables executed before that point will see the original values.'
 STR_WARNING = 'Warning: %s' 
 
+STR_MAX_NAMESPACE_WARNING_TITLE = 'Namespace Warning'
+STR_MAX_NAMESPACE_WARNING_TYPE = '*** WARNING ***'
+STR_MAX_NAMESPACE_WARNING_MSG = 'Number of items exceeds capacity of namespace browser.'
+STR_MAX_EVALUATE_LENGTH_WARNING = 'Output length exeeds maximum capacity.'
+
 ENCRYPTION_ENABLED = 'encrypted'
 ENCRYPTION_DISABLED = 'plain-text'
 
@@ -1614,7 +1619,16 @@ RPDB_EXEC_INFO = 'rpdb_exception_info'
 MODE_ON = 'ON'
 MODE_OFF = 'OFF'
 
+MAX_EVALUATE_LENGTH = 256 * 1024
 MAX_NAMESPACE_ITEMS = 1024
+
+MAX_NAMESPACE_WARNING = {
+    DICT_KEY_EXPR: STR_MAX_NAMESPACE_WARNING_TITLE, 
+    DICT_KEY_NAME: STR_MAX_NAMESPACE_WARNING_TITLE, 
+    DICT_KEY_REPR: STR_MAX_NAMESPACE_WARNING_MSG, 
+    DICT_KEY_TYPE: STR_MAX_NAMESPACE_WARNING_TYPE, 
+    DICT_KEY_N_SUBNODES: 0
+    }
 
 MAX_EVENT_LIST_LENGTH = 1000
 
@@ -6053,6 +6067,9 @@ class CDebuggerEngine(CDebuggerCore):
                     e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
                     snl.append(e)
+                
+                if len(g) > MAX_NAMESPACE_ITEMS:
+                    snl.append(MAX_NAMESPACE_WARNING)
 
                 return snl
 
@@ -6070,6 +6087,9 @@ class CDebuggerEngine(CDebuggerCore):
 
                 snl.append(e)
 
+            if len(r) > MAX_NAMESPACE_ITEMS:
+                snl.append(MAX_NAMESPACE_WARNING)
+
             return snl
 
         if (type(r) == dict) or isinstance(r, dict):
@@ -6082,6 +6102,10 @@ class CDebuggerEngine(CDebuggerCore):
                 if fFilter and (expr in ['globals()', 'locals()']) and self.__is_filtered_type(v):
                     continue
                     
+                if len(snl) >= MAX_NAMESPACE_ITEMS:
+                    snl.append(MAX_NAMESPACE_WARNING)
+                    break
+
                 e = {}
 
                 rk = repr(k)
@@ -6097,9 +6121,6 @@ class CDebuggerEngine(CDebuggerCore):
 
                 snl.append(e)
 
-                if len(snl) > MAX_NAMESPACE_ITEMS:
-                    break
-
             return snl            
 
         al = self.__calc_attribute_list(r)
@@ -6114,6 +6135,10 @@ class CDebuggerEngine(CDebuggerCore):
             if fFilter and self.__is_filtered_type(v):
                 continue
                 
+            if len(snl) >= MAX_NAMESPACE_ITEMS:
+                snl.append(MAX_NAMESPACE_WARNING)
+                break
+
             e = {}
             e[DICT_KEY_EXPR] = '%s.%s' % (expr, a)
             e[DICT_KEY_NAME] = a
@@ -6122,9 +6147,6 @@ class CDebuggerEngine(CDebuggerCore):
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
             snl.append(e)
-
-            if len(snl) > MAX_NAMESPACE_ITEMS:
-                break
 
         return snl                
 
@@ -6244,6 +6266,11 @@ class CDebuggerEngine(CDebuggerCore):
         try:
             r = eval(expr, _globals, _locals)
             v = safe_repr(r)
+            
+            if len(v) > MAX_EVALUATE_LENGTH:
+                v = v[0: MAX_EVALUATE_LENGTH] + '... *** %s ***' % STR_MAX_EVALUATE_LENGTH_WARNING 
+                w = STR_MAX_EVALUATE_LENGTH_WARNING
+
         except:
             exc_info = sys.exc_info()
             e = "%s, %s" % (str(exc_info[0]), str(exc_info[1]))
