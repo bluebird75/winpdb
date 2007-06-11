@@ -1376,8 +1376,8 @@ POSIX = 'posix'
 # '%s' serves as a place holder.
 #
 osSpawn = {
-    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /c %s %s', 
-    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k %s %s', 
+    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /c "%s" %s', 
+    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k "%s" %s', 
     POSIX: "%s -e %s %s &", 
     GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x %s %s &", 
     MAC: '%s %s',
