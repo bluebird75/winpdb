@@ -618,6 +618,18 @@ g_ignored_warnings = {'': True}
 
 
 
+def open_new(url):
+    if sys.version.startswith('2.5.') and 'ubuntu' in sys.version:
+        w = webbrowser.get()
+        if 'firefox' in w.name:
+            cmd = '%s -new-window "%s"' % (w.name, url)
+            os.popen(cmd)
+            return
+
+    webbrowser.open_new(url) 
+
+
+
 def image_from_base64(str_b64):
     s = base64.decodestring(str_b64)
     stream = cStringIO.StringIO(s)
@@ -1622,19 +1634,19 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def do_website(self, event):
-        self.job_post(webbrowser.open_new, (WEBSITE_URL, ))
+        self.job_post(open_new, (WEBSITE_URL, ))
 
 
     def do_support(self, event):
-        self.job_post(webbrowser.open_new, (SUPPORT_URL, ))
+        self.job_post(open_new, (SUPPORT_URL, ))
 
 
     def do_docs(self, event):
-        self.job_post(webbrowser.open_new, (DOCS_URL, ))
+        self.job_post(open_new, (DOCS_URL, ))
 
 
     def do_updates(self, event):
-        self.job_post(webbrowser.open_new, (UPDATES_URL, ))
+        self.job_post(open_new, (UPDATES_URL, ))
 
 
     def do_license(self, event):
