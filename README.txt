@@ -23,10 +23,13 @@ Requirements
 	
 Installation
 
-    From a console type:
+    In a console with admin privileges type:
 
         python setup.py install -f
 
+    On Ubuntu you can type in a normal console:
+        
+        sudo python setup.py install -f
 
     Where do the files go? 
 
