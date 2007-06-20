@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-rpdb2.py - version 2.1.3
+rpdb2.py - version 2.1.4
 
 A remote Python debugger for CPython
 
@@ -443,9 +443,9 @@ def setbreak():
 
 
 
-VERSION = (2, 1, 3, 0, '')
-RPDB_VERSION = "RPDB_2_1_3"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_1_3"
+VERSION = (2, 1, 4, 0, '')
+RPDB_VERSION = "RPDB_2_1_4"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_1_4"
 
 
 

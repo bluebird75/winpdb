@@ -416,9 +416,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.1.3"
-WINPDB_VERSION = "WINPDB_1_1_3"
-VERSION = (1, 1, 3, 0, '')
+WINPDB_TITLE = "Winpdb 1.1.4"
+WINPDB_VERSION = "WINPDB_1_1_4"
+VERSION = (1, 1, 4, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -488,6 +488,7 @@ ML_HELP = "&Help"
 ML_WEBSITE = "&Website"
 ML_SUPPORT = "&Support"
 ML_DOCS = "&Online Docs"
+ML_EXT_DOCS = "&External Docs"
 ML_UPDATES = "&Check for Updates"
 ML_LICENSE = "&License"
 ML_ABOUT = "&About"
@@ -523,6 +524,7 @@ OPEN_TIP = "Open source file in the source viewer."
 WEBSITE_TIP = "Open the Winpdb homepage."
 SUPPORT_TIP = "Open the Winpdb support web page."
 DOCS_TIP = "Open the Winpdb online documentation web page."
+EXT_DOCS_TIP = "Open the Winpdb external documentation web page."
 UPDATES_TIP = "Check for updates in the Winpdb website."
 TOGGLE_TIP = "Toggle breakpoint at cursor location."
 DISABLE_TIP = "Disable all breakpoints."
@@ -602,9 +604,10 @@ ABOUT_HTML_SUFFIX = """
 """
 
 WEBSITE_URL = "http://www.digitalpeers.com/pythondebugger/"
-SUPPORT_URL = "http://www.digitalpeers.com/pythondebugger/support.htm"
-DOCS_URL = "http://www.digitalpeers.com/pythondebugger/docs.htm"
-UPDATES_URL = "http://www.digitalpeers.com/pythondebugger/download.htm"
+SUPPORT_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=4"
+DOCS_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=5"
+EXT_DOCS_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=17"
+UPDATES_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=3"
 
 STR_ERROR_INTERFACE_COMPATIBILITY = "The rpdb2 module which was found by Winpdb is of unexpected version (version expected: %s, version found: %s). Please upgrade to the latest versions of winpdb.py and rpdb2.py."
 STR_NAMESPACE_DEADLOCK = 'Data Retrieval Timeout'
@@ -1170,9 +1173,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/4/" + ML_HELP +   "/0/" + ML_WEBSITE: {COMMAND: self.do_website, TOOLTIP: WEBSITE_TIP}, 
             "/4/" + ML_HELP +   "/1/" + ML_SUPPORT: {COMMAND: self.do_support, TOOLTIP: SUPPORT_TIP}, 
             "/4/" + ML_HELP +   "/2/" + ML_DOCS: {COMMAND: self.do_docs, TOOLTIP: DOCS_TIP}, 
-            "/4/" + ML_HELP +   "/3/" + ML_UPDATES: {COMMAND: self.do_updates, TOOLTIP: UPDATES_TIP}, 
-            "/4/" + ML_HELP +   "/4/" + ML_ABOUT: {COMMAND: self.do_about}, 
-            "/4/" + ML_HELP +   "/5/" + ML_LICENSE: {COMMAND: self.do_license}
+            "/4/" + ML_HELP +   "/3/" + ML_EXT_DOCS: {COMMAND: self.do_ext_docs, TOOLTIP: EXT_DOCS_TIP}, 
+            "/4/" + ML_HELP +   "/4/" + ML_UPDATES: {COMMAND: self.do_updates, TOOLTIP: UPDATES_TIP}, 
+            "/4/" + ML_HELP +   "/5/" + ML_ABOUT: {COMMAND: self.do_about}, 
+            "/4/" + ML_HELP +   "/6/" + ML_LICENSE: {COMMAND: self.do_license}
         }
         
         self.init_menubar(menu_resource)
@@ -1207,31 +1211,31 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         self.init_statusbar(statusbar_resource)
 
-        self.m_splitterv = wx.SplitterWindow(self, -1, style = wx.SP_LIVE_UPDATE | wx.SP_3D)
+        self.m_splitterv = wx.SplitterWindow(self, -1, style = wx.SP_LIVE_UPDATE | wx.SP_NOBORDER)
         self.m_splitterv.SetMinimumPaneSize(100)
         self.m_splitterv.SetSashGravity(0.5)
         
-        self.m_splitterh1 = wx.SplitterWindow(self.m_splitterv, -1, style = wx.SP_LIVE_UPDATE | wx.SP_3D)
+        self.m_splitterh1 = wx.SplitterWindow(self.m_splitterv, -1, style = wx.SP_LIVE_UPDATE | wx.SP_NOBORDER)
         self.m_splitterh1.SetMinimumPaneSize(70)
         self.m_splitterh1.SetSashGravity(0.67)
 
-        self.m_splitterh2 = wx.SplitterWindow(self.m_splitterh1, -1, style = wx.SP_LIVE_UPDATE | wx.SP_3D)
+        self.m_splitterh2 = wx.SplitterWindow(self.m_splitterh1, -1, style = wx.SP_LIVE_UPDATE | wx.SP_NOBORDER)
         self.m_splitterh2.SetMinimumPaneSize(70)
         self.m_splitterh2.SetSashGravity(0.5)
         
-        self.m_namespace_viewer = CNamespaceViewer(self.m_splitterh2, style = wx.STATIC_BORDER, session_manager = self.m_session_manager)
+        self.m_namespace_viewer = CNamespaceViewer(self.m_splitterh2, style = wx.NO_BORDER, session_manager = self.m_session_manager)
 
-        self.m_threads_viewer = CThreadsViewer(self.m_splitterh2, style = wx.STATIC_BORDER, select_command = self.OnThreadSelected)
+        self.m_threads_viewer = CThreadsViewer(self.m_splitterh2, style = wx.NO_BORDER, select_command = self.OnThreadSelected)
 
-        self.m_stack_viewer = CStackViewer(self.m_splitterh1, style = wx.STATIC_BORDER, select_command = self.OnFrameSelected)
+        self.m_stack_viewer = CStackViewer(self.m_splitterh1, style = wx.NO_BORDER, select_command = self.OnFrameSelected)
 
-        self.m_splitterh3 = wx.SplitterWindow(self.m_splitterv, -1, style = wx.SP_LIVE_UPDATE | wx.SP_3D)
+        self.m_splitterh3 = wx.SplitterWindow(self.m_splitterv, -1, style = wx.SP_LIVE_UPDATE | wx.SP_NOBORDER)
         self.m_splitterh3.SetMinimumPaneSize(100)
         self.m_splitterh3.SetSashGravity(1.0)
         
-        self.m_code_viewer = CCodeViewer(self.m_splitterh3, style = wx.STATIC_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, source_manager = self.m_source_manager, notify_filename = self.do_notify_filename)        
+        self.m_code_viewer = CCodeViewer(self.m_splitterh3, style = wx.NO_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, source_manager = self.m_source_manager, notify_filename = self.do_notify_filename)        
 
-        self.m_console = CConsole(self.m_splitterh3, style = wx.STATIC_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, exit_command = self.do_exit)
+        self.m_console = CConsole(self.m_splitterh3, style = wx.NO_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, exit_command = self.do_exit)
         
         self.m_splitterh2.SplitHorizontally(self.m_namespace_viewer, self.m_threads_viewer)
         self.m_splitterh1.SplitHorizontally(self.m_splitterh2, self.m_stack_viewer)
@@ -1643,6 +1647,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def do_docs(self, event):
         self.job_post(open_new, (DOCS_URL, ))
+
+
+    def do_ext_docs(self, event):
+        self.job_post(open_new, (EXT_DOCS_URL, ))
 
 
     def do_updates(self, event):
@@ -3818,8 +3826,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_1_3":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_1_3", rpdb2.get_version())
+    if rpdb2.get_version() != "RPDB_2_1_4":
+        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_1_4", rpdb2.get_version())
         return
         
     return rpdb2.main(StartClient)
