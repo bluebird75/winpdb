@@ -1182,13 +1182,13 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.init_menubar(menu_resource)
         
         toolbar_resource = [
-            {LABEL: TB_GO,      DATA: BASE64_GO,    COMMAND: self.do_go},
             {LABEL: TB_BREAK,   DATA: BASE64_BREAK, COMMAND: self.do_break},
+            {LABEL: TB_GO,      DATA: BASE64_GO,    COMMAND: self.do_go},
             {LABEL: ML_SEPARATOR},
-            {LABEL: TB_STEP,    DATA: BASE64_STEP,  COMMAND: self.do_step},
             {LABEL: TB_NEXT,    DATA: BASE64_NEXT,  COMMAND: self.do_next},
-            {LABEL: TB_RETURN,  DATA: BASE64_RETURN, COMMAND: self.do_return},
+            {LABEL: TB_STEP,    DATA: BASE64_STEP,  COMMAND: self.do_step},
             {LABEL: TB_GOTO,    DATA: BASE64_GOTO,  COMMAND: self.do_goto},
+            {LABEL: TB_RETURN,  DATA: BASE64_RETURN, COMMAND: self.do_return},
             {LABEL: ML_SEPARATOR},
             {LABEL: TB_TOGGLE_BP, DATA: BASE64_TOGGLE_BP,  COMMAND: self.toggle_breakpoint},
             {LABEL: ML_SEPARATOR},
