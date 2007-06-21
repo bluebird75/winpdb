@@ -6761,7 +6761,7 @@ class CIOServer(threading.Thread):
         Looks for an available tcp port to listen on.
         """
         
-        host = [LOCALHOST, ""][self.m_fAllowRemote]
+        host = [LOOPBACK, ""][self.m_fAllowRemote]
         port = SERVER_PORT_RANGE_START
 
         while True:
@@ -7094,10 +7094,14 @@ class CSession:
 
 
     def Connect(self):
-        server = CPwdServerProxy(self.m_crypto, calcURL(self.m_host, self.m_port), CTimeoutTransport())
+        host = self.m_host
+        if host.lower() == LOCALHOST:
+            host = LOOPBACK
+        
+        server = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), CTimeoutTransport())
         server_info = server.server_info()
 
-        self.m_proxy = CPwdServerProxy(self.m_crypto, calcURL(self.m_host, self.m_port), target_rid = server_info.m_rid)
+        self.m_proxy = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), target_rid = server_info.m_rid)
         self.m_server_info = server_info
 
                 
