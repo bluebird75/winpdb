@@ -2654,55 +2654,6 @@ def ParseEncoding(txt):
 
 
 
-def calc_special_bp_strings(code):   
-    osi = list(code.co_names).index('os')
-    forki = list(code.co_names).index('fork')
-    _exiti = list(code.co_names).index('_exit')
-
-    load_global = dis.opmap['LOAD_GLOBAL']
-    load_attr = dis.opmap['LOAD_ATTR']
-    call_function =  dis.opmap['CALL_FUNCTION']
-    load_const =  dis.opmap['LOAD_CONST']
-    load_fast = dis.opmap['LOAD_FAST']
-    
-    lfork = [load_global, osi, 0, load_attr, forki, 0, call_function]
-    sfork = ''.join([chr(c) for c in lfork])
-
-    lexit1 = [load_global, osi, 0, load_attr, _exiti, 0, load_const]
-    sexit1 = ''.join([chr(c) for c in lexit1])
-
-    lexit2 = [load_global, osi, 0, load_attr, _exiti, 0, load_fast]
-    sexit2 = ''.join([chr(c) for c in lexit2])
-
-    return sfork, sexit1, sexit2
-
-
-
-def findlinestarts(code):
-    """
-    Copied as is from module dis.
-    Find the offsets in a byte code which are start of lines in the source.
-    Generate pairs (offset, lineno) as described in Python/compile.c.
-    """
-
-    byte_increments = [ord(c) for c in code.co_lnotab[0::2]]
-    line_increments = [ord(c) for c in code.co_lnotab[1::2]]
-
-    lastlineno = None
-    lineno = code.co_firstlineno
-    addr = 0
-    for byte_incr, line_incr in zip(byte_increments, line_increments):
-        if byte_incr:
-            if lineno != lastlineno:
-                yield (addr, lineno)
-                lastlineno = lineno
-            addr += byte_incr
-        lineno += line_incr
-    if lineno != lastlineno:
-        yield (addr, lineno)
-
-
-
 #
 #--------------------------------------- Crypto ---------------------------------------
 #
@@ -4219,8 +4170,6 @@ class CCodeContext:
         self.m_filename = calc_frame_path(frame)
         self.m_basename = os.path.basename(self.m_filename)
 
-        self.calc_special_breakpoints(bp_manager)
-
         self.m_file_breakpoints = bp_manager.get_active_break_points_by_file(self.m_filename)
 
         self.m_fExceptionTrap = False
@@ -4241,33 +4190,6 @@ class CCodeContext:
         """
         
         return self.m_basename == THREADING_FILENAME
-
-
-    def calc_special_breakpoints(self, bp_manager):
-        if 'fork' not in self.m_code.co_names and '_exit' not in self.m_code.co_names:
-            return
-
-        sfork, sexit1, sexit2 = calc_special_bp_strings(self.m_code) 
-
-        dis_lineno_list = [b for (b, s) in findlinestarts(self.m_code)]
-        source_lineno_list = [s for (b, s) in findlinestarts(self.m_code)]
-
-        for s in [sfork, sexit1, sexit2]:
-            i = 0
-            while True:
-                i = self.m_code.co_code.find(s, i)
-                if i == -1:
-                    break
-
-                if not i in dis_lineno_list:
-                    continue
-
-                ii = dis_lineno_list.index(i)
-                #ii = len([d for d in dis_lineno_list if d <= i]) - 1
-
-                lineno = source_lineno_list[ii]
-
-                bp_manager.set_breakpoint(self.m_filename, '', lineno, True, '')
 
 
 
@@ -9615,6 +9537,44 @@ Type 'help up' or 'help down' for more information on focused frames."""
 
 
 
+def __fork():
+    #
+    # os.fork() has been called. 
+    # Please choose if you would like to debug 
+    # this process or the child process 
+    # that is about to fork.
+    #
+    setbreak()
+    return g_os_fork()
+
+
+
+g_os_fork = None
+
+if __name__ == 'rpdb2' and os.fork != __fork:
+    g_os_fork = os.fork
+    os.fork = __fork
+
+
+
+def __exit(n):
+    #
+    # os._exit(n) has been called. 
+    # The program is about to terminate.
+    #
+    setbreak()
+    return g_os_exit(n)
+
+
+
+g_os_exit = None
+
+if __name__ == 'rpdb2' and os._exit != __exit:
+    g_os_exit = os._exit
+    os._exit = __exit
+
+
+
 def __settrace():
     if g_debugger is None:
         return
@@ -9957,7 +9917,7 @@ def main(StartClient_func = StartClient):
 
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     import rpdb2
 
     #
