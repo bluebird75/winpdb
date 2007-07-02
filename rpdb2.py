@@ -485,6 +485,9 @@ class CSimpleSessionManager:
         event_type_dict = {CEventState: {}}
         self.__sm.register_callback(self.__state_calback, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {ceventosexit: {}}
+        self.__sm.register_callback(self.__script_about_to_terminate_callback, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventExit: {}}
         self.__sm.register_callback(self.__termination_callback, event_type_dict, fSingleUse = False)
 
@@ -557,6 +560,10 @@ class CSimpleSessionManager:
     
     def __unhandled_exception(self, event):   
         self.unhandled_exception_callback()
+
+
+    def __script_about_to_terminate_callback(self, event):   
+        self.script_about_to_terminate_callback()
 
         
     def __state_calback(self, event):   
@@ -1702,6 +1709,14 @@ g_error_mapping = {
     NoThreads: STR_NO_THREADS,
     NoExceptionFound: STR_EXCEPTION_NOT_FOUND,
 }
+
+#
+# These globals are related to handling the os.fork() os._exit() pattern.
+#
+g_fdebug_child_fork = False
+g_forkpid = None
+g_forktid = None
+g_fos_exit = False
 
 
 
@@ -2920,6 +2935,15 @@ class CEvent:
     
     def is_match(self, arg):
         pass
+
+
+
+class CEventOSExit(CEvent):
+    """
+    Debugger is about to do os._exit()
+    """
+
+    pass
 
 
 
@@ -5073,6 +5097,8 @@ class CDebuggerCore:
         finally:
             self.m_state_manager.release()
 
+        self.handle_fork(ctx.m_thread_id)
+
         if f_full_notification:
             self.send_events(None) 
         else:
@@ -5083,10 +5109,66 @@ class CDebuggerCore:
             self.send_unhandled_exception_event()
             
         state = self.m_state_manager.wait_for_state([STATE_RUNNING])
-        
+       
+        self.prepare_fork_step(ctx.m_thread_id)
+
         ctx.m_fUnhandledException = False
         ctx.m_fBroken = False 
         ctx.set_tracers()
+
+        if g_fos_exit:
+            time.sleep(2.0)
+
+
+    def prepare_fork_step(self, tid):
+        global g_forkpid
+
+        if tid != g_forktid:
+            return
+
+        self.m_step_tid = tid
+        g_forkpid = os.getpid()
+
+
+    def handle_fork(self, tid):
+        global g_forktid
+        global g_forkpid
+
+        if g_forkpid == None or tid != g_forktid:
+            return
+
+        forkpid = g_forkpid
+        g_forkpid = None
+        g_forktid = None
+
+        if os.getpid() == forkpid:
+            #
+            # Parent side of fork().
+            #
+
+            if not g_fdebug_child_fork:
+                return
+
+            #
+            # Shutdown debugger to allow child fork to quietly take over.
+            #
+            g_server.shutdown()
+            self.stoptrace()
+            return
+
+        #
+        # Child side of fork().
+        #
+        if not g_fdebug_child_fork:
+            self.stoptrace()
+            return
+
+        #
+        # Sleep to let parent fork enough time to stop tracing.
+        #
+        time.sleep(2.0)
+
+        __child_fork_jumpstart()
 
 
     def notify_thread_broken(self, tid, name):
@@ -5383,6 +5465,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventNamespace: {},
             CEventUnhandledException: {},
             CEventStack: {},
+            CEventOSExit: {},
             CEventExit: {}
             }
 
@@ -5509,12 +5592,18 @@ class CDebuggerEngine(CDebuggerCore):
         Send series of events that define the debugger state.
         """
         
+        global g_fos_exit
+
         if isinstance(event, CEventSync):
             fException = event.m_fException
             fSendUnhandled = event.m_fSendUnhandled
         else:
             fException = False
             fSendUnhandled = False
+
+        if g_fos_exit:
+            g_fos_exit = False
+            self.send_os_exit_event()
 
         try:
             if isinstance(event, CEventSync) and not fException:
@@ -5536,6 +5625,15 @@ class CDebuggerEngine(CDebuggerCore):
             raise
 
 
+    def send_os_exit_event(self):
+        """
+        Notify client that the debuggee is about to shutdown with os._exit().
+        """
+        
+        event = CEventOSExit()
+        self.m_event_dispatcher.fire_event(event)
+
+        
     def send_unhandled_exception_event(self):
         event = CEventUnhandledException()
         self.m_event_dispatcher.fire_event(event)
@@ -6634,13 +6732,14 @@ class CPwdServerProxy:
 
 
     
-class CIOServer(threading.Thread):
+class CIOServer:
     """
     Base class for debuggee server.
     """
     
     def __init__(self, pwd, fAllowUnencrypted, fAllowRemote, rid):
-        threading.Thread.__init__(self)
+        self.m_thread = threading.Thread(target = self.run)
+        self.m_thread.setDaemon(True)
 
         self.m_crypto = CCrypto(pwd, fAllowUnencrypted, rid)
         
@@ -6651,27 +6750,34 @@ class CIOServer(threading.Thread):
         self.m_stop = False
         self.m_server = None
         
-        self.setDaemon(True)
-
 
     def shutdown(self):
         self.stop()
         
     
+    def start(self):
+        self.m_thread.start()
+
+
+    def restart(self):
+        self.m_thread = threading.Thread(target = self.run)
+        self.m_thread.setDaemon(True)
+
+
     def stop(self):
         if self.m_stop:
             return
             
         self.m_stop = True
 
-        while self.isAlive():
+        while self.m_thread.isAlive():
             try:
                 proxy = CPwdServerProxy(self.m_crypto, calcURL(LOOPBACK, self.m_port), CLocalTimeoutTransport())
                 proxy.null()
             except (socket.error, CException):
                 pass
             
-            self.join(0.5)
+            self.m_thread.join(0.5)
 
         self.m_server.shutdown_work_queue()
 
@@ -6687,8 +6793,9 @@ class CIOServer(threading.Thread):
 
         sys.settrace(None)
         sys.setprofile(None)
-        
-        (self.m_port, self.m_server) = self.__StartXMLRPCServer()
+       
+        if self.m_server == None:
+            (self.m_port, self.m_server) = self.__StartXMLRPCServer()
 
         self.m_server.init_work_queue()
         self.m_server.register_function(self.dispatcher_method)        
@@ -7210,6 +7317,9 @@ class CSessionManagerInternal:
         event_type_dict = {CEventNoThreads: {}}
         self.register_callback(self._reset_frame_indexes, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {CEventOSExit: {}}
+        self.register_callback(self.on_event_os_exit, event_type_dict, fSingleUse = False)
+        
         event_type_dict = {CEventExit: {}}
         self.register_callback(self.on_event_exit, event_type_dict, fSingleUse = False)
         
@@ -7223,6 +7333,7 @@ class CSessionManagerInternal:
         self.m_last_fchdir = None
 
         self.m_ftrap = True
+        self.m_fos_exit = False
         
     
     def __del__(self):
@@ -7582,6 +7693,10 @@ class CSessionManagerInternal:
                 return
 
 
+    def on_event_os_exit(self, event):
+        self.m_fos_exit = True
+
+    
     def on_event_exit(self, event):
         self.m_printer(STR_DEBUGGEE_TERMINATED)        
         threading.Thread(target = self.detach_job).start()
@@ -7596,6 +7711,8 @@ class CSessionManagerInternal:
             
     def detach(self):
         self.__verify_attached()
+
+        self.m_fos_exit = False
 
         try:
             self.save_breakpoints()
@@ -7640,10 +7757,16 @@ class CSessionManagerInternal:
 
     
     def request_go(self):
+        if self.m_fos_exit:
+            return self.detach()
+
         self.getSession().getProxy().request_go()
 
     
     def request_go_breakpoint(self, filename, scope, lineno):
+        if self.m_fos_exit:
+            return self.detach()
+
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
@@ -7651,14 +7774,23 @@ class CSessionManagerInternal:
 
 
     def request_step(self):
+        if self.m_fos_exit:
+            return self.detach()
+
         self.getSession().getProxy().request_step()
 
 
     def request_next(self):
+        if self.m_fos_exit:
+            return self.detach()
+
         self.getSession().getProxy().request_next()
 
 
     def request_return(self):
+        if self.m_fos_exit:
+            return self.detach()
+
         self.getSession().getProxy().request_return()
 
 
@@ -9537,7 +9669,15 @@ Type 'help up' or 'help down' for more information on focused frames."""
 
 
 
+def __child_fork_jumpstart():
+    g_server.restart()
+
+
+
 def __fork():
+    global g_forktid
+    g_forktid = thread.get_ident()
+
     #
     # os.fork() has been called. 
     # Please choose if you would like to debug 
@@ -9558,9 +9698,13 @@ if __name__ == 'rpdb2' and os.fork != __fork:
 
 
 def __exit(n):
+    global g_fos_exit
+    g_fos_exit = True
+
     #
     # os._exit(n) has been called. 
-    # The program is about to terminate.
+    # Stepping on from this point will result in program
+    # termination.
     #
     setbreak()
     return g_os_exit(n)
