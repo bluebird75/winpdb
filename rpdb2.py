@@ -9706,6 +9706,7 @@ def _child_fork_jumpstart():
 def __fork():
     global g_forktid
     g_forktid = thread.get_ident()
+    setbreak()
 
     #
     # os.fork() has been called. 
@@ -9713,14 +9714,13 @@ def __fork():
     # this process or the child process 
     # that is about to fork.
     #
-    setbreak()
     return g_os_fork()
 
 
 
 g_os_fork = None
 
-if __name__ == 'rpdb2' and os.fork != __fork:
+if __name__ == 'rpdb2' and 'fork' in dir(os) and os.fork != __fork:
     g_os_fork = os.fork
     os.fork = __fork
 
@@ -9729,13 +9729,13 @@ if __name__ == 'rpdb2' and os.fork != __fork:
 def __exit(n):
     global g_fos_exit
     g_fos_exit = True
+    setbreak()
 
     #
     # os._exit(n) has been called. 
     # Stepping on from this point will result in program
     # termination.
     #
-    setbreak()
     return g_os_exit(n)
 
 
