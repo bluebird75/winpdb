@@ -2938,6 +2938,15 @@ class CEvent:
 
 
 
+class CEventForkSwitch(CEvent):
+    """
+    Debuggee forked. Debugger should switch to child.
+    """
+
+    pass
+
+
+
 class CEventOSExit(CEvent):
     """
     Debugger is about to do os._exit()
@@ -4812,6 +4821,15 @@ class CDebuggerCore:
         return self.m_fembedded
 
         
+    def send_fork_switch(self):
+        """
+        Notify client that it should switch to the child fork.
+        """
+        
+        event = CEventForkSwitch()
+        self.m_event_dispatcher.fire_event(event)
+
+
     def send_events(self, event):
         pass
 
@@ -5152,6 +5170,7 @@ class CDebuggerCore:
             #
             # Shutdown debugger to allow child fork to quietly take over.
             #
+            self.send_fork_switch()
             g_server.shutdown()
             self.stoptrace()
             return
@@ -5168,7 +5187,7 @@ class CDebuggerCore:
         #
         time.sleep(2.0)
 
-        __child_fork_jumpstart()
+        _child_fork_jumpstart()
 
 
     def notify_thread_broken(self, tid, name):
@@ -5466,7 +5485,8 @@ class CDebuggerEngine(CDebuggerCore):
             CEventUnhandledException: {},
             CEventStack: {},
             CEventOSExit: {},
-            CEventExit: {}
+            CEventExit: {},
+            CEventForkSwitch: {}
             }
 
         self.m_event_queue = CEventQueue(self.m_event_dispatcher)
@@ -6759,9 +6779,10 @@ class CIOServer:
         self.m_thread.start()
 
 
-    def restart(self):
+    def jumpstart(self):
         self.m_thread = threading.Thread(target = self.run)
         self.m_thread.setDaemon(True)
+        self.m_thread.start()
 
 
     def stop(self):
@@ -7658,8 +7679,13 @@ class CSessionManagerInternal:
         self.m_worker_thread_ident = thread.get_ident()
         t = 0
         nfailures = 0
+        ffork = False
         
         while not self.m_fStop:
+            if ffork:
+                ffork = False
+                time.sleep(2.0)
+                
             try:
                 t = ControlRate(t, IDLE_MAX_RATE)
                 if self.m_fStop:
@@ -7667,6 +7693,9 @@ class CSessionManagerInternal:
                     
                 (n, sel) = self.getSession().getProxy().wait_for_event(PING_TIMEOUT, self.m_remote_event_index)
                 
+                if True in [isinstance(e, CEventForkSwitch) for e in sel]:
+                    ffork = True
+                                
                 if True in [isinstance(e, CEventExit) for e in sel]:
                     self.getSession().shut_down()
                     self.m_fStop = True
@@ -9669,8 +9698,8 @@ Type 'help up' or 'help down' for more information on focused frames."""
 
 
 
-def __child_fork_jumpstart():
-    g_server.restart()
+def _child_fork_jumpstart():
+    g_server.jumpstart()
 
 
 
