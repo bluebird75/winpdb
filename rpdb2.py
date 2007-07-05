@@ -5187,7 +5187,7 @@ class CDebuggerCore:
         finally:
             self.m_state_manager.release()
 
-        self.handle_fork(ctx.m_thread_id)
+        self.handle_fork(ctx)
         
         if f_full_notification and (g_fos_exit or g_fexit_normal):
             g_fexit_normal = False
@@ -5226,9 +5226,11 @@ class CDebuggerCore:
         g_forkpid = os.getpid()
 
 
-    def handle_fork(self, tid):
+    def handle_fork(self, ctx):
         global g_forktid
         global g_forkpid
+
+        tid = ctx.m_thread_id
 
         if g_forkpid == None or tid != g_forktid:
             return
@@ -5264,6 +5266,8 @@ class CDebuggerCore:
         # Sleep to let parent fork enough time to stop tracing.
         #
         time.sleep(2.0)
+        
+        self.m_threads = {tid: ctx}
 
         _child_fork_jumpstart()
 
@@ -9848,11 +9852,11 @@ def _child_fork_jumpstart():
 
 def __fork():
     global g_forktid
-    g_forktid = thread.get_ident()
-    setbreak()
+    g_forktid = setbreak()
 
     #
     # os.fork() has been called. 
+    #
     # You can choose if you would like the debugger
     # to continue with the parent or child fork with
     # the 'fork' console command.
@@ -9874,11 +9878,11 @@ if __name__ == 'rpdb2' and 'fork' in dir(os) and os.fork != __fork:
 
 def __exit(n):
     global g_fos_exit
-    g_fos_exit = True
-    setbreak()
+    g_fos_exit = (setbreak() != None)
 
     #
-    # os._exit(n) has been called. 
+    # os._exit(n) has been called.
+    #
     # Stepping on from this point will result 
     # in program termination.
     #
@@ -9910,8 +9914,9 @@ def __setbreak():
     f = sys._getframe(2)
     g_debugger.setbreak(f)
 
-    
+    return thread.get_ident()
 
+    
 
 def _atexit(fabort = False):
     if g_debugger is None:
@@ -10252,6 +10257,7 @@ if __name__ == '__main__':
     #
     # Debuggee breaks (pauses) here 
     # before program termination. 
+    #
     # You can step to debug any exit handlers.
     #
     rpdb2.setbreak()
