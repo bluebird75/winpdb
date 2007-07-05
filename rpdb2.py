@@ -485,7 +485,7 @@ class CSimpleSessionManager:
         event_type_dict = {CEventState: {}}
         self.__sm.register_callback(self.__state_calback, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {ceventosexit: {}}
+        event_type_dict = {CEventExitPrepare: {}}
         self.__sm.register_callback(self.__script_about_to_terminate_callback, event_type_dict, fSingleUse = False)
 
         event_type_dict = {CEventExit: {}}
@@ -537,11 +537,16 @@ class CSimpleSessionManager:
 
 
     #
-    # Override these callback to react to the related events.
+    # Override these callbacks to react to the related events.
     #
     
     def unhandled_exception_callback(self):
         print 'unhandled_exception_callback'
+        self.request_go()
+
+
+    def script_paused(self):
+        print 'script_paused'
         self.request_go()
 
 
@@ -566,6 +571,10 @@ class CSimpleSessionManager:
         self.script_about_to_terminate_callback()
 
         
+    def __termination_callback(self, event):
+        self.script_terminated_callback()
+
+
     def __state_calback(self, event):   
         """
         Handle state change notifications from the debugge.
@@ -594,35 +603,29 @@ class CSimpleSessionManager:
             return
             
         e = s[-1]
-        
-        lineno = e[1]
-        path = e[0]
+       
+        function_name = e[2]
         filename = os.path.basename(e[0])
 
-        if filename == DEBUGGER_FILENAME and lineno == self.__get_termination_lineno(path):
-            self.script_about_to_terminate_callback()
+        if filename != DEBUGGER_FILENAME:
+            #
+            # This is a user breakpoint (e.g. rpdb2.setbreak())
+            #
+            self.script_paused()
+            return
 
-    
-    def __termination_callback(self, event):
-        self.script_terminated_callback()
-
-
-    def __get_termination_lineno(self, path):
-        """
-        Return the last line number of a file.
-        """
-        
-        if self.m_termination_lineno is not None:
-            return self.m_termination_lineno
-            
-        f = open(path, 'rb')
-        l = f.read()
-        f.close()
-        _l = l.rstrip()
-        _s = _l.split('\n')
-
-        self.m_termination_lineno = len(_s)
-        return self.m_termination_lineno
+        if '__fork' in function_name:
+            #
+            # This is the setbreak() before a fork.
+            #
+            self.request_go()
+            return
+ 
+        #
+        # This must be a break before a termination warning.
+        # a CEventExitPrepare() event will soon arrive. 
+        # Do nothing.
+        #
 
         
 
@@ -1717,6 +1720,8 @@ g_fdebug_child_fork = False
 g_forkpid = None
 g_forktid = None
 g_fos_exit = False
+
+g_fexit_normal = False
 
 
 
@@ -2947,9 +2952,9 @@ class CEventForkSwitch(CEvent):
 
 
 
-class CEventOSExit(CEvent):
+class CEventExitPrepare(CEvent):
     """
-    Debugger is about to do os._exit()
+    Debugger is about to terminate.
     """
 
     pass
@@ -2958,7 +2963,7 @@ class CEventOSExit(CEvent):
 
 class CEventExit(CEvent):
     """
-    Debuggee is about to terminate.
+    Debuggee is terminating.
     """
     
     pass
@@ -4830,6 +4835,24 @@ class CDebuggerCore:
         self.m_event_dispatcher.fire_event(event)
 
 
+    def send_event_exit_prepare(self):
+        """
+        Notify client that the debuggee is prepared to shut down.
+        """
+        
+        event = CEventExitPrepare()
+        self.m_event_dispatcher.fire_event(event)
+
+
+    def send_event_exit(self):
+        """
+        Notify client that the debuggee is shutting down.
+        """
+        
+        event = CEventExit()
+        self.m_event_dispatcher.fire_event(event)
+
+
     def send_events(self, event):
         pass
 
@@ -5072,6 +5095,9 @@ class CDebuggerCore:
         """
         Main break logic.
         """
+
+        global g_fos_exit
+        global g_fexit_normal
         
         if not self.is_break(ctx, frame, event) and not ctx.is_breakpoint():
             ctx.set_tracers()
@@ -5095,7 +5121,7 @@ class CDebuggerCore:
             except:
                 pass
             
-            if ctx.m_fUnhandledException and not self.m_fUnhandledException and not 'SCRIPT_TERMINATED' in frame.f_locals:
+            if ctx.m_fUnhandledException and not self.m_fUnhandledException:
                 self.m_fUnhandledException = True
                 f_uhe_notification = True
                 
@@ -5116,6 +5142,10 @@ class CDebuggerCore:
             self.m_state_manager.release()
 
         self.handle_fork(ctx.m_thread_id)
+        
+        if f_full_notification and (g_fos_exit or g_fexit_normal):
+            g_fexit_normal = False
+            self.send_event_exit_prepare()
 
         if f_full_notification:
             self.send_events(None) 
@@ -5135,6 +5165,8 @@ class CDebuggerCore:
         ctx.set_tracers()
 
         if g_fos_exit:
+            g_fos_exit = False
+            self.send_event_exit()
             time.sleep(2.0)
 
 
@@ -5484,7 +5516,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventNamespace: {},
             CEventUnhandledException: {},
             CEventStack: {},
-            CEventOSExit: {},
+            CEventExitPrepare: {},
             CEventExit: {},
             CEventForkSwitch: {}
             }
@@ -5502,15 +5534,7 @@ class CDebuggerEngine(CDebuggerCore):
         CDebuggerCore.shutdown(self)
 
 
-    def send_event_exit(self):
-        """
-        Notify client that the debuggee is shutting down.
-        """
-        
-        event = CEventExit()
-        self.m_event_dispatcher.fire_event(event)
-
-        
+       
     def sync_with_events(self, fException, fSendUnhandled):
         """
         Send debugger state to client.
@@ -5612,18 +5636,12 @@ class CDebuggerEngine(CDebuggerCore):
         Send series of events that define the debugger state.
         """
         
-        global g_fos_exit
-
         if isinstance(event, CEventSync):
             fException = event.m_fException
             fSendUnhandled = event.m_fSendUnhandled
         else:
             fException = False
             fSendUnhandled = False
-
-        if g_fos_exit:
-            g_fos_exit = False
-            self.send_os_exit_event()
 
         try:
             if isinstance(event, CEventSync) and not fException:
@@ -5645,15 +5663,7 @@ class CDebuggerEngine(CDebuggerCore):
             raise
 
 
-    def send_os_exit_event(self):
-        """
-        Notify client that the debuggee is about to shutdown with os._exit().
-        """
-        
-        event = CEventOSExit()
-        self.m_event_dispatcher.fire_event(event)
-
-        
+       
     def send_unhandled_exception_event(self):
         event = CEventUnhandledException()
         self.m_event_dispatcher.fire_event(event)
@@ -7338,9 +7348,6 @@ class CSessionManagerInternal:
         event_type_dict = {CEventNoThreads: {}}
         self.register_callback(self._reset_frame_indexes, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {CEventOSExit: {}}
-        self.register_callback(self.on_event_os_exit, event_type_dict, fSingleUse = False)
-        
         event_type_dict = {CEventExit: {}}
         self.register_callback(self.on_event_exit, event_type_dict, fSingleUse = False)
         
@@ -7354,7 +7361,6 @@ class CSessionManagerInternal:
         self.m_last_fchdir = None
 
         self.m_ftrap = True
-        self.m_fos_exit = False
         
     
     def __del__(self):
@@ -7722,10 +7728,6 @@ class CSessionManagerInternal:
                 return
 
 
-    def on_event_os_exit(self, event):
-        self.m_fos_exit = True
-
-    
     def on_event_exit(self, event):
         self.m_printer(STR_DEBUGGEE_TERMINATED)        
         threading.Thread(target = self.detach_job).start()
@@ -7740,8 +7742,6 @@ class CSessionManagerInternal:
             
     def detach(self):
         self.__verify_attached()
-
-        self.m_fos_exit = False
 
         try:
             self.save_breakpoints()
@@ -7786,16 +7786,10 @@ class CSessionManagerInternal:
 
     
     def request_go(self):
-        if self.m_fos_exit:
-            return self.detach()
-
         self.getSession().getProxy().request_go()
 
     
     def request_go_breakpoint(self, filename, scope, lineno):
-        if self.m_fos_exit:
-            return self.detach()
-
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
@@ -7803,23 +7797,14 @@ class CSessionManagerInternal:
 
 
     def request_step(self):
-        if self.m_fos_exit:
-            return self.detach()
-
         self.getSession().getProxy().request_step()
 
 
     def request_next(self):
-        if self.m_fos_exit:
-            return self.detach()
-
         self.getSession().getProxy().request_next()
 
 
     def request_return(self):
-        if self.m_fos_exit:
-            return self.detach()
-
         self.getSession().getProxy().request_return()
 
 
@@ -9733,8 +9718,8 @@ def __exit(n):
 
     #
     # os._exit(n) has been called. 
-    # Stepping on from this point will result in program
-    # termination.
+    # Stepping on from this point will result 
+    # in program termination.
     #
     return g_os_exit(n)
 
@@ -10101,14 +10086,14 @@ if __name__ == '__main__':
     #
     ret = rpdb2.main()
 
-    SCRIPT_TERMINATED = True
+    rpdb2.g_fexit_normal = True
 
     #
     # Debuggee breaks (pauses) here 
-    # before program termination.
+    # before program termination. 
+    # You can step to debug any exit handlers.
     #
-    sys.exit(ret)
+    rpdb2.setbreak()
 
 
-    
 
