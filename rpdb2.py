@@ -889,6 +889,31 @@ class CSessionManager:
         """
 
         return self.__smi.get_trap_unhandled_exceptions()
+
+
+    def set_fork_mode(self, ffork_into_child, ffork_auto):
+        """
+        Determine how to handle os.fork().
+        
+        ffork_into_child - True|False - If True, the debugger will debug the 
+            child process after a fork, otherwise the debugger will continue
+            to debug the parent process.
+
+        ffork_auto - True|False - If True, the debugger will not pause before
+            a fork and will automatically make a decision based on the 
+            value of the ffork_into_child flag.
+        """
+
+        return self.__smi.set_fork_mode(ffork_into_child, ffork_auto)
+
+
+    def get_fork_mode(self):
+        """
+        Return the fork mode in the form of a (ffork_into_child, ffork_auto) 
+        flags tuple.
+        """
+
+        return self.__smi.get_fork_mode()
     
 
     def get_stack(self, tid_list, fAll):   
@@ -1556,8 +1581,10 @@ STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
-STR_TRAP_MODE = 'Trap unhandled exceptions mode is: %s'
+STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
 STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
+STR_FORK_MODE = "Fork mode is set to: %s, %s."
+STR_FORK_MODE_SET = "Fork mode was set to: %s, %s."
 STR_LOCAL_NAMESPACE_WARNING = 'Debugger modifications to the original bindings of the local namespace of this frame will be committed before the execution of the next statement of the frame. Any code using these variables executed before that point will see the original values.'
 STR_WARNING = 'Warning: %s' 
 
@@ -1565,6 +1592,11 @@ STR_MAX_NAMESPACE_WARNING_TITLE = 'Namespace Warning'
 STR_MAX_NAMESPACE_WARNING_TYPE = '*** WARNING ***'
 STR_MAX_NAMESPACE_WARNING_MSG = 'Number of items exceeds capacity of namespace browser.'
 STR_MAX_EVALUATE_LENGTH_WARNING = 'Output length exeeds maximum capacity.'
+
+FORK_CHILD = 'child'
+FORK_PARENT = 'parent'
+FORK_MANUAL = 'manual'
+FORK_AUTO = 'auto'
 
 ENCRYPTION_ENABLED = 'encrypted'
 ENCRYPTION_DISABLED = 'plain-text'
@@ -1716,7 +1748,6 @@ g_error_mapping = {
 #
 # These globals are related to handling the os.fork() os._exit() pattern.
 #
-g_fdebug_child_fork = False
 g_forkpid = None
 g_forktid = None
 g_fos_exit = False
@@ -2997,6 +3028,18 @@ class CEventTrap(CEvent):
 
     def is_match(self, arg):
         return self.m_ftrap == arg
+
+
+
+class CEventForkMode(CEvent):
+    """
+    Mode of fork behavior has changed.
+    Sent when the mode changes.
+    """
+    
+    def __init__(self, ffork_into_child, ffork_auto):
+        self.m_ffork_into_child = ffork_into_child
+        self.m_ffork_auto = ffork_auto
 
 
 
@@ -4801,6 +4844,9 @@ class CDebuggerCore:
         self.m_event_dispatcher = CEventDispatcher()
         self.m_state_manager = CStateManager(STATE_RUNNING, self.m_event_dispatcher)
 
+        self.m_ffork_into_child = False
+        self.m_ffork_auto = False
+
         self.m_ftrap = True
         self.m_fUnhandledException = False        
         self.m_fBreak = False
@@ -5196,7 +5242,7 @@ class CDebuggerCore:
             # Parent side of fork().
             #
 
-            if not g_fdebug_child_fork:
+            if not self.m_ffork_into_child:
                 return
 
             #
@@ -5210,7 +5256,7 @@ class CDebuggerCore:
         #
         # Child side of fork().
         #
-        if not g_fdebug_child_fork:
+        if not self.m_ffork_into_child:
             self.stoptrace()
             return
 
@@ -5518,7 +5564,9 @@ class CDebuggerEngine(CDebuggerCore):
             CEventStack: {},
             CEventExitPrepare: {},
             CEventExit: {},
-            CEventForkSwitch: {}
+            CEventForkSwitch: {},
+            CEventTrap: {},
+            CEventForkMode: {}
             }
 
         self.m_event_queue = CEventQueue(self.m_event_dispatcher)
@@ -6478,6 +6526,14 @@ class CDebuggerEngine(CDebuggerCore):
         self.m_event_dispatcher.fire_event(event)
 
 
+    def set_fork_mode(self, ffork_into_child, ffork_auto):
+        self.m_ffork_into_child = ffork_into_child
+        self.m_ffork_auto = ffork_auto
+
+        event = CEventForkMode(ffork_into_child, ffork_auto)
+        self.m_event_dispatcher.fire_event(event)
+
+
     
 #
 # ------------------------------------- RPC Server --------------------------------------------
@@ -7087,6 +7143,11 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
+    def export_set_fork_mode(self, ffork_into_child, ffork_auto):
+        self.m_debugger.set_fork_mode(ffork_into_child, ffork_auto)
+        return 0
+
+
         
 #
 # ------------------------------------- RPC Client --------------------------------------------
@@ -7355,12 +7416,19 @@ class CSessionManagerInternal:
         self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
         self.m_event_dispatcher.register_chain_override(event_type_dict)
 
+        event_type_dict = {CEventForkMode: {}}
+        self.m_event_dispatcher_proxy.register_callback(self.on_event_fork_mode, event_type_dict, fSingleUse = False)
+        self.m_event_dispatcher.register_chain_override(event_type_dict)
+
         self.m_printer = self.__nul_printer
 
         self.m_last_command_line = None
         self.m_last_fchdir = None
 
         self.m_ftrap = True
+
+        self.m_ffork_into_child = False
+        self.m_ffork_auto = False
         
     
     def __del__(self):
@@ -7908,7 +7976,7 @@ class CSessionManagerInternal:
         self.m_ftrap = event.m_ftrap
 
         if ffire:
-            event = CEventTrap(ftrap)
+            event = CEventTrap(event.m_ftrap)
             self.m_event_dispatcher.fire_event(event)
         
         
@@ -7927,6 +7995,40 @@ class CSessionManagerInternal:
     
     def get_trap_unhandled_exceptions(self):
         return self.m_ftrap
+
+
+    def on_event_fork_mode(self, event):
+        ffire = ((self.m_ffork_into_child , self.m_ffork_auto) != 
+            (event.m_ffork_into_child, event.m_ffork_auto))
+
+        self.m_ffork_into_child = event.m_ffork_into_child
+        self.m_ffork_auto = event.m_ffork_auto
+
+        if ffire:
+            event = CEventForkMode(self.m_ffork_into_child, self.m_ffork_auto)
+            self.m_event_dispatcher.fire_event(event)
+       
+
+    def set_fork_mode(self, ffork_into_child, ffork_auto):
+        self.m_ffork_into_child = ffork_into_child
+        self.m_ffork_auto = ffork_auto
+
+        if self.__is_attached():
+            try:
+                self.getSession().getProxy().set_fork_mode(
+                    self.m_ffork_into_child,
+                    self.m_ffork_auto
+                    )
+
+            except NotAttached:
+                pass
+
+        event = CEventForkMode(ffork_into_child, ffork_auto)
+        self.m_event_dispatcher.fire_event(event)
+
+    
+    def get_fork_mode(self):
+        return (self.m_ffork_into_child, self.m_ffork_auto)
     
 
     def get_stack(self, tid_list, fAll):    
@@ -8208,7 +8310,7 @@ class CSessionManagerInternal:
             self.m_printer(STR_DETACH_SUCCEEDED)
 
 
-    
+
 class CConsoleInternal(cmd.Cmd, threading.Thread):
     def __init__(self, session_manager, stdin = None, stdout = None, fSplit = False):
         cmd.Cmd.__init__(self, stdin = stdin, stdout = stdout)
@@ -8233,6 +8335,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         event_type_dict = {CEventTrap: {}}
         self.m_session_manager.register_callback(self.trap_handler, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {CEventForkMode: {}}
+        self.m_session_manager.register_callback(self.fork_mode_handler, event_type_dict, fSingleUse = False)
 
         self.m_last_source_line = None
         self.m_last_nlines = DEFAULT_NUMBER_OF_LINES
@@ -8368,6 +8473,13 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     def trap_handler(self, event):
         self.printer(STR_TRAP_MODE_SET % (str(event.m_ftrap), ))
+
+        
+    def fork_mode_handler(self, event):
+        x = [FORK_PARENT, FORK_CHILD][event.m_ffork_into_child]
+        y = [FORK_MANUAL, FORK_AUTO][event.m_ffork_auto]
+
+        self.printer(STR_FORK_MODE_SET % (x, y))
 
         
     def do_launch(self, arg):
@@ -9083,7 +9195,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     do_a = do_analyze
 
-    
+   
     def do_trap(self, arg):
         if arg == '':
             ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
@@ -9100,7 +9212,32 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         self.m_session_manager.set_trap_unhandled_exceptions(ftrap)
 
-    
+   
+    def do_fork(self, arg):
+        (ffork_into_child, ffork_auto) = self.m_session_manager.get_fork_mode()
+
+        if arg == '':
+            x = [FORK_PARENT, FORK_CHILD][ffork_into_child]
+            y = [FORK_MANUAL, FORK_AUTO][ffork_auto]
+
+            print >> self.stdout, STR_FORK_MODE % (x, y)
+            return 
+
+        arg = arg.lower()
+
+        if FORK_PARENT in arg:
+            ffork_into_child = False
+        elif FORK_CHILD in arg:
+            ffork_into_child = True
+
+        if FORK_AUTO in arg:
+            ffork_auto = True
+        elif FORK_MANUAL in arg:
+            ffork_auto = False
+
+        self.m_session_manager.set_fork_mode(ffork_into_child, ffork_auto)
+ 
+
     def do_password(self, arg):
         if arg == '':
             pwd = self.m_session_manager.get_password()
@@ -9228,6 +9365,7 @@ eval        - Evaluate expression in the context of the current frame.
 exec        - Execute suite in the context of the current frame.
 analyze     - Toggle analyze last exception mode.
 trap        - Get or set "trap unhandled exceptions" mode.
+fork        - Get or set fork handling mode.
 
 License:
 ----------------
@@ -9324,6 +9462,26 @@ Debuggee will ignore unhandled exceptions.
 
 When set to True: 
 Debuggee will pause on unhandled exceptions for inspection."""
+
+
+    def help_fork(self):
+        print >> self.stdout, """fork [parent | child] [manual | auto]
+
+Get or set fork handling mode.
+
+Without arguments returns the current mode.
+
+When 'parent' is specified the debugger will continue to debug the original
+parent process after a fork.
+
+When 'child' is specified the debugger will switch to debug the forked 
+child process after a fork.
+
+When 'manual' is specified the debugger will pause before doing a fork.
+
+When 'auto' is specified the debugger will go through the fork without 
+pausing and will make the forking decision based on the parent/child 
+setting."""
 
 
     def help_stop(self):
@@ -9695,9 +9853,12 @@ def __fork():
 
     #
     # os.fork() has been called. 
-    # Please choose if you would like to debug 
-    # this process or the child process 
-    # that is about to fork.
+    # You can choose if you would like the debugger
+    # to continue with the parent or child fork with
+    # the 'fork' console command.
+    # 
+    # For example: 'fork child' or 'fork parent'
+    # Type: 'help fork' for more information.
     #
     return g_os_fork()
 
