@@ -4855,6 +4855,8 @@ class CDebuggerCore:
         self.m_step_tid = None
         self.m_next_frame = None
         self.m_return_frame = None       
+        self.m_saved_step = None
+        self.m_saved_next = None
 
         self.m_bp_manager = CBreakPointsManager()
 
@@ -4936,6 +4938,7 @@ class CDebuggerCore:
         
         ctx = self.m_threads[tid]
         f.f_trace = ctx.trace_dispatch_break
+        self.m_saved_next = self.m_next_frame
         self.m_next_frame = f
 
         
@@ -5170,7 +5173,11 @@ class CDebuggerCore:
             if ctx.m_fUnhandledException and not self.m_fUnhandledException:
                 self.m_fUnhandledException = True
                 f_uhe_notification = True
-                
+            
+            if self.is_auto_fork_first_stage(ctx.m_thread_id):
+                self.m_saved_step = (self.m_step_tid, self.m_saved_next, self.m_return_frame)
+                self.m_bp_manager.m_fhard_tbp = True
+
             if self.m_f_first_to_break or (self.m_current_ctx == ctx):                
                 self.m_current_ctx = ctx
                 self.m_lastest_event = event
@@ -5187,23 +5194,35 @@ class CDebuggerCore:
         finally:
             self.m_state_manager.release()
 
-        self.handle_fork(ctx)
+        ffork_second_stage = self.handle_fork(ctx)
         
         if f_full_notification and (g_fos_exit or g_fexit_normal):
             g_fexit_normal = False
             self.send_event_exit_prepare()
 
-        if f_full_notification:
-            self.send_events(None) 
-        else:
-            self.notify_thread_broken(ctx.m_thread_id, ctx.m_thread_name)
-            self.notify_namespace()
+        if self.is_auto_fork_first_stage(ctx.m_thread_id):
+            self.request_go()
 
-        if f_uhe_notification:
-            self.send_unhandled_exception_event()
-            
-        state = self.m_state_manager.wait_for_state([STATE_RUNNING])
-       
+        elif self.m_ffork_auto and ffork_second_stage:
+            (self.m_step_tid, self.m_next_frame, self.m_return_frame) = self.m_saved_step
+            self.m_saved_step = None
+            self.m_bp_manager.m_fhard_tbp = False
+            self.request_go()
+
+        else:
+            if f_full_notification:
+                self.send_events(None) 
+            else:
+                self.notify_thread_broken(ctx.m_thread_id, ctx.m_thread_name)
+                self.notify_namespace()
+
+            if f_uhe_notification:
+                self.send_unhandled_exception_event()
+                
+            state = self.m_state_manager.wait_for_state([STATE_RUNNING])
+      
+        self.m_saved_next = None
+
         self.prepare_fork_step(ctx.m_thread_id)
 
         ctx.m_fUnhandledException = False
@@ -5214,6 +5233,13 @@ class CDebuggerCore:
             g_fos_exit = False
             self.send_event_exit()
             time.sleep(2.0)
+
+
+    def is_auto_fork_first_stage(self, tid):
+        if not self.m_ffork_auto:
+            return False
+
+        return tid == g_forktid and g_forkpid == None
 
 
     def prepare_fork_step(self, tid):
@@ -5233,7 +5259,7 @@ class CDebuggerCore:
         tid = ctx.m_thread_id
 
         if g_forkpid == None or tid != g_forktid:
-            return
+            return False
 
         forkpid = g_forkpid
         g_forkpid = None
@@ -5245,7 +5271,7 @@ class CDebuggerCore:
             #
 
             if not self.m_ffork_into_child:
-                return
+                return True
 
             #
             # Shutdown debugger to allow child fork to quietly take over.
@@ -5253,14 +5279,14 @@ class CDebuggerCore:
             self.send_fork_switch()
             g_server.shutdown()
             self.stoptrace()
-            return
+            return False
 
         #
         # Child side of fork().
         #
         if not self.m_ffork_into_child:
             self.stoptrace()
-            return
+            return False
 
         #
         # Sleep to let parent fork enough time to stop tracing.
@@ -5270,6 +5296,8 @@ class CDebuggerCore:
         self.m_threads = {tid: ctx}
 
         _child_fork_jumpstart()
+
+        return True
 
 
     def notify_thread_broken(self, tid, name):
@@ -7712,6 +7740,8 @@ class CSessionManagerInternal:
         self.m_server_info = self.get_server_info()
 
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
+        self.getSession().getProxy().set_fork_mode(self.m_ffork_into_child, self.m_ffork_auto)
+
         self.request_break()
         self.refresh(True)
         
