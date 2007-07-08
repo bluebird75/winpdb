@@ -1414,8 +1414,8 @@ POSIX = 'posix'
 osSpawn = {
     'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /c ""%s" %s"', 
     NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%s" %s"', 
-    POSIX: "%s -e %s %s &", 
-    GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x %s %s &", 
+    POSIX: "%s -e bash -c '%s %s; bash' &", 
+    GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x bash -c '%s %s; bash' &", 
     MAC: '%s %s',
     DARWIN: '%s %s',
     SCREEN: 'screen -t debuggee_console %s %s'
@@ -2139,6 +2139,7 @@ def FindFile(
         raise IOError
         
     filename = filename.strip('\'"')
+    filename = os.path.expanduser(filename)
 
     if fModules and not (os.path.isabs(filename) or filename.startswith('.')):
         try:    
