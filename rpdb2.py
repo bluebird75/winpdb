@@ -5186,6 +5186,7 @@ class CDebuggerCore:
                 self.m_step_tid = None
                 self.m_next_frame = None
                 self.m_return_frame = None       
+                self.m_saved_next = None
 
                 self.m_bp_manager.del_temp_breakpoint(breakpoint = ctx.get_breakpoint())
 
@@ -5222,8 +5223,6 @@ class CDebuggerCore:
                 
             state = self.m_state_manager.wait_for_state([STATE_RUNNING])
       
-        self.m_saved_next = None
-
         self.prepare_fork_step(ctx.m_thread_id)
 
         ctx.m_fUnhandledException = False
@@ -7286,6 +7285,7 @@ class CSession:
         self.m_exc_info = None
 
         self.m_fShutDown = False
+        self.m_fRestart = False
 
 
     def get_encryption(self):
@@ -7294,6 +7294,19 @@ class CSession:
         
     def getServerInfo(self):
         return self.m_server_info
+
+
+    def restart(self, nsleep = 0):
+        self.m_fRestart = True
+
+        if nsleep > 0:
+            time.sleep(nsleep)
+
+        try:
+            self.Connect()
+
+        finally:
+            self.m_fRestart = False
 
 
     def shut_down(self):
@@ -7306,9 +7319,12 @@ class CSession:
         With this object you can invoke methods on the server.
         """
         
+        while self.m_fRestart:
+            time.sleep(1.0)
+
         if self.m_fShutDown:
             raise NotAttached
-            
+        
         return self.m_proxy
 
 
@@ -7788,13 +7804,8 @@ class CSessionManagerInternal:
         self.m_worker_thread_ident = thread.get_ident()
         t = 0
         nfailures = 0
-        ffork = False
         
         while not self.m_fStop:
-            if ffork:
-                ffork = False
-                time.sleep(2.0)
-                
             try:
                 t = ControlRate(t, IDLE_MAX_RATE)
                 if self.m_fStop:
@@ -7803,7 +7814,7 @@ class CSessionManagerInternal:
                 (n, sel) = self.getSession().getProxy().wait_for_event(PING_TIMEOUT, self.m_remote_event_index)
                 
                 if True in [isinstance(e, CEventForkSwitch) for e in sel]:
-                    ffork = True
+                    self.getSession().restart(2.0)
                                 
                 if True in [isinstance(e, CEventExit) for e in sel]:
                     self.getSession().shut_down()
@@ -10283,15 +10294,13 @@ if __name__ == '__main__':
     #
     ret = rpdb2.main()
 
-    rpdb2.g_fexit_normal = True
-
     #
     # Debuggee breaks (pauses) here 
     # before program termination. 
     #
     # You can step to debug any exit handlers.
     #
-    rpdb2.setbreak()
+    rpdb2.g_fexit_normal = (rpdb2.setbreak() != None)
 
 
 
