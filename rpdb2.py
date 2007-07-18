@@ -1754,6 +1754,8 @@ g_fos_exit = False
 
 g_fexit_normal = False
 
+g_execv = None
+
 
 
 #
@@ -2705,6 +2707,95 @@ def ParseEncoding(txt):
     return e
 
 
+
+#
+# ---------------------------------- CThread ---------------------------------------
+#
+
+
+
+class CThread (threading.Thread):
+    m_fstop = False
+    m_threads = {}
+
+
+    def __init__(self, target = None, args = (), shutdown = None):
+        threading.Thread.__init__(self, target = target, args = args)
+
+        self.m_fstarted = False
+        self.m_shutdown = shutdown
+
+
+    def __del__(self):
+        #threading.Thread.__del__(self)
+
+        if self.m_fstarted:
+            try:
+                del CThread.m_threads[thread.get_ident()]
+            except KeyError:
+                pass
+
+
+    def start(self):
+        if CThread.m_fstop:
+            return
+
+        CThread.m_threads[thread.get_ident()] = self.shutdown
+
+        if CThread.m_fstop:
+            del CThread.m_threads[thread.get_ident()]
+            return
+
+        self.m_fstarted = True
+
+        threading.Thread.start(self)
+
+
+    def run(self):
+        sys.settrace(None)
+        sys.setprofile(None)
+ 
+        threading.Thread.run(self)
+
+    
+    def join(self, timeout = None):
+        try:
+            threading.Thread.join(timeout)
+        except AssertionError:
+            pass
+
+
+    def shutdown(self):
+        if self.m_shutdown:
+            self.m_shutdown()
+
+
+    def joinAll(cls):
+        CThread.m_fstop = True
+
+        for tid, shutdown in CThread.m_threads.items():
+            if shutdown != None:
+                CThread.m_threads[tid] = None
+                
+                try:
+                    shutdown()
+                except:
+                    pass
+
+                shutdown = None
+
+        while len(CThread.m_threads) > 0:
+            time.sleep(0.1)
+
+    joinAll = classmethod(joinAll)
+
+
+    def clearJoin(cls):
+        m_fstop = False
+
+    clearJoin = classmethod(clearJoin)
+
+    
 
 #
 #--------------------------------------- Crypto ---------------------------------------
@@ -6442,7 +6533,7 @@ class CDebuggerEngine(CDebuggerCore):
                 continue
 
             args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index)
-            t = threading.Thread(target = self.calc_expr, args = args)
+            t = CThread(target = self.calc_expr, args = args)
             t.start()
             t.join(2)
             
@@ -6548,7 +6639,7 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        thread.start_new_thread(_atexit, (True, ))
+        CThread(target = _atexit, args = (True, )).start()
 
 
     def set_trap_unhandled_exceptions(self, ftrap):
@@ -6593,7 +6684,7 @@ class CWorkQueue:
         
 
     def __create_thread(self): 
-        t = threading.Thread(target = self.__worker_target)
+        t = CThread(target = self.__worker_target, shutdown = self.shutdown)
         #t.setDaemon(True)
         t.start()
 
@@ -6603,6 +6694,9 @@ class CWorkQueue:
         Signal worker threads to exit, and wait until they do.
         """
         
+        if self.m_f_shutdown:
+            return
+
         self.m_lock.acquire()
         self.m_f_shutdown = True
         self.m_lock.notifyAll()
@@ -6856,7 +6950,7 @@ class CIOServer:
     """
     
     def __init__(self, pwd, fAllowUnencrypted, fAllowRemote, rid):
-        self.m_thread = threading.Thread(target = self.run)
+        self.m_thread = CThread(target = self.run, shutdown = self.shutdown)
         self.m_thread.setDaemon(True)
 
         self.m_crypto = CCrypto(pwd, fAllowUnencrypted, rid)
@@ -6878,7 +6972,7 @@ class CIOServer:
 
 
     def jumpstart(self):
-        self.m_thread = threading.Thread(target = self.run)
+        self.m_thread = CThread(target = self.run, shutdown = self.shutdown)
         self.m_thread.setDaemon(True)
         self.m_thread.start()
 
@@ -8145,7 +8239,7 @@ class CSessionManagerInternal:
     def set_host(self, host):
         self.__verify_unattached()
         try:
-            socket.getaddrinfo(host, 0)
+            socket.getaddrinfo(host, 0, 0, socket.SOCK_STREAM)
 
         except socket.gaierror:
             if host.lower() != LOCALHOST:
@@ -9934,9 +10028,53 @@ def __exit(n):
 
 g_os_exit = None
 
-if __name__ == 'rpdb2' and os._exit != __exit:
+if __name__ == 'rpdb2' and '_exit' in dir(os) and os._exit != __exit:
     g_os_exit = os._exit
     os._exit = __exit
+
+
+
+def __execv(path, args):
+    global g_execv
+    g_execv = setbreak()
+
+    #
+    # os.execv() has been called. 
+    #
+    # Stepping on from this point may result 
+    # in termination of the debug session.
+    #
+    return g_os_execv(path, args)
+
+
+
+g_os_execv = None
+
+if __name__ == 'rpdb2' and os.name == POSIX and 'execv' in dir(os) and os.execv != __execv:
+    g_os_execv = os.execv
+    os.execv = __execv
+
+
+
+def __execve(path, args, env):
+    global g_execv
+    g_execv = setbreak()
+
+    #
+    # os.execve() has been called. 
+    #
+    # Stepping on from this point may result 
+    # in termination of the debug session.
+    #
+    return g_os_execve(path, args, env)
+
+
+
+g_os_execve = None
+
+if __name__ == 'rpdb2' and os.name == POSIX and 'execve' in dir(os) and os.execve != __execve:
+    g_os_execve = os.execve
+    os.execve = __execve
 
 
 
@@ -9961,6 +10099,9 @@ def __setbreak():
     
 
 def _atexit(fabort = False):
+    sys.settrace(None)
+    sys.setprofile(None)
+    
     if g_debugger is None:
         return
 
