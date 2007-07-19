@@ -1018,7 +1018,7 @@ class CJobs:
             exc_info = sys.exc_info()
 
             if callback == None:
-                rpdb2.print_debug()
+                rpdb2.print_debug_exception()
 
         if callback is not None:
             wx.CallAfter(callback, r, exc_info)
@@ -1071,7 +1071,7 @@ class CAsyncSessionManagerCall:
             self.m_session_manager.report_exception(*sys.exc_info())
         except:
             self.m_session_manager.report_exception(*sys.exc_info())
-            rpdb2.print_debug(True)
+            rpdb2.print_debug_exception(True)
 
     
     def __call__(self, *args):
@@ -3019,7 +3019,7 @@ class CNamespacePanel(wx.Panel, CJobs):
                 wx.CallAfter(self.m_tree.DeleteAllItems)
                 
             except:
-                rpdb2.print_debug()
+                rpdb2.print_debug_exception()
 
             self.m_lock.acquire()
             self.m_n_workers -= 1
@@ -3462,7 +3462,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         elif t != None:
             self.m_session_manager.report_exception(t, v, tb)
-            rpdb2.print_debug(True)
+            rpdb2.print_debug_exception(True)
             return
 
         self.m_async_sm.with_callback(self.update_body).calc_server_list()
@@ -3473,7 +3473,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         if t != None:
             self.m_session_manager.report_exception(t, v, tb)
-            rpdb2.print_debug(True)
+            rpdb2.print_debug_exception(True)
             return
 
         (self.m_server_list, self.m_errors) = r

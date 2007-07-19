@@ -273,6 +273,7 @@ import encodings
 import compiler
 import commands
 import tempfile
+import weakref
 import __main__
 import cPickle
 import httplib
@@ -1412,13 +1413,13 @@ POSIX = 'posix'
 # '%s' serves as a place holder.
 #
 osSpawn = {
-    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /c ""%s" %s"', 
-    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%s" %s"', 
-    POSIX: "%s -e bash -c '%s %s; bash' &", 
-    GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x bash -c '%s %s; bash' &", 
-    MAC: '%s %s',
-    DARWIN: '%s %s',
-    SCREEN: 'screen -t debuggee_console %s %s'
+    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /c ""%(exec)s" %(options)s"', 
+    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%(exec)s" %(options)s"', 
+    POSIX: "%(term)s -e %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
+    GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
+    MAC: '%(exec)s %(options)s',
+    DARWIN: '%(exec)s %(options)s',
+    SCREEN: 'screen -t debuggee_console %(exec)s %(options)s'
 }
 
 RPDBTERM = 'RPDBTERM'
@@ -1819,8 +1820,16 @@ def safe_repr_limited(x):
     return y
 
     
-    
-def print_debug(fForce = False):
+
+def print_debug(str):
+    if not g_fDebug:
+        return
+
+    print >> sys.__stderr__, str
+
+
+
+def print_debug_exception(fForce = False):
     """
     Print exceptions to stdout when in debug mode.
     """
@@ -2596,7 +2605,7 @@ def calc_bpl_filename(filename):
         try:
             os.mkdir(bpldir, 0700)
         except:
-            print_debug()
+            print_debug_exception()
             raise CException
 
     else:    
@@ -2708,6 +2717,29 @@ def ParseEncoding(txt):
 
 
 
+def CalcUserShell():
+    try:
+        s = os.getenv('SHELL')
+        if s != None:
+            return s
+
+        import getpass
+        username = getpass.getuser()
+
+        f = open('/etc/passwd', 'r')
+        l = f.read()
+        f.close()
+
+        ll = l.split('\n')
+        d = dict([(e.split(':', 1)[0], e.split(':')[-1]) for e in ll])
+
+        return d[username]
+
+    except:
+        return 'sh'
+
+
+
 #
 # ---------------------------------- CThread ---------------------------------------
 #
@@ -2718,20 +2750,27 @@ class CThread (threading.Thread):
     m_fstop = False
     m_threads = {}
 
+    m_lock = threading.RLock()
+    m_id = 0
 
-    def __init__(self, target = None, args = (), shutdown = None):
-        threading.Thread.__init__(self, target = target, args = args)
+
+    def __init__(self, name = None, target = None, args = (), shutdown = None):
+        threading.Thread.__init__(self, name = name, target = target, args = args)
 
         self.m_fstarted = False
         self.m_shutdown = shutdown
 
+        self.m_id = self.__getId()
+
 
     def __del__(self):
+        #print_debug('Destructor called for ' + self.getName())
+        
         #threading.Thread.__del__(self)
 
         if self.m_fstarted:
             try:
-                del CThread.m_threads[thread.get_ident()]
+                del CThread.m_threads[self.m_id]
             except KeyError:
                 pass
 
@@ -2740,10 +2779,10 @@ class CThread (threading.Thread):
         if CThread.m_fstop:
             return
 
-        CThread.m_threads[thread.get_ident()] = self.shutdown
+        CThread.m_threads[self.m_id] = weakref.ref(self)
 
         if CThread.m_fstop:
-            del CThread.m_threads[thread.get_ident()]
+            del CThread.m_threads[self.m_id]
             return
 
         self.m_fstarted = True
@@ -2760,7 +2799,7 @@ class CThread (threading.Thread):
     
     def join(self, timeout = None):
         try:
-            threading.Thread.join(timeout)
+            threading.Thread.join(self, timeout)
         except AssertionError:
             pass
 
@@ -2771,29 +2810,47 @@ class CThread (threading.Thread):
 
 
     def joinAll(cls):
+        print_debug('Shutting down debugger threads...')
+
         CThread.m_fstop = True
 
-        for tid, shutdown in CThread.m_threads.items():
-            if shutdown != None:
-                CThread.m_threads[tid] = None
-                
-                try:
-                    shutdown()
-                except:
-                    pass
+        for tid, w in CThread.m_threads.items():
+            t = w()
+            if !t:
+                continue
 
-                shutdown = None
+            try:
+                #print_debug('Calling shutdown of thread %s.' % (t.getName(), ))
+                t.shutdown()
+            except:
+                pass
+
+            t = None
+
+        #print_debug('Waiting for threads to terminate.')
 
         while len(CThread.m_threads) > 0:
+            #print_debug(repr(CThread.m_threads))
             time.sleep(0.1)
+
+        print_debug('Shut down debugger threads, done.')
 
     joinAll = classmethod(joinAll)
 
 
     def clearJoin(cls):
-        m_fstop = False
+        CThread.m_fstop = False
 
     clearJoin = classmethod(clearJoin)
+
+
+    def __getId(self):
+        CThread.m_lock.acquire()
+        id = CThread.m_id
+        CThread.m_id += 1
+        CThread.m_lock.release()
+
+        return id
 
     
 
@@ -2991,7 +3048,7 @@ class CCrypto:
         except AuthenticationFailure:
             raise
         except:
-            print_debug()
+            print_debug_exception()
             self.__wait_a_little()
             raise AuthenticationBadData
             
@@ -4971,8 +5028,11 @@ class CDebuggerCore:
         Notify client that it should switch to the child fork.
         """
         
+        print_debug('Sending fork switch event')
+
         event = CEventForkSwitch()
         self.m_event_dispatcher.fire_event(event)
+        
 
 
     def send_event_exit_prepare(self):
@@ -5266,7 +5326,7 @@ class CDebuggerCore:
                 self.m_fUnhandledException = True
                 f_uhe_notification = True
             
-            if self.is_auto_fork_first_stage(ctx.m_thread_id):
+            if self.m_ffork_auto and self.is_fork_first_stage(ctx.m_thread_id):
                 self.m_saved_step = (self.m_step_tid, self.m_saved_next, self.m_return_frame)
                 self.m_bp_manager.m_fhard_tbp = True
 
@@ -5293,7 +5353,7 @@ class CDebuggerCore:
             g_fexit_normal = False
             self.send_event_exit_prepare()
 
-        if self.is_auto_fork_first_stage(ctx.m_thread_id):
+        if self.m_ffork_auto and self.is_fork_first_stage(ctx.m_thread_id):
             self.request_go()
 
         elif self.m_ffork_auto and ffork_second_stage:
@@ -5326,10 +5386,7 @@ class CDebuggerCore:
             time.sleep(2.0)
 
 
-    def is_auto_fork_first_stage(self, tid):
-        if not self.m_ffork_auto:
-            return False
-
+    def is_fork_first_stage(self, tid):
         return tid == g_forktid and g_forkpid == None
 
 
@@ -5341,6 +5398,11 @@ class CDebuggerCore:
 
         self.m_step_tid = tid
         g_forkpid = os.getpid()
+
+        self.send_fork_switch()
+        g_server.shutdown()
+        CThread.joinAll()
+        time.sleep(0.1)
 
 
     def handle_fork(self, ctx):
@@ -5362,19 +5424,23 @@ class CDebuggerCore:
             #
 
             if not self.m_ffork_into_child:
+                CThread.clearJoin()
+                g_server.jumpstart()
+               
                 return True
 
             #
             # Shutdown debugger to allow child fork to quietly take over.
             #
-            self.send_fork_switch()
-            g_server.shutdown()
+            #self.send_fork_switch()
+            #g_server.shutdown()
             self.stoptrace()
             return False
 
         #
         # Child side of fork().
         #
+
         if not self.m_ffork_into_child:
             self.stoptrace()
             return False
@@ -5385,9 +5451,10 @@ class CDebuggerCore:
         time.sleep(2.0)
         
         self.m_threads = {tid: ctx}
-
-        _child_fork_jumpstart()
-
+        
+        CThread.clearJoin()
+        g_server.jumpstart()
+        
         return True
 
 
@@ -5830,7 +5897,7 @@ class CDebuggerEngine(CDebuggerCore):
             self.send_no_threads_event()
             
         except:
-            print_debug()
+            print_debug_exception()
             raise
 
 
@@ -6480,9 +6547,6 @@ class CDebuggerEngine(CDebuggerCore):
 
 
     def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index):
-        sys.settrace(None)
-        sys.setprofile(None)
-                
         e = {}
 
         try:
@@ -6507,7 +6571,7 @@ class CDebuggerEngine(CDebuggerCore):
                 e[DICT_KEY_N_SUBNODES] = len(e[DICT_KEY_SUBNODES])
                 
         except:
-            print_debug()
+            print_debug_exception()
             e[DICT_KEY_ERROR] = repr(sys.exc_info())
         
         lock.acquire()
@@ -6520,7 +6584,7 @@ class CDebuggerEngine(CDebuggerCore):
         try:
             (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException, fReadOnly = True)
         except:    
-            print_debug()
+            print_debug_exception()
             raise
 
         failed_expr_list = []
@@ -6533,9 +6597,10 @@ class CDebuggerEngine(CDebuggerCore):
                 continue
 
             args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index)
-            t = CThread(target = self.calc_expr, args = args)
+            t = CThread(name = 'calc_expr %s' % (expr, ), target = self.calc_expr, args = args)
             t.start()
             t.join(2)
+            t = None
             
             lock.acquire()
             if len(rl) == index:
@@ -6639,7 +6704,7 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        CThread(target = _atexit, args = (True, )).start()
+        CThread(name = '_atexit', target = _atexit, args = (True, )).start()
 
 
     def set_trap_unhandled_exceptions(self, ftrap):
@@ -6669,13 +6734,11 @@ class CWorkQueue:
     Worker threads pool mechanism for RPC server.    
     """
     
-    def __init__(self, size = N_WORK_QUEUE_THREADS, ftrace = True):
+    def __init__(self, size = N_WORK_QUEUE_THREADS):
         self.m_lock = threading.Condition()
         self.m_work_items = []
         self.m_f_shutdown = False
 
-        self.m_ftrace = ftrace
-        
         self.m_size = size
         self.m_n_threads = 0
         self.m_n_available = 0
@@ -6684,7 +6747,7 @@ class CWorkQueue:
         
 
     def __create_thread(self): 
-        t = CThread(target = self.__worker_target, shutdown = self.shutdown)
+        t = CThread(name = '__worker_target', target = self.__worker_target, shutdown = self.shutdown)
         #t.setDaemon(True)
         t.start()
 
@@ -6693,9 +6756,11 @@ class CWorkQueue:
         """
         Signal worker threads to exit, and wait until they do.
         """
-        
+       
         if self.m_f_shutdown:
             return
+
+        print_debug('Shutting down worker queue...')
 
         self.m_lock.acquire()
         self.m_f_shutdown = True
@@ -6706,12 +6771,10 @@ class CWorkQueue:
             
         self.m_lock.release()
 
+        print_debug('Shutting down worker queue, done.')
+
 
     def __worker_target(self): 
-        if not self.m_ftrace:
-            sys.settrace(None)
-            sys.setprofile(None)
-
         try:
             self.m_lock.acquire()
             
@@ -6748,7 +6811,7 @@ class CWorkQueue:
                 try:
                     target(*args)
                 except:
-                    print_debug()
+                    print_debug_exception()
 
                 self.m_lock.acquire()
                 self.m_n_available += 1
@@ -6792,7 +6855,7 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     """
     
     def init_work_queue(self):
-        self.m_work_queue = CWorkQueue(ftrace = False)
+        self.m_work_queue = CWorkQueue()
     
     def shutdown_work_queue(self):
         self.m_work_queue.shutdown()
@@ -6842,7 +6905,7 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
             response = xmlrpclib.dumps(
                 xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value))
                 )
-            print_debug()
+            print_debug_exception()
 
         return response
 
@@ -6929,11 +6992,11 @@ class CPwdServerProxy:
                     raise AuthenticationFailure
                     
                 else:
-                    print_debug()
+                    print_debug_exception()
                     assert False 
 
             except xmlrpclib.ProtocolError:
-                print_debug()
+                print_debug_exception()
                 raise CConnectionException
                 
             return _r
@@ -6950,8 +7013,7 @@ class CIOServer:
     """
     
     def __init__(self, pwd, fAllowUnencrypted, fAllowRemote, rid):
-        self.m_thread = CThread(target = self.run, shutdown = self.shutdown)
-        self.m_thread.setDaemon(True)
+        self.m_thread = None
 
         self.m_crypto = CCrypto(pwd, fAllowUnencrypted, rid)
         
@@ -6968,19 +7030,22 @@ class CIOServer:
         
     
     def start(self):
+        self.m_thread = CThread(name = 'ioserver', target = self.run, shutdown = self.shutdown)
+        self.m_thread.setDaemon(True)
         self.m_thread.start()
 
 
     def jumpstart(self):
-        self.m_thread = CThread(target = self.run, shutdown = self.shutdown)
-        self.m_thread.setDaemon(True)
-        self.m_thread.start()
+        self.m_stop = False
+        self.start()
 
 
     def stop(self):
         if self.m_stop:
             return
-            
+        
+        print_debug('Stopping IO server...')
+
         self.m_stop = True
 
         while self.m_thread.isAlive():
@@ -6992,7 +7057,11 @@ class CIOServer:
             
             self.m_thread.join(0.5)
 
+        self.m_thread = None
+
         self.m_server.shutdown_work_queue()
+
+        print_debug('Stopping IO server, done.')
 
         
     def export_null(self):
@@ -7000,13 +7069,6 @@ class CIOServer:
 
 
     def run(self):
-        #
-        # Turn tracing off. We don't want debugger threads traced.
-        #
-
-        sys.settrace(None)
-        sys.setprofile(None)
-       
         if self.m_server == None:
             (self.m_port, self.m_server) = self.__StartXMLRPCServer()
 
@@ -7035,7 +7097,7 @@ class CIOServer:
             #
             ((name, _params, target_rid), fEncryption) = self.m_crypto.undo_crypto(_params)
         except AuthenticationBadIndex, e:
-            #print_debug()
+            #print_debug_exception()
 
             #
             # Notify the caller on the expected index.
@@ -7065,7 +7127,7 @@ class CIOServer:
             r = func(*_params)
 
         except Exception, _e:
-            print_debug()
+            print_debug_exception()
             e = _e            
 
         #
@@ -7750,13 +7812,15 @@ class CSessionManagerInternal:
             python_exec = python_exec[:-5] + '.exe'
 
         if name == POSIX:
+            shell = CalcUserShell()
             terminal_command = CalcTerminalCommand()
+
             if terminal_command == GNOME_DEFAULT_TERM:
-                command = osSpawn[GNOME_DEFAULT_TERM] % (python_exec, options)
+                command = osSpawn[GNOME_DEFAULT_TERM] % {'shell': shell, 'exec': python_exec, 'options': options}
             else:    
-                command = osSpawn[name] % (terminal_command, python_exec, options)
+                command = osSpawn[name] % {'term': terminal_command, 'shell': shell, 'exec': python_exec, 'options': options}
         else:    
-            command = osSpawn[name] % (python_exec, options)
+            command = osSpawn[name] % {'exec': python_exec, 'options': options}
 
         if name == DARWIN:
             s = 'cd "%s" ; %s' % (os.getcwdu(), command)
@@ -7810,7 +7874,7 @@ class CSessionManagerInternal:
             raise
             
         except:
-            print_debug()
+            print_debug_exception()
             assert False
 
 
@@ -7908,6 +7972,7 @@ class CSessionManagerInternal:
                 (n, sel) = self.getSession().getProxy().wait_for_event(PING_TIMEOUT, self.m_remote_event_index)
                 
                 if True in [isinstance(e, CEventForkSwitch) for e in sel]:
+                    print_debug('Received fork switch event')
                     self.getSession().restart(2.0)
                                 
                 if True in [isinstance(e, CEventExit) for e in sel]:
@@ -7954,7 +8019,7 @@ class CSessionManagerInternal:
         try:
             self.save_breakpoints()
         except:
-            print_debug()
+            print_debug_exception()
             pass
 
         self.m_printer(STR_ATTEMPTING_TO_DETACH)
@@ -8063,7 +8128,7 @@ class CSessionManagerInternal:
                 file.write(sbpl)
 
             except:
-                print_debug()
+                print_debug_exception()
                 raise CException
 
         finally:
@@ -8088,7 +8153,7 @@ class CSessionManagerInternal:
                 self.delete_breakpoint([], True)
 
             except:
-                print_debug()
+                print_debug_exception()
                 raise CException
 
             #
@@ -8101,7 +8166,7 @@ class CSessionManagerInternal:
                 try:
                     self.set_breakpoint(bp.m_filename, bp.m_scope_fqn, bp.m_scope_offset, bp.m_fEnabled, bp.m_expr)
                 except:
-                    print_debug()
+                    print_debug_exception()
                     ferror = True
 
             if ferror:
@@ -8431,7 +8496,7 @@ class CSessionManagerInternal:
         try:
             self.save_breakpoints()
         except:
-            print_debug()
+            print_debug_exception()
             pass
 
         self.m_printer(STR_ATTEMPTING_TO_STOP)
@@ -8528,7 +8593,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.report_exception(*sys.exc_info())
         except:
             self.m_session_manager.report_exception(*sys.exc_info())
-            print_debug(True)
+            print_debug_exception(True)
 
         return False
         
@@ -9225,7 +9290,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.report_exception(*sys.exc_info())
         except:
             self.m_session_manager.report_exception(*sys.exc_info())
-            print_debug(True)
+            print_debug_exception(True)
         
 
     def do_eval(self, arg):
@@ -9269,7 +9334,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.report_exception(*sys.exc_info())
         except:
             self.m_session_manager.report_exception(*sys.exc_info())
-            print_debug(True)
+            print_debug_exception(True)
         
 
     def do_exec(self, arg):
@@ -9430,7 +9495,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 self.m_session_manager.report_exception(*sys.exc_info())
             except:
                 self.m_session_manager.report_exception(*sys.exc_info())
-                print_debug(True)
+                print_debug_exception(True)
 
         print >> self.stdout, ''
 
@@ -9981,11 +10046,6 @@ Type 'help up' or 'help down' for more information on focused frames."""
 
 
 
-def _child_fork_jumpstart():
-    g_server.jumpstart()
-
-
-
 def __fork():
     global g_forktid
     g_forktid = setbreak()
@@ -9999,6 +10059,11 @@ def __fork():
     # 
     # For example: 'fork child' or 'fork parent'
     # Type: 'help fork' for more information.
+    #
+    # WARNING: 
+    # On some Posix OS such as FreeBSD and OS X, 
+    # Stepping into the child fork can result in 
+    # termination of the child process.
     #
     return g_os_fork()
 
@@ -10099,9 +10164,6 @@ def __setbreak():
     
 
 def _atexit(fabort = False):
-    sys.settrace(None)
-    sys.setprofile(None)
-    
     if g_debugger is None:
         return
 
