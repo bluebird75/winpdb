@@ -5380,8 +5380,6 @@ class CDebuggerCore:
         g_server.shutdown()
         CThread.joinAll()
 
-        #time.sleep(1.0)
-
 
     def handle_fork(self, ctx):
         global g_forktid
@@ -5438,8 +5436,6 @@ class CDebuggerCore:
         self.send_fork_switch()
         g_server.shutdown()
         CThread.joinAll()
-
-        #time.sleep(1.0)
 
 
     def handle_exec(self, ctx):
@@ -7458,14 +7454,21 @@ class CSession:
         return self.m_server_info
 
 
-    def restart(self, nsleep = 0):
+    def restart(self, timeout = 20):
         self.m_fRestart = True
 
-        if nsleep > 0:
-            time.sleep(nsleep)
+        t0 = time.time()
 
         try:
-            self.Connect()
+            while time.time() < t0 + timeout:
+                try:
+                    self.Connect()
+                    return
+
+                except socket.error:
+                    continue
+
+            raise CConnectionException
 
         finally:
             self.m_fRestart = False
@@ -7974,12 +7977,12 @@ class CSessionManagerInternal:
                 t = ControlRate(t, IDLE_MAX_RATE)
                 if self.m_fStop:
                     return
-                    
+                
                 (n, sel) = self.getSession().getProxy().wait_for_event(PING_TIMEOUT, self.m_remote_event_index)
                 
                 if True in [isinstance(e, CEventForkSwitch) for e in sel]:
-                    print_debug('Received fork switch event')
-                    self.getSession().restart(2.0)
+                    print_debug('Received fork switch event.')
+                    self.getSession().restart()
                                 
                 if True in [isinstance(e, CEventExit) for e in sel]:
                     self.getSession().shut_down()
