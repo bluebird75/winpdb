@@ -486,9 +486,6 @@ class CSimpleSessionManager:
         event_type_dict = {CEventState: {}}
         self.__sm.register_callback(self.__state_calback, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {CEventExitPrepare: {}}
-        self.__sm.register_callback(self.__script_about_to_terminate_callback, event_type_dict, fSingleUse = False)
-
         event_type_dict = {CEventExit: {}}
         self.__sm.register_callback(self.__termination_callback, event_type_dict, fSingleUse = False)
 
@@ -551,11 +548,6 @@ class CSimpleSessionManager:
         self.request_go()
 
 
-    def script_about_to_terminate_callback(self):
-        print 'script_about_to_terminate_callback'
-        self.request_go()
-
-
     def script_terminated_callback(self):
         print 'script_terminated_callback'
 
@@ -568,10 +560,6 @@ class CSimpleSessionManager:
         self.unhandled_exception_callback()
 
 
-    def __script_about_to_terminate_callback(self, event):   
-        self.script_about_to_terminate_callback()
-
-        
     def __termination_callback(self, event):
         self.script_terminated_callback()
 
@@ -615,18 +603,12 @@ class CSimpleSessionManager:
             self.script_paused()
             return
 
-        if '__fork' in function_name:
-            #
-            # This is the setbreak() before a fork.
-            #
-            self.request_go()
-            return
- 
         #
-        # This must be a break before a termination warning.
-        # a CEventExitPrepare() event will soon arrive. 
-        # Do nothing.
+        # This is the setbreak() before a fork, exec or program 
+        # termination.
         #
+        self.request_go()
+        return
 
         
 
@@ -1747,15 +1729,16 @@ g_error_mapping = {
 }
 
 #
-# These globals are related to handling the os.fork() os._exit() pattern.
+# These globals are related to handling the os.fork() os._exit() and exec
+# pattern.
 #
 g_forkpid = None
 g_forktid = None
+
+g_exectid = None
+g_execpid = None
+
 g_fos_exit = False
-
-g_fexit_normal = False
-
-g_execv = None
 
 
 
@@ -1825,7 +1808,11 @@ def print_debug(str):
     if not g_fDebug:
         return
 
-    print >> sys.__stderr__, str
+    t = time.time()
+    l = time.localtime(t)
+    s = time.strftime('%H:%M:%S', l) + '.%03d' % ((t - int(t)) * 1000, )
+
+    print >> sys.__stderr__, s, 'RPDB2:', str
 
 
 
@@ -2816,7 +2803,7 @@ class CThread (threading.Thread):
 
         for tid, w in CThread.m_threads.items():
             t = w()
-            if !t:
+            if not t:
                 continue
 
             try:
@@ -2826,8 +2813,6 @@ class CThread (threading.Thread):
                 pass
 
             t = None
-
-        #print_debug('Waiting for threads to terminate.')
 
         while len(CThread.m_threads) > 0:
             #print_debug(repr(CThread.m_threads))
@@ -3126,15 +3111,6 @@ class CEvent:
 class CEventForkSwitch(CEvent):
     """
     Debuggee forked. Debugger should switch to child.
-    """
-
-    pass
-
-
-
-class CEventExitPrepare(CEvent):
-    """
-    Debugger is about to terminate.
     """
 
     pass
@@ -4419,7 +4395,13 @@ class CCodeContext:
         exceptions.
         """
         
-        return self.m_basename == THREADING_FILENAME
+        if self.m_basename == THREADING_FILENAME:
+            return True
+
+        if self.m_basename == DEBUGGER_FILENAME and self.m_code.co_name in ['__execv', '__execve']:
+            return True
+
+        return False
 
 
 
@@ -5035,15 +5017,6 @@ class CDebuggerCore:
         
 
 
-    def send_event_exit_prepare(self):
-        """
-        Notify client that the debuggee is prepared to shut down.
-        """
-        
-        event = CEventExitPrepare()
-        self.m_event_dispatcher.fire_event(event)
-
-
     def send_event_exit(self):
         """
         Notify client that the debuggee is shutting down.
@@ -5083,6 +5056,9 @@ class CDebuggerCore:
         Set thread to break on next statement.
         """
         
+        if not self.m_ftrace:
+            return 
+            
         tid = thread.get_ident()
 
         if not tid in self.m_threads:
@@ -5120,7 +5096,7 @@ class CDebuggerCore:
 
     def stoptrace(self):
         """
-        Stop tracing mechanism for thread.
+        Stop tracing mechanism.
         """
         
         threading.settrace(None)
@@ -5298,7 +5274,6 @@ class CDebuggerCore:
         """
 
         global g_fos_exit
-        global g_fexit_normal
         
         if not self.is_break(ctx, frame, event) and not ctx.is_breakpoint():
             ctx.set_tracers()
@@ -5326,7 +5301,7 @@ class CDebuggerCore:
                 self.m_fUnhandledException = True
                 f_uhe_notification = True
             
-            if self.m_ffork_auto and self.is_fork_first_stage(ctx.m_thread_id):
+            if self.is_auto_fork_first_stage(ctx.m_thread_id):
                 self.m_saved_step = (self.m_step_tid, self.m_saved_next, self.m_return_frame)
                 self.m_bp_manager.m_fhard_tbp = True
 
@@ -5348,12 +5323,9 @@ class CDebuggerCore:
             self.m_state_manager.release()
 
         ffork_second_stage = self.handle_fork(ctx)
-        
-        if f_full_notification and (g_fos_exit or g_fexit_normal):
-            g_fexit_normal = False
-            self.send_event_exit_prepare()
+        self.handle_exec(ctx)
 
-        if self.m_ffork_auto and self.is_fork_first_stage(ctx.m_thread_id):
+        if self.is_auto_fork_first_stage(ctx.m_thread_id):
             self.request_go()
 
         elif self.m_ffork_auto and ffork_second_stage:
@@ -5375,6 +5347,7 @@ class CDebuggerCore:
             state = self.m_state_manager.wait_for_state([STATE_RUNNING])
       
         self.prepare_fork_step(ctx.m_thread_id)
+        self.prepare_exec_step(ctx.m_thread_id)
 
         ctx.m_fUnhandledException = False
         ctx.m_fBroken = False 
@@ -5383,10 +5356,14 @@ class CDebuggerCore:
         if g_fos_exit:
             g_fos_exit = False
             self.send_event_exit()
-            time.sleep(2.0)
+            
+            time.sleep(1.0)
 
 
-    def is_fork_first_stage(self, tid):
+    def is_auto_fork_first_stage(self, tid):
+        if not self.m_ffork_auto:
+            return False
+
         return tid == g_forktid and g_forkpid == None
 
 
@@ -5402,7 +5379,8 @@ class CDebuggerCore:
         self.send_fork_switch()
         g_server.shutdown()
         CThread.joinAll()
-        time.sleep(0.1)
+
+        #time.sleep(1.0)
 
 
     def handle_fork(self, ctx):
@@ -5429,11 +5407,6 @@ class CDebuggerCore:
                
                 return True
 
-            #
-            # Shutdown debugger to allow child fork to quietly take over.
-            #
-            #self.send_fork_switch()
-            #g_server.shutdown()
             self.stoptrace()
             return False
 
@@ -5444,14 +5417,48 @@ class CDebuggerCore:
         if not self.m_ffork_into_child:
             self.stoptrace()
             return False
-
-        #
-        # Sleep to let parent fork enough time to stop tracing.
-        #
-        time.sleep(2.0)
-        
+       
         self.m_threads = {tid: ctx}
         
+        CThread.clearJoin()
+        g_server.jumpstart()
+        
+        return True
+
+
+    def prepare_exec_step(self, tid):
+        global g_execpid
+
+        if tid != g_exectid:
+            return
+
+        self.m_step_tid = tid
+        g_execpid = os.getpid()
+
+        self.send_fork_switch()
+        g_server.shutdown()
+        CThread.joinAll()
+
+        #time.sleep(1.0)
+
+
+    def handle_exec(self, ctx):
+        global g_exectid
+        global g_execpid
+
+        tid = ctx.m_thread_id
+
+        if g_execpid == None or tid != g_exectid:
+            return False
+
+        g_execpid = None
+        g_exectid = None
+
+        #
+        # If we are here it means that the exec failed.
+        # Jumpstart the debugger to allow debugging to continue.
+        #
+
         CThread.clearJoin()
         g_server.jumpstart()
         
@@ -5752,7 +5759,6 @@ class CDebuggerEngine(CDebuggerCore):
             CEventNamespace: {},
             CEventUnhandledException: {},
             CEventStack: {},
-            CEventExitPrepare: {},
             CEventExit: {},
             CEventForkSwitch: {},
             CEventTrap: {},
@@ -7476,7 +7482,7 @@ class CSession:
         """
         
         while self.m_fRestart:
-            time.sleep(1.0)
+            time.sleep(0.1)
 
         if self.m_fShutDown:
             raise NotAttached
@@ -9686,7 +9692,14 @@ When 'manual' is specified the debugger will pause before doing a fork.
 
 When 'auto' is specified the debugger will go through the fork without 
 pausing and will make the forking decision based on the parent/child 
-setting."""
+setting.
+
+WARNING:
+On some Posix OS such as FreeBSD and OS X, Stepping into the child fork 
+can result in termination of the child process since the debugger
+uses threading for its operation and on these systems threading and 
+forking can conflict.
+"""
 
 
     def help_stop(self):
@@ -10100,14 +10113,15 @@ if __name__ == 'rpdb2' and '_exit' in dir(os) and os._exit != __exit:
 
 
 def __execv(path, args):
-    global g_execv
-    g_execv = setbreak()
+    global g_exectid
+    g_exectid = setbreak()
 
     #
     # os.execv() has been called. 
     #
-    # Stepping on from this point may result 
-    # in termination of the debug session.
+    # Stepping on from this point will result 
+    # in termination of the debug session if
+    # the exec operation completes successfully.
     #
     return g_os_execv(path, args)
 
@@ -10122,14 +10136,15 @@ if __name__ == 'rpdb2' and os.name == POSIX and 'execv' in dir(os) and os.execv 
 
 
 def __execve(path, args, env):
-    global g_execv
-    g_execv = setbreak()
+    global g_exectid
+    g_exectid = setbreak()
 
     #
     # os.execve() has been called. 
     #
-    # Stepping on from this point may result 
-    # in termination of the debug session.
+    # Stepping on from this point will result 
+    # in termination of the debug session if
+    # the exec operation completes successfully.
     #
     return g_os_execve(path, args, env)
 
@@ -10291,7 +10306,7 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRem
     c = CConsole(sm)
     c.start()
 
-    time.sleep(0.5)
+    time.sleep(1.0)
 
     try:
         if fAttach:
@@ -10503,7 +10518,7 @@ if __name__ == '__main__':
     #
     # You can step to debug any exit handlers.
     #
-    rpdb2.g_fexit_normal = (rpdb2.setbreak() != None)
+    rpdb2.setbreak()
 
 
 
