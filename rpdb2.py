@@ -285,6 +285,7 @@ import thread
 import random
 import base64
 import atexit
+import errno
 import time
 import copy
 import hmac
@@ -1435,10 +1436,6 @@ LOCALHOST = 'localhost'
 
 SERVER_PORT_RANGE_START = 51000
 SERVER_PORT_RANGE_LENGTH = 20
-
-ERROR_SOCKET_ADDRESS_IN_USE_WIN = 10048
-ERROR_SOCKET_ADDRESS_IN_USE_UNIX = 98
-ERROR_SOCKET_ADDRESS_IN_USE_MAC = 48
 
 SOURCE_EVENT_CALL = 'C'
 SOURCE_EVENT_LINE = 'L'
@@ -7155,7 +7152,7 @@ class CIOServer:
                 return (port, server)
                 
             except socket.error, e:
-                if not GetSocketError(e) in [ERROR_SOCKET_ADDRESS_IN_USE_WIN, ERROR_SOCKET_ADDRESS_IN_USE_UNIX, ERROR_SOCKET_ADDRESS_IN_USE_MAC]:
+                if GetSocketError(e) != errno.EADDRINUSE:
                     raise
                     
                 if port >= SERVER_PORT_RANGE_START + SERVER_PORT_RANGE_LENGTH - 1:
@@ -7362,11 +7359,11 @@ class CTimeoutHTTPConnection(httplib.HTTPConnection):
                 self.sock = socket.socket(af, socktype, proto)
                 self.sock.settimeout(self._rpdb2_timeout)
                 if self.debuglevel > 0:
-                    print >> sys.__stderr__, "connect: (%s, %s)" % (self.host, self.port)
+                    print_debug("connect: (%s, %s)" % (self.host, self.port))
                 self.sock.connect(sa)
             except socket.error, msg:
                 if self.debuglevel > 0:
-                    print >> sys.__stderr__, 'connect fail:', (self.host, self.port)
+                    print_debug('connect fail: ' + repr((self.host, self.port)))
                 if self.sock:
                     self.sock.close()
                 self.sock = None
@@ -7454,7 +7451,7 @@ class CSession:
         return self.m_server_info
 
 
-    def restart(self, timeout = 20):
+    def restart(self, timeout = 10):
         self.m_fRestart = True
 
         t0 = time.time()
@@ -10081,6 +10078,8 @@ def __fork():
     # Stepping into the child fork can result in 
     # termination of the child process.
     #
+    # *** RPDB2 SAYS: Read the entire comment! ***
+    #
     return g_os_fork()
 
 
@@ -10117,7 +10116,9 @@ if __name__ == 'rpdb2' and '_exit' in dir(os) and os._exit != __exit:
 
 def __execv(path, args):
     global g_exectid
-    g_exectid = setbreak()
+    
+    if os.path.isfile(path):
+        g_exectid = setbreak()
 
     #
     # os.execv() has been called. 
@@ -10140,7 +10141,9 @@ if __name__ == 'rpdb2' and os.name == POSIX and 'execv' in dir(os) and os.execv 
 
 def __execve(path, args, env):
     global g_exectid
-    g_exectid = setbreak()
+
+    if os.path.isfile(path):
+        g_exectid = setbreak()
 
     #
     # os.execve() has been called. 
