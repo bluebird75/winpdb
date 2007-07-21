@@ -3107,7 +3107,16 @@ class CEvent:
 
 class CEventForkSwitch(CEvent):
     """
-    Debuggee forked. Debugger should switch to child.
+    Debuggee is about to fork. Try to reconnect.
+    """
+
+    pass
+
+
+
+class CEventExecSwitch(CEvent):
+    """
+    Debuggee is about to exec. Try to reconnect.
     """
 
     pass
@@ -5004,14 +5013,26 @@ class CDebuggerCore:
         
     def send_fork_switch(self):
         """
-        Notify client that it should switch to the child fork.
+        Notify client that debuggee is forking and that it should
+        try to reconnect (to parent or child).
         """
         
         print_debug('Sending fork switch event')
 
         event = CEventForkSwitch()
         self.m_event_dispatcher.fire_event(event)
+
+
+    def send_exec_switch(self):
+        """
+        Notify client that debuggee is doing an exec and that it should 
+        try to reconnect (in case the exec failed).
+        """
         
+        print_debug('Sending exec switch event')
+
+        event = CEventExecSwitch()
+        self.m_event_dispatcher.fire_event(event)
 
 
     def send_event_exit(self):
@@ -5430,7 +5451,7 @@ class CDebuggerCore:
         self.m_step_tid = tid
         g_execpid = os.getpid()
 
-        self.send_fork_switch()
+        self.send_exec_switch()
         g_server.shutdown()
         CThread.joinAll()
 
@@ -5754,6 +5775,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventStack: {},
             CEventExit: {},
             CEventForkSwitch: {},
+            CEventExecSwitch: {},
             CEventTrap: {},
             CEventForkMode: {}
             }
@@ -7980,6 +8002,13 @@ class CSessionManagerInternal:
                 if True in [isinstance(e, CEventForkSwitch) for e in sel]:
                     print_debug('Received fork switch event.')
                     self.getSession().restart()
+                                
+                if True in [isinstance(e, CEventExecSwitch) for e in sel]:
+                    print_debug('Received exec switch event.')
+                    try:
+                        self.getSession().restart()
+                    except CConnectionException:
+                        sel.append(CEventExit())
                                 
                 if True in [isinstance(e, CEventExit) for e in sel]:
                     self.getSession().shut_down()
