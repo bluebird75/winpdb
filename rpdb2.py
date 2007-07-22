@@ -1522,7 +1522,7 @@ STR_ATTACH_FAILED_NAME = "Failed to attach to '%s'."
 STR_ATTACH_CRYPTO_MODE = "Debug Channel is%s encrypted."
 STR_ATTACH_CRYPTO_MODE_NOT = "NOT"
 STR_ATTACH_SUCCEEDED = "Successfully attached to '%s'."
-STR_ATTEMPTING_TO_STOP = "Requesting script to stop."
+STR_ATTEMPTING_TO_STOP = "Requesting script to stop (with os.abort())."
 STR_ATTEMPTING_TO_DETACH = "Detaching from script..."
 STR_DETACH_SUCCEEDED = "Detached from script."
 STR_DEBUGGEE_UNKNOWN = "Failed to find script."
@@ -6876,6 +6876,7 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     """
     
     def init_work_queue(self):
+        self.m_fignore_error = True
         self.m_work_queue = CWorkQueue()
     
     def shutdown_work_queue(self):
@@ -6884,6 +6885,12 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     def process_request(self, request, client_address):
         self.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address))
 
+    def handle_error(self, request, client_address):
+        if self.m_fignore_error:
+            self.m_fignore_error = False
+            return
+
+        return SocketServer.ThreadingMixIn.handle_error(self, request, client_address)
 
 
 def my_xmlrpclib_loads(data):
@@ -9724,7 +9731,7 @@ pausing and will make the forking decision based on the parent/child
 setting.
 
 WARNING:
-On some Posix OS such as FreeBSD and OS X, Stepping into the child fork 
+On some Posix OS such as FreeBSD, Stepping into the child fork 
 can result in termination of the child process since the debugger
 uses threading for its operation and on these systems threading and 
 forking can conflict.
@@ -10103,7 +10110,7 @@ def __fork():
     # Type: 'help fork' for more information.
     #
     # WARNING: 
-    # On some Posix OS such as FreeBSD and OS X, 
+    # On some Posix OS such as FreeBSD, 
     # Stepping into the child fork can result in 
     # termination of the child process.
     #
