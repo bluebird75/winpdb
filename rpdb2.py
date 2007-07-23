@@ -4404,7 +4404,7 @@ class CCodeContext:
         if self.m_basename == THREADING_FILENAME:
             return True
 
-        if self.m_basename == DEBUGGER_FILENAME and self.m_code.co_name in ['__execv', '__execve']:
+        if self.m_basename == DEBUGGER_FILENAME and self.m_code.co_name in ['__execv', '__execve', '__start_new_thread']:
             return True
 
         return False
@@ -10090,7 +10090,7 @@ Type 'help up' or 'help down' for more information on focused frames."""
     
 
 #
-# ---------------------------------------- main ------------------------------------
+# ---------------------------------------- Replacement Functions ------------------------------------
 #
 
 
@@ -10130,7 +10130,9 @@ if __name__ == 'rpdb2' and 'fork' in dir(os) and os.fork != __fork:
 
 def __exit(n):
     global g_fos_exit
-    g_fos_exit = (setbreak() != None)
+
+    if type(n) == int:
+        g_fos_exit = (setbreak() != None)
 
     #
     # os._exit(n) has been called.
@@ -10200,11 +10202,43 @@ if __name__ == 'rpdb2' and os.name == POSIX and 'execve' in dir(os) and os.execv
 
 
 
-def __settrace():
+def __function_wrapper(function, args, kwargs):
+    __settrace(depth = 1)
+
+    #
+    # Debuggee breaks (pauses) here
+    # on unhandled exceptions.
+    # Use analyze mode for post mortem.
+    # type 'help analyze' for more information.
+    #
+    return function(*args, **kwargs)
+
+
+
+def __start_new_thread(function, args, kwargs = {}):
+    return g_thread_start_new_thread(__function_wrapper, (function, args, kwargs))
+
+
+
+g_thread_start_new_thread = None
+
+if __name__ == 'rpdb2' and 'start_new_thread' in dir(thread) and thread.start_new_thread != __start_new_thread:
+    g_thread_start_new_thread = thread.start_new_thread
+    thread.start_new_thread = __start_new_thread
+
+
+
+#
+# ---------------------------------------- main ------------------------------------
+#
+
+
+
+def __settrace(depth = 2):
     if g_debugger is None:
         return
         
-    f = sys._getframe(2)
+    f = sys._getframe(depth)
     g_debugger.settrace(f, f_break_on_init = False)
 
     
