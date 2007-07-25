@@ -2883,7 +2883,13 @@ class CThread (threading.Thread):
 
             t = None
 
+        t0 = time.time()
+
         while len(CThread.m_threads) > 0:
+            if time.time() - t0 > 16:
+                print_debug('Shut down of debugger threads has TIMED OUT!')
+                return
+
             #print_debug(repr(CThread.m_threads))
             time.sleep(0.1)
 
