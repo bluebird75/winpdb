@@ -2724,6 +2724,78 @@ def CalcUserShell():
 
 
 
+def IsFilteredProperty(a):
+    if not (a.startswith('__') and a.endswith('__')):
+        return False
+
+    if a in ['__class__', '__bases__', '__file__', '__doc__', '__name__']:
+        return False
+
+    return True
+
+
+
+def CalcFilteredDir(r, fFilter):
+    d = dir(r)
+
+    if not fFilter:
+        return d
+
+    fd = [e for e in d if not IsFilteredProperty(e)]
+
+    return fd
+
+
+
+def CalcIdentity(r, fFilter):
+    if not fFilter:
+        return r
+
+    if not hasattr(r, 'im_func'):
+        return r
+
+    return r.im_func
+
+
+
+def CalcDictKeys(r, fFilter):
+    d = CalcFilteredDir(r, fFilter)
+    rs = sets.Set(d)
+
+    if hasattr(r, '__class__'):
+        c = getattr(r, '__class__')
+        d = CalcFilteredDir(c, fFilter)
+        cs = sets.Set(d)
+        s = rs & cs
+
+        for e in s:
+            o1 = getattr(r, e)
+            o2 = getattr(c, e)
+
+            if CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+                rs.discard(e)
+
+    if hasattr(r, '__bases__'):
+        bl = getattr(r, '__bases__')
+        if type(bl) == tuple:
+            for b in bl:
+                d = CalcFilteredDir(b, fFilter)
+                bs = sets.Set(d)
+                s = rs & bs
+
+                for e in s:
+                    o1 = getattr(r, e)
+                    o2 = getattr(b, e)
+
+                    if CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+                        rs.discard(e)
+      
+    l = [a for a in rs]
+
+    return l
+
+
+
 #
 # ---------------------------------- CThread ---------------------------------------
 #
@@ -6294,93 +6366,18 @@ class CDebuggerEngine(CDebuggerCore):
         return (_globals, _locals, _original_locals_copy)
 
 
-    def __is_verbose_attr(self, r, a):
-        try:
-            v = getattr(r, a)
-        except AttributeError:
-            return True
-            
-        if a == '__class__':
-            if self.__parse_type(type(v)) != 'type':
-                return False
-
-            #return self.__parse_type(v) in BASIC_TYPES_LIST
-
-        if (a == '__bases__'):
-            if (type(v) == tuple) and (len(v) > 0):    
-                return False
-
-        if a in ['__name__', '__file__', '__doc__']:
-            return False
-        
-        if a.startswith('__') and a.endswith('__'):
-            return True
-        
-        if self.__is_property_attr(r, a):
-            return True
-            
-        t = self.__parse_type(type(v))
-
-        if ('method' in t) and not ('builtin' in t):
-            return True
-
-        return False    
-
-
-    def __is_property_attr(self, r, a):
-        if a.startswith('__') and a.endswith('__'):
-            return False
-
-        try:
-            v = getattr(r, a)            
-        except AttributeError:
-            return False
-            
-        t = self.__parse_type(type(v))
-        
-        if 'descriptor' in t:
-            return True
-            
-        if t == 'property':
-            return True
-            
-        return False    
-
-
-    def __calc_property_list(self, r):
-        pl = [a for a in r.__dict__.keys() if self.__is_property_attr(r, a)]
-
-        for b in r.__bases__:
-            if (self.__parse_type(type(b)) == 'type') and (self.__parse_type(b) == 'object'):
-                continue
-
-            pl += self.__calc_property_list(b)
-
-        return pl    
-
-        
-    def __calc_attribute_list(self, r):
-        if hasattr(r, '__dict__'):
-            al = r.__dict__.keys()
-        else:
-            al = [a for a in dir(r)]
-
+    def __calc_attribute_list(self, r, fFilter):
+        al = CalcDictKeys(r, fFilter)    
+                
         if hasattr(r, '__class__') and not '__class__' in al:
             al = ['__class__'] + al
 
         if hasattr(r, '__bases__') and not '__bases__' in al:
             al = ['__bases__'] + al
 
-        if hasattr(r, '__class__'):
-            pl = self.__calc_property_list(r.__class__)
-            _pl = [p for p in pl if not p in al]
-            
-            al += _pl
-
-        _al = [a for a in al if hasattr(r, a)]           
-        __al = [a for a in _al if not self.__is_verbose_attr(r, a)]    
-
-        return __al
+        _al = [a for a in al if hasattr(r, a)] 
+  
+        return _al
 
     
     def __calc_number_of_subnodes(self, r):
@@ -6413,8 +6410,6 @@ class CDebuggerEngine(CDebuggerCore):
             return 1
 
         return 0
-        
-        #return len(self.__calc_attribute_list(r))
 
 
     def __parse_type(self, t):
@@ -6423,21 +6418,6 @@ class CDebuggerEngine(CDebuggerCore):
         return st
 
 
-    def __is_filtered_type(self, v):
-        t = self.__parse_type(type(v))
-
-        if 'function' in t:
-            return True
-
-        if 'module' in t:
-            return True
-
-        if 'classobj' in t:
-            return True
-
-        return False
-        
-        
     def __calc_subnodes(self, expr, r, fForceNames, fFilter):
         snl = []
         
@@ -6487,9 +6467,6 @@ class CDebuggerEngine(CDebuggerCore):
             for k in kl:
                 v = r[k]
 
-                if fFilter and (expr in ['globals()', 'locals()']) and self.__is_filtered_type(v):
-                    continue
-                    
                 if len(snl) >= MAX_NAMESPACE_ITEMS:
                     snl.append(MAX_NAMESPACE_WARNING)
                     break
@@ -6511,7 +6488,7 @@ class CDebuggerEngine(CDebuggerCore):
 
             return snl            
 
-        al = self.__calc_attribute_list(r)
+        al = self.__calc_attribute_list(r, fFilter)
         al.sort()
 
         for a in al:
@@ -6520,9 +6497,6 @@ class CDebuggerEngine(CDebuggerCore):
             except AttributeError:
                 continue
             
-            if fFilter and self.__is_filtered_type(v):
-                continue
-                
             if len(snl) >= MAX_NAMESPACE_ITEMS:
                 snl.append(MAX_NAMESPACE_WARNING)
                 break

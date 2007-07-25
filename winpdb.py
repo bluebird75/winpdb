@@ -616,6 +616,7 @@ UPDATES_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=3"
 
 STR_ERROR_INTERFACE_COMPATIBILITY = "The rpdb2 module which was found by Winpdb is of unexpected version (version expected: %s, version found: %s). Please upgrade to the latest versions of winpdb.py and rpdb2.py."
 STR_NAMESPACE_DEADLOCK = 'Data Retrieval Timeout'
+STR_NAMESPACE_LOADING = 'Loading...'
 
 BAD_FILE_WARNING_TIMEOUT_SEC = 10.0
 POSITION_TIMEOUT = 2.0
@@ -1228,7 +1229,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
         self.set_toggle(TB_TRAP, ftrap)
-        
+       
         statusbar_resource = [
             {WIDTH: -2},
             {WIDTH: -1, FORMAT: SB_STATE + ": %(" + SB_STATE + ")s", KEYS: [SB_STATE]},
@@ -1251,6 +1252,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_splitterh2.SetSashGravity(0.5)
         
         self.m_namespace_viewer = CNamespaceViewer(self.m_splitterh2, style = wx.NO_BORDER, session_manager = self.m_session_manager)
+        self.m_namespace_viewer.set_filter(True)
+        self.set_toggle(TB_FILTER, True)
 
         self.m_threads_viewer = CThreadsViewer(self.m_splitterh2, style = wx.NO_BORDER, select_command = self.OnThreadSelected)
 
@@ -2780,7 +2783,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     def OnItemActivated(self, event):
         item = event.GetItem()
         expr = self.m_tree.GetPyData(item)
-        if expr in [STR_NAMESPACE_DEADLOCK, rpdb2.STR_MAX_NAMESPACE_WARNING_TITLE]:
+        if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK, rpdb2.STR_MAX_NAMESPACE_WARNING_TITLE]:
             return
 
         expr_dialog = CExpressionDialog(self)
@@ -2844,7 +2847,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         child = self.get_children(item)[0]
         expr = self.m_tree.GetPyData(child)
 
-        if expr == STR_NAMESPACE_DEADLOCK:
+        if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK]:
             return 0
 
         return 1
@@ -2904,9 +2907,16 @@ class CNamespacePanel(wx.Panel, CJobs):
         
         if self.GetChildrenCount(item) > 0:
             event.Skip()
+            self.m_tree.Refresh();
             return
             
         self.m_tree.DeleteChildren(item)
+        
+        child = self.m_tree.AppendItem(item, STR_NAMESPACE_LOADING)
+        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 2)
+        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 1)
+        self.m_tree.SetItemPyData(child, STR_NAMESPACE_LOADING)
+
         expr = self.m_tree.GetPyData(item)
 
         f = lambda r, exc_info: self.callback_ns(r, exc_info, expr)        
@@ -2921,7 +2931,9 @@ class CNamespacePanel(wx.Panel, CJobs):
         item = self.find_item(expr)
         if item == None:
             return
-            
+        
+        self.m_tree.DeleteChildren(item)
+    
         if t != None or r is None or len(r) == 0:
             child = self.m_tree.AppendItem(item, STR_NAMESPACE_DEADLOCK)
             self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 2)
@@ -2930,7 +2942,9 @@ class CNamespacePanel(wx.Panel, CJobs):
             self.m_tree.Expand(item)
             return
             
-        self.expand_item(item, r, False, True)               
+        self.expand_item(item, r, False, True)  
+
+        self.m_tree.Refresh()
         
 
     def find_item(self, expr):
