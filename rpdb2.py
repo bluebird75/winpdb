@@ -976,7 +976,7 @@ class CSessionManager:
         return self.__smi.get_server_info()
 
 
-    def get_namespace(self, nl, fFilter):
+    def get_namespace(self, nl, fFilter, repr_limit = 128):
         """
         get_namespace is designed for locals/globals panes that let 
         the user inspect a namespace tree in GUI debuggers such as Winpdb.
@@ -987,8 +987,11 @@ class CSessionManager:
              value, that is, to return its children as well in case it has 
              children e.g. lists, dictionaries, etc...
              
-        fFilter - Flag. Filter functions and classes out of the globals 
-             dictionary, to make it more readable.
+        fFilter - Flag. Filter out __methods__ from objects and classes in 
+             the namespace viewer.
+
+        repr_limit - Length limit (approximated) to be imposed repr() of 
+             returned items.
         
         examples of expression lists: 
 
@@ -1029,7 +1032,7 @@ class CSessionManager:
                           etc, this key will have their number as value.
         """
         
-        return self.__smi.get_namespace(nl, fFilter)
+        return self.__smi.get_namespace(nl, fFilter, repr_limit)
 
 
     #
@@ -1644,6 +1647,8 @@ MODE_OFF = 'OFF'
 
 MAX_EVALUATE_LENGTH = 256 * 1024
 MAX_NAMESPACE_ITEMS = 1024
+MAX_SORTABLE_LENGTH = 512 * 1024
+REPR_ID_LENGTH = 4096
 
 MAX_NAMESPACE_WARNING = {
     DICT_KEY_EXPR: STR_MAX_NAMESPACE_WARNING_TITLE, 
@@ -1778,28 +1783,111 @@ def safe_repr(x):
         return y
 
     except:
-        pass
+        return 'N/A'
+
+
+
+def repr_list(pattern, l, length):
+    length = max(0, length - len(pattern) + 2)
+
+    s = ''
+
+    index = 0
+    for i in l:
+        s += repr_ltd(i, length - len(s))
+
+        index += 1
+        
+        if index < len(l) and len(s) > length:
+            if not s.endswith('...'):
+                s += '...'
+            break
+
+        if index < len(l):
+            s += ', '
+
+    return pattern % s
+
+
+
+def repr_dict(pattern, d, length):
+    length = max(0, length - len(pattern) + 2)
+
+    s = ''
+
+    index = 0
+    for k in d:
+        v = d[k]
+
+        s += repr_ltd(k, length - len(s))
+
+        if len(s) > length:
+            if not s.endswith('...'):
+                s += '...'
+            break
+
+        s +=  ': ' + repr_ltd(v, length - len(s))
+
+        index += 1
+
+        if index < len(d) and len(s) > length:
+            if not s.endswith('...'):
+                s += '...'
+            break
+
+        if index < len(d):
+            s += ', '
+
+    return pattern % s
+
+
+
+def repr_str(s, length):
+    if len(s) > length:
+        s = s[: length] + '...'
+
+    return repr(s)
+
+
+
+def repr_ltd(x, length):
+    length = max(0, length)
 
     try:
-        y = str(x)
-        return y
-        
-    except:
+        if isinstance(x, set):
+            return repr_list('set([%s])', x, length)
+
+        if isinstance(x, frozenset):
+            return repr_list('frozenset([%s])', x, length)
+
+    except NameError:
         pass
 
-    return 'N/A'
+    if isinstance(x, sets.Set):
+        return repr_list('sets.Set([%s])', x, length)
 
+    if isinstance(x, sets.ImmutableSet):
+        return repr_list('sets.ImmutableSet([%s])', x, length)
 
+    if isinstance(x, list):
+        return repr_list('[%s]', x, length)
 
-def safe_repr_limited(x):
-    y = safe_repr(x)[0:128]
+    if isinstance(x, tuple):
+        return repr_list('(%s)', x, length)
 
-    if len(y) == 128:
+    if isinstance(x, dict):
+        return repr_dict('{%s}', x, length)
+
+    if type(x) in [str, unicode]:
+        return repr_str(x, length)
+
+    y = safe_repr(x)[: length]
+    if len(y) == length:
         y += '...'
 
     return y
 
-    
+
 
 def print_debug(str):
     if not g_fDebug:
@@ -2793,6 +2881,32 @@ def CalcDictKeys(r, fFilter):
     l = [a for a in rs]
 
     return l
+
+
+
+def _RPDB2_FindRepr(x, r, repr_limit):
+    index = 0
+    for i in x:
+        if repr_ltd(i, repr_limit) == r:
+            if isinstance(x, dict):
+                return x[i]
+
+            return i
+
+        index += 1
+        if index > MAX_SORTABLE_LENGTH:
+            return None
+
+
+
+def SafeCmp(x, y):
+    try:
+        return cmp(x, y)
+
+    except:
+        pass
+
+    return cmp(repr_ltd(x, 256), repr_ltd(y, 256))
 
 
 
@@ -6391,16 +6505,13 @@ class CDebuggerEngine(CDebuggerCore):
             return 0
         
         try:
-            if type(r) == set or isinstance(r, set):
+            if isinstance(r, set) or isinstance(r, frozenset):
                 return len(r)
 
         except NameError:
             pass
 
-        if type(r) == sets.Set or isinstance(r, sets.Set):
-            return len(r)
-
-        if type(r) in [dict, list, tuple]:
+        if isinstance(r, sets.BaseSet):
             return len(r)
 
         if isinstance(r, dict):
@@ -6424,38 +6535,69 @@ class CDebuggerEngine(CDebuggerCore):
         return st
 
 
-    def __calc_subnodes(self, expr, r, fForceNames, fFilter):
+    def __calc_subnodes(self, expr, r, fForceNames, fFilter, repr_limit):
         snl = []
         
         try:
-            if type(r) == set or isinstance(r, set) or isinstance(r, sets.Set):
-                g = [i for i in r]
-                g.sort()
+            if isinstance(r, set) or isinstance(r, frozenset):
+                if len(r) > MAX_SORTABLE_LENGTH:
+                    g = r
+                else:
+                    g = [i for i in r]
+                    g.sort(cmp = SafeCmp)
 
-                for i in g[0: MAX_NAMESPACE_ITEMS]:
+                for i in g:
+                    if len(snl) >= MAX_NAMESPACE_ITEMS:
+                        snl.append(MAX_NAMESPACE_WARNING)
+                        break
+
+                    rk = repr_ltd(i, REPR_ID_LENGTH)
+
                     e = {}
-                    e[DICT_KEY_EXPR] = '[v for v in (%s) if repr(v) == "%s"][0]' % (expr, repr(i))
-                    e[DICT_KEY_NAME] = repr(i)
-                    e[DICT_KEY_REPR] = safe_repr_limited(i)
+                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), "%s", %d)' % (expr, rk, REPR_ID_LENGTH)
+                    e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
+                    e[DICT_KEY_REPR] = repr_ltd(i, repr_limit)
                     e[DICT_KEY_TYPE] = self.__parse_type(type(i))
                     e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
                     snl.append(e)
                 
-                if len(g) > MAX_NAMESPACE_ITEMS:
-                    snl.append(MAX_NAMESPACE_WARNING)
-
                 return snl
 
         except NameError:
             pass
         
-        if (type(r) in [list, tuple]) or isinstance(r, list) or isinstance(r, tuple):
+        if isinstance(r, sets.BaseSet):
+            if len(r) > MAX_SORTABLE_LENGTH:
+                g = r
+            else:
+                g = [i for i in r]
+                g.sort(cmp = SafeCmp)
+
+            for i in g:
+                if len(snl) >= MAX_NAMESPACE_ITEMS:
+                    snl.append(MAX_NAMESPACE_WARNING)
+                    break
+
+                rk = repr_ltd(i, REPR_ID_LENGTH)
+
+                e = {}
+                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), "%s", %d)' % (expr, rk, REPR_ID_LENGTH)
+                e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
+                e[DICT_KEY_REPR] = repr_ltd(i, repr_limit)
+                e[DICT_KEY_TYPE] = self.__parse_type(type(i))
+                e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
+
+                snl.append(e)
+            
+            return snl
+
+        if isinstance(r, list) or isinstance(r, tuple):
             for i, v in enumerate(r[0: MAX_NAMESPACE_ITEMS]):
                 e = {}
                 e[DICT_KEY_EXPR] = '%s[%d]' % (expr, i)
                 e[DICT_KEY_NAME] = repr(i)
-                e[DICT_KEY_REPR] = safe_repr_limited(v)
+                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
@@ -6466,27 +6608,29 @@ class CDebuggerEngine(CDebuggerCore):
 
             return snl
 
-        if (type(r) == dict) or isinstance(r, dict):
-            kl = r.keys()
-            kl.sort()
+        if isinstance(r, dict):
+            if len(r) > MAX_SORTABLE_LENGTH:
+                kl = r
+            else:
+                kl = r.keys()
+                kl.sort(cmp = SafeCmp)
 
             for k in kl:
+                if k == '_RPDB2_FindRepr':
+                    continue
+
                 v = r[k]
 
                 if len(snl) >= MAX_NAMESPACE_ITEMS:
                     snl.append(MAX_NAMESPACE_WARNING)
                     break
 
-                e = {}
+                rk = repr_ltd(k, REPR_ID_LENGTH)
 
-                rk = repr(k)
-                if rk.startswith('<'):
-                    e[DICT_KEY_EXPR] = '[v for k, v in (%s).items() if repr(k) == "%s"][0]' % (expr, rk)
-                else:    
-                    e[DICT_KEY_EXPR] = '%s[%s]' % (expr, rk)
-                    
-                e[DICT_KEY_NAME] = [repr(k), k][fForceNames]
-                e[DICT_KEY_REPR] = safe_repr_limited(v)
+                e = {}
+                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), "%s", %d)' % (expr, rk, REPR_ID_LENGTH)
+                e[DICT_KEY_NAME] = [repr_ltd(k, repr_limit), k][fForceNames]
+                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
@@ -6495,7 +6639,7 @@ class CDebuggerEngine(CDebuggerCore):
             return snl            
 
         al = self.__calc_attribute_list(r, fFilter)
-        al.sort()
+        al.sort(cmp = SafeCmp)
 
         for a in al:
             try:
@@ -6510,7 +6654,7 @@ class CDebuggerEngine(CDebuggerCore):
             e = {}
             e[DICT_KEY_EXPR] = '%s.%s' % (expr, a)
             e[DICT_KEY_NAME] = a
-            e[DICT_KEY_REPR] = safe_repr_limited(v)
+            e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
             e[DICT_KEY_TYPE] = self.__parse_type(type(v))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
@@ -6547,7 +6691,7 @@ class CDebuggerEngine(CDebuggerCore):
         return False        
 
 
-    def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index):
+    def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit):
         e = {}
 
         try:
@@ -6559,16 +6703,18 @@ class CDebuggerEngine(CDebuggerCore):
                 __globals = globals()
                 __locals = locals()
 
+            __locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
+
             r = eval(expr, __globals, __locals)
 
             e[DICT_KEY_EXPR] = expr
-            e[DICT_KEY_REPR] = safe_repr_limited(r)
+            e[DICT_KEY_REPR] = repr_ltd(r, repr_limit)
             e[DICT_KEY_TYPE] = self.__parse_type(type(r))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(r)
             
             if fExpand and (e[DICT_KEY_N_SUBNODES] > 0):
                 fForceNames = (expr in ['globals()', 'locals()']) or (RPDB_EXEC_INFO in expr)
-                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, fFilter)
+                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, fFilter, repr_limit)
                 e[DICT_KEY_N_SUBNODES] = len(e[DICT_KEY_SUBNODES])
                 
         except:
@@ -6581,7 +6727,7 @@ class CDebuggerEngine(CDebuggerCore):
         lock.release()    
 
         
-    def get_namespace(self, nl, fFilter, frame_index, fException):
+    def get_namespace(self, nl, fFilter, frame_index, fException, repr_limit):
         try:
             (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException, fReadOnly = True)
         except:    
@@ -6597,7 +6743,7 @@ class CDebuggerEngine(CDebuggerCore):
             if self.is_child_of_failure(failed_expr_list, expr):
                 continue
 
-            args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index)
+            args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit)
             t = CThread(name = 'calc_expr %s' % (expr, ), target = self.calc_expr, args = args)
             t.start()
             t.join(2)
@@ -6631,10 +6777,10 @@ class CDebuggerEngine(CDebuggerCore):
 
         try:
             r = eval(expr, _globals, _locals)
-            v = safe_repr(r)
+            v = repr_ltd(r, MAX_EVALUATE_LENGTH)
             
             if len(v) > MAX_EVALUATE_LENGTH:
-                v = v[0: MAX_EVALUATE_LENGTH] + '... *** %s ***' % STR_MAX_EVALUATE_LENGTH_WARNING 
+                v += '... *** %s ***' % STR_MAX_EVALUATE_LENGTH_WARNING 
                 w = STR_MAX_EVALUATE_LENGTH_WARNING
 
         except:
@@ -7314,8 +7460,8 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
-    def export_get_namespace(self, nl, fFilter, frame_index, fException):
-        r = self.m_debugger.get_namespace(nl, fFilter, frame_index, fException)
+    def export_get_namespace(self, nl, fFilter, frame_index, fException, repr_limit):
+        r = self.m_debugger.get_namespace(nl, fFilter, frame_index, fException, repr_limit)
         return r
 
         
@@ -8293,11 +8439,11 @@ class CSessionManagerInternal:
         self.getSession().getProxy().set_thread(tid)
 
         
-    def get_namespace(self, nl, fFilter):
+    def get_namespace(self, nl, fFilter, repr_limit):
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        r = self.getSession().getProxy().get_namespace(nl, fFilter, frame_index, fAnalyzeMode)
+        r = self.getSession().getProxy().get_namespace(nl, fFilter, frame_index, fAnalyzeMode, repr_limit)
         return r
 
 
