@@ -1424,6 +1424,7 @@ RPDB_BPL_FOLDER = os.path.join(RPDB_SETTINGS_FOLDER, 'breakpoints')
 RPDB_BPL_FOLDER_NT = 'rpdb2_breakpoints'
 MAX_BPL_FILES = 100
 
+HEARTBEAT_TIMEOUT = 16
 IDLE_MAX_RATE = 2.0
 PING_TIMEOUT = 4.0
 LOCAL_TIMEOUT = 1.0
@@ -3135,9 +3136,9 @@ class CCrypto:
         """
 
         (_s, fEncryption) = self.__decrypt(s_encrypted)            
-        s = self.__verify_signature(_s, fVerifyIndex)
+        s, id = self.__verify_signature(_s, fVerifyIndex)
 
-        return (s, fEncryption)
+        return (s, id, fEncryption)
 
     
     def __encrypt(self, s):
@@ -3229,7 +3230,7 @@ class CCrypto:
         if fVerifyIndex:
             self.__verify_index(anchor, i, id)
 
-        return s_original
+        return s_original, id
 
         
     def __verify_index(self, anchor, i, id):
@@ -5192,6 +5193,8 @@ class CDebuggerCore:
         self.m_code_contexts = {None: None}
 
         self.m_fembedded = fembedded
+
+        self.m_heartbeats = {0: time.time() + 3600}
         
 
     def shutdown(self):
@@ -5477,7 +5480,33 @@ class CDebuggerCore:
 
         return False    
 
+    
+    def heartbeat(self, id, finit, fdetach):
+        """
+        Record that client id is still attached.
+        """
+       
+        if finit:
+            self.m_heartbeats.pop(0, None)
+
+        if fdetach:
+            self.m_heartbeats.pop(id, None)
+            return
+
+        if finit or id in self.m_heartbeats:
+            self.m_heartbeats[id] = time.time()
+
+
+    def are_clients_attached(self):
+        t = time.time()
         
+        for v in self.m_heartbeats.values():
+            if t < v + HEARTBEAT_TIMEOUT:
+                return True
+
+        return False
+
+
     def _break(self, ctx, frame, event, arg):
         """
         Main break logic.
@@ -5542,6 +5571,9 @@ class CDebuggerCore:
             (self.m_step_tid, self.m_next_frame, self.m_return_frame) = self.m_saved_step
             self.m_saved_step = None
             self.m_bp_manager.m_fhard_tbp = False
+            self.request_go()
+
+        elif not self.are_clients_attached():
             self.request_go()
 
         else:
@@ -7111,7 +7143,7 @@ class CPwdServerProxy:
                 #
                 # Decrypt response.
                 #
-                ((max_index, _r, _e), fe)= self.m_crypto.undo_crypto(r, fVerifyIndex = False)
+                ((max_index, _r, _e), id, fe)= self.m_crypto.undo_crypto(r, fVerifyIndex = False)
                 
                 if _e is not None:
                     raise _e
@@ -7249,7 +7281,7 @@ class CIOServer:
             #
             # Decrypt parameters.
             #
-            ((name, _params, target_rid), fEncryption) = self.m_crypto.undo_crypto(_params)
+            ((name, _params, target_rid), client_id, fEncryption) = self.m_crypto.undo_crypto(_params)
         except AuthenticationBadIndex, e:
             #print_debug_exception()
 
@@ -7277,7 +7309,12 @@ class CIOServer:
         try:
             if (target_rid != 0) and (target_rid != self.m_rid):
                 raise NotAttached
-                
+            
+            #
+            # Record that client id is still attached. 
+            #
+            self.heartbeat(client_id, name, _params)
+
             r = func(*_params)
 
         except Exception, _e:
@@ -7315,6 +7352,10 @@ class CIOServer:
 
                 port += 1
                 continue
+
+
+    def heartbeat(self, id, name, params):
+        pass
 
 
 
@@ -7356,6 +7397,13 @@ class CDebuggeeServer(CIOServer):
         CIOServer.shutdown(self)
 
         
+    def heartbeat(self, id, name, params):
+        finit = (name == 'request_break')
+        fdetach = (name == 'request_go' and True in params)
+
+        self.m_debugger.heartbeat(id, finit, fdetach)
+
+
     def export_server_info(self):
         age = time.time() - self.m_time
         state = self.m_debugger.get_state()
@@ -7405,7 +7453,7 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
-    def export_request_go(self):
+    def export_request_go(self, fdetach = False):
         self.m_debugger.request_go()
         return 0
 
@@ -8201,7 +8249,7 @@ class CSessionManagerInternal:
 
             try:
                 self.getSession().getProxy().set_trap_unhandled_exceptions(False)
-                self.request_go()
+                self.request_go(fdetach = True)
 
             except DebuggerNotBroken:
                 pass
@@ -8226,8 +8274,8 @@ class CSessionManagerInternal:
         self.getSession().getProxy().request_break()
 
     
-    def request_go(self):
-        self.getSession().getProxy().request_go()
+    def request_go(self, fdetach = False):
+        self.getSession().getProxy().request_go(fdetach)
 
     
     def request_go_breakpoint(self, filename, scope, lineno):
