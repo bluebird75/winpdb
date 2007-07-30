@@ -1394,12 +1394,16 @@ POSIX = 'posix'
 #
 # REVIEW: Go over this mechanism
 #
-# map between OS type and relvant command to initiate a new OS console.
+# map between OS type and relevant command to initiate a new OS console.
 # entries for other OSs can be added here. 
 # '%s' serves as a place holder.
 #
+# Currently there is no difference between 'nt' and NT_DEBUG, since now
+# both of them leave the terminal open after termination of debuggee to
+# accommodate scenarios of scripts with child processes.
+#
 osSpawn = {
-    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /c ""%(exec)s" %(options)s"', 
+    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%(exec)s" %(options)s"', 
     NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%(exec)s" %(options)s"', 
     POSIX: "%(term)s -e %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
     GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
@@ -1742,6 +1746,13 @@ g_exectid = None
 g_execpid = None
 
 g_fos_exit = False
+
+
+#
+# To hold a reference to __main__ to prevent its release if an unhandled
+# exception is raised.
+#
+g_module_main = None
 
 
 
@@ -4597,7 +4608,7 @@ class CCodeContext:
         if self.m_basename == THREADING_FILENAME:
             return True
 
-        if self.m_basename == DEBUGGER_FILENAME and self.m_code.co_name in ['__execv', '__execve', '__start_new_thread']:
+        if self.m_basename == DEBUGGER_FILENAME and self.m_code.co_name in ['__execv', '__execve', '__function_wrapper']:
             return True
 
         return False
@@ -5481,7 +5492,7 @@ class CDebuggerCore:
         return False    
 
     
-    def heartbeat(self, id, finit, fdetach):
+    def record_client_heartbeat(self, id, finit, fdetach):
         """
         Record that client id is still attached.
         """
@@ -5513,6 +5524,7 @@ class CDebuggerCore:
         """
 
         global g_fos_exit
+        global g_module_main
         
         if not self.is_break(ctx, frame, event) and not ctx.is_breakpoint():
             ctx.set_tracers()
@@ -5526,6 +5538,12 @@ class CDebuggerCore:
             self.m_state_manager.acquire()
             if self.m_state_manager.get_state() != STATE_BROKEN:
                 self.set_break_dont_lock()
+
+            if g_module_main == -1:
+                try:
+                    g_module_main = sys.modules['__main__']
+                except:
+                    g_module_main = None
 
             if not frame.f_exc_traceback is None:
                 ctx.set_exc_info((frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback))
@@ -7313,7 +7331,7 @@ class CIOServer:
             #
             # Record that client id is still attached. 
             #
-            self.heartbeat(client_id, name, _params)
+            self.record_client_heartbeat(client_id, name, _params)
 
             r = func(*_params)
 
@@ -7354,7 +7372,7 @@ class CIOServer:
                 continue
 
 
-    def heartbeat(self, id, name, params):
+    def record_client_heartbeat(self, id, name, params):
         pass
 
 
@@ -7397,11 +7415,11 @@ class CDebuggeeServer(CIOServer):
         CIOServer.shutdown(self)
 
         
-    def heartbeat(self, id, name, params):
+    def record_client_heartbeat(self, id, name, params):
         finit = (name == 'request_break')
         fdetach = (name == 'request_go' and True in params)
 
-        self.m_debugger.heartbeat(id, finit, fdetach)
+        self.m_debugger.record_client_heartbeat(id, finit, fdetach)
 
 
     def export_server_info(self):
@@ -8131,7 +8149,7 @@ class CSessionManagerInternal:
         
         self.__start_event_monitor()
 
-        self.enable_breakpoint([], fAll = True)
+        #self.enable_breakpoint([], fAll = True)
 
         
     def __verify_unattached(self):
@@ -8245,7 +8263,7 @@ class CSessionManagerInternal:
         self.__stop_event_monitor()
 
         try:
-            self.disable_breakpoint([], fAll = True)
+            #self.disable_breakpoint([], fAll = True)
 
             try:
                 self.getSession().getProxy().set_trap_unhandled_exceptions(False)
@@ -10495,6 +10513,7 @@ def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDe
 def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid): 
     global g_server
     global g_debugger
+    global g_module_main
     
     try:
         ExpandedFilename = FindFile(args[0])
@@ -10533,6 +10552,7 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
     f = sys._getframe(0)
     g_debugger.settrace(f, f_break_on_init = False, builtins_hack = ExpandedFilename)
 
+    g_module_main = -1
     del sys.modules['__main__']
 
     #
