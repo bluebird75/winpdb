@@ -1296,6 +1296,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         event_type_dict = {rpdb2.CEventUnhandledException: {}}
         self.m_session_manager.register_callback(self.update_unhandled_exception, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {rpdb2.CEventPsycoWarning: {}}
+        self.m_session_manager.register_callback(self.update_psyco_warning, event_type_dict, fSingleUse = False)
+
         event_type_dict = {rpdb2.CEventThreadBroken: {}}
         self.m_session_manager.register_callback(self.update_thread_broken, event_type_dict, fSingleUse = False)
 
@@ -1503,6 +1506,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             return
 
         self.m_async_sm.set_analyze(True)
+
+
+    def update_psyco_warning(self, event):
+        wx.CallAfter(self.notify_psyco_warning)
+
+
+    def notify_psyco_warning(self):
+        dlg = wx.MessageDialog(self, rpdb2.STR_PSYCO_WARNING, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg.ShowModal()
+        dlg.Destroy()
         
     
     def do_filter(self, event):

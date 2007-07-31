@@ -1502,6 +1502,7 @@ STR_ILEGAL_ANALYZE_MODE_ARG = "Argument is not allowed in analyze mode. Type 'he
 STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'help analyze' for more info."
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
+STR_PSYCO_WARNING = "The psyco module was detected. The debugger is incompatible with the psyco module and will not function correctly as long as the psyco module is imported and used."
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
 STR_DEBUGGEE_NOT_BROKEN = "Debuggee has to be waiting at break point to complete this command."
 STR_DEBUGGER_HAS_BROKEN = "Debuggee is waiting at break point for further commands."
@@ -1753,6 +1754,8 @@ g_fos_exit = False
 # exception is raised.
 #
 g_module_main = None
+
+g_fsent_psyco_warning = False
 
 
 
@@ -3327,6 +3330,15 @@ class CEvent:
     
     def is_match(self, arg):
         pass
+
+
+
+class CEventPsycoWarning(CEvent):
+    """
+    The psyco module was detected. Rpdb2 is incompatible with this module.
+    """
+    
+    pass
 
 
 
@@ -6040,7 +6052,8 @@ class CDebuggerEngine(CDebuggerCore):
             CEventForkSwitch: {},
             CEventExecSwitch: {},
             CEventTrap: {},
-            CEventForkMode: {}
+            CEventForkMode: {},
+            CEventPsycoWarning: {}
             }
 
         self.m_event_queue = CEventQueue(self.m_event_dispatcher)
@@ -6071,13 +6084,27 @@ class CDebuggerEngine(CDebuggerCore):
         return index
 
 
+    def trap_psyco_module(self):
+        global g_fsent_psyco_warning
+        
+       
+        if g_fsent_psyco_warning or not 'psyco' in sys.modules:
+            return
+
+        g_fsent_psyco_warning = True
+
+        event = CEventPsycoWarning()
+        self.m_event_dispatcher.fire_event(event)
+
+
     def wait_for_event(self, timeout, event_index):
         """
         Wait for new events and return them as list of events.
         """
-        
+
         self.cancel_request_go_timer()
-        
+        self.trap_psyco_module()
+
         (new_event_index, sel) = self.m_event_queue.wait_for_event(timeout, event_index)
         return (new_event_index, sel)
 
@@ -7872,6 +7899,9 @@ class CSessionManagerInternal:
 
         event_type_dict = {CEventExit: {}}
         self.register_callback(self.on_event_exit, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {CEventPsycoWarning: {}}
+        self.register_callback(self.on_event_psyco, event_type_dict, fSingleUse = False)
         
         event_type_dict = {CEventTrap: {}}
         self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
@@ -8262,6 +8292,10 @@ class CSessionManagerInternal:
                 self.report_exception(*sys.exc_info())
                 threading.Thread(target = self.detach_job).start()
                 return
+
+
+    def on_event_psyco(self, event):
+        self.m_printer(STR_PSYCO_WARNING)
 
 
     def on_event_exit(self, event):
