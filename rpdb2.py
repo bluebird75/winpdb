@@ -2896,18 +2896,39 @@ def CalcDictKeys(r, fFilter):
 
 
 
-def _RPDB2_FindRepr(x, r, repr_limit):
-    index = 0
-    for i in x:
-        if repr_ltd(i, repr_limit) == r:
-            if isinstance(x, dict):
-                return x[i]
+class _RPDB2_FindRepr:
+    def __init__(self, o, repr_limit):
+        self.m_object = o
+        self.m_repr_limit = repr_limit
 
-            return i
 
-        index += 1
-        if index > MAX_SORTABLE_LENGTH:
-            return None
+    def __getitem__(self, key):
+        index = 0
+        for i in self.m_object:
+            if repr_ltd(i, self.m_repr_limit) == key:
+                if isinstance(self.m_object, dict):
+                    return self.m_object[i]
+
+                return i
+
+            index += 1
+            if index > MAX_SORTABLE_LENGTH:
+                return None
+
+
+    def __setitem__(self, key, value):
+        if not isinstance(self.m_object, dict):
+            return 
+
+        index = 0
+        for i in self.m_object:
+            if repr_ltd(i, self.m_repr_limit) == key:
+                self.m_object[i] = value
+                return
+
+            index += 1
+            if index > MAX_SORTABLE_LENGTH:
+                return None
 
 
 
@@ -6604,7 +6625,7 @@ class CDebuggerEngine(CDebuggerCore):
                     rk = repr_ltd(i, REPR_ID_LENGTH)
 
                     e = {}
-                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), "%s", %d)' % (expr, rk, REPR_ID_LENGTH)
+                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
                     e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
                     e[DICT_KEY_REPR] = repr_ltd(i, repr_limit)
                     e[DICT_KEY_TYPE] = self.__parse_type(type(i))
@@ -6632,7 +6653,7 @@ class CDebuggerEngine(CDebuggerCore):
                 rk = repr_ltd(i, REPR_ID_LENGTH)
 
                 e = {}
-                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), "%s", %d)' % (expr, rk, REPR_ID_LENGTH)
+                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
                 e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
                 e[DICT_KEY_REPR] = repr_ltd(i, repr_limit)
                 e[DICT_KEY_TYPE] = self.__parse_type(type(i))
@@ -6678,7 +6699,7 @@ class CDebuggerEngine(CDebuggerCore):
                 rk = repr_ltd(k, REPR_ID_LENGTH)
 
                 e = {}
-                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), "%s", %d)' % (expr, rk, REPR_ID_LENGTH)
+                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
                 e[DICT_KEY_NAME] = [repr_ltd(k, repr_limit), k][fForceNames]
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
@@ -6856,8 +6877,16 @@ class CDebuggerEngine(CDebuggerCore):
         w = ''
         e = ''
 
-        try:    
-            exec suite in _globals, _locals
+        try:
+            if '_RPDB2_FindRepr' in suite and not '_RPDB2_FindRepr' in _original_locals_copy:
+                _locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
+
+            try:
+                exec suite in _globals, _locals
+            finally:
+                if '_RPDB2_FindRepr' in suite and not '_RPDB2_FindRepr' in _original_locals_copy:
+                    del _locals['_RPDB2_FindRepr']
+
         except:    
             exc_info = sys.exc_info()
             e = "%s, %s" % (str(exc_info[0]), str(exc_info[1]))
