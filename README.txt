@@ -5,7 +5,8 @@ Winpdb - A GPL Python Debugger
 
 Contact: Nir Aides
 Email:   nir@digitalpeers.com
-Website: http://sourceforge.net/projects/winpdb/
+Website: http://www.digitalpeers.com/pythondebugger/
+         http://sourceforge.net/projects/winpdb/
 Version: 1.1.5		 
 
 
@@ -51,7 +52,8 @@ Installation
 
     In the event of insufficient permissions, installation can be avoided 
     completely. To use Winpdb simply launch it from the folder in which it is 
-    placed.
+    placed. On Linux don't forget to add the (x) bit to 'rpdb2' and 'winpdb' 
+    with chmod to allow these scripts to run.
 
 
 
@@ -65,6 +67,8 @@ Launch Time
 
         %PYTHONHOME%\Scripts\winpdb
 
+    Note that the Python interpreter must be in the PATH for this to work.
+
 
 
 Documentation
@@ -75,7 +79,7 @@ Documentation
     commands.
 
     Online documentation is available at:
-    http://www.digitalpeers.com/pythondebugger/docs.htm
+    http://www.digitalpeers.com/pythondebugger/
 
 
 

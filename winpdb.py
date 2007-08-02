@@ -367,7 +367,7 @@ MSG_WARNING_TITLE = "Warning"
 MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in the future."
 MSG_ERROR_TITLE = "Error"
 MSG_ERROR_FILE_NOT_FOUND = "File not found."
-MSG_ERROR_FILE_NOT_PYTHON = "Only Python files that end with '.py' are accepted."
+MSG_ERROR_FILE_NOT_PYTHON = "'%s' does not seem to be a Python source file. Only Python files are accepted."
 
 STR_FILE_LOAD_ERROR = "Failed to load source file '%s' from debuggee."
 STR_FILE_LOAD_ERROR2 = """Failed to load source file '%s' from debuggee.
@@ -2129,7 +2129,13 @@ class CSourceManager:
             u = _source.decode(se, 'ignore')
             source = u.encode(de, 'ignore')
             _time = 0
-            
+        
+        elif t == rpdb2.NotPythonSource and fComplain:
+            dlg = wx.MessageDialog(None, MSG_ERROR_FILE_NOT_PYTHON % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
         elif t in (IOError, socket.error, rpdb2.CConnectionException):
             if fComplain:
                 dlg = wx.MessageDialog(None, STR_FILE_LOAD_ERROR % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
@@ -3691,7 +3697,7 @@ class COpenDialog(wx.Dialog):
         sizerv.Add(btnsizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
         
         self.m_ok = wx.Button(self, wx.ID_OK)
-        self.Bind(wx.EVT_BUTTON, self.do_ok, self.m_ok)
+        self.m_ok.Disable()
         self.m_ok.SetDefault()
         btnsizer.AddButton(self.m_ok)
 
@@ -3732,28 +3738,6 @@ class COpenDialog(wx.Dialog):
         self.m_entry.SetValue(abs_path)
 
 
-    def do_validate(self):
-        filename = self.m_entry.GetValue()
-        if filename[:1] + filename[-1:] in ['""', "''"]:
-            filename = filename[1:-1]
-
-        if not rpdb2.IsPythonSourceFile(filename):
-            dlg = wx.MessageDialog(self, MSG_ERROR_FILE_NOT_PYTHON, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
-            dlg.ShowModal()
-            dlg.Destroy()
-            return False
-
-        return True
-
-
-    def do_ok(self, event):
-        f = self.do_validate()
-        if not f:
-            return
-
-        event.Skip()
-
-        
     def get_file_name(self):
         return self.m_entry.GetValue()
 

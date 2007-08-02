@@ -269,15 +269,13 @@ import xmlrpclib
 import threading
 import linecache
 import traceback
-import encodings
-import compiler
 import commands
 import tempfile
-import weakref
 import __main__
-import cPickle
+import weakref
 import httplib
 import os.path
+import pickle
 import socket
 import getopt
 import string
@@ -295,7 +293,6 @@ import sys
 import cmd
 import md5
 import imp
-import dis
 import os
 
 try:
@@ -1213,6 +1210,13 @@ class CConsole:
 
 
 
+class NotPythonSource(IOError):
+    """
+    Raised when an attempt to load non Python source is made.
+    """
+    
+
+
 class CException(Exception):
     """
     Base exception class for the debugger.
@@ -1392,9 +1396,7 @@ DARWIN = 'darwin'
 POSIX = 'posix'
 
 #
-# REVIEW: Go over this mechanism
-#
-# map between OS type and relevant command to initiate a new OS console.
+# Map between OS type and relevant command to initiate a new OS console.
 # entries for other OSs can be added here. 
 # '%s' serves as a place holder.
 #
@@ -1510,6 +1512,7 @@ STR_ALREADY_ATTACHED = "Already attached. Detach from debuggee and try again."
 STR_NOT_ATTACHED = "Not attached to any script. Attach to a script and try again."
 STR_COMMUNICATION_FAILURE = "Failed to communicate with debugged script."
 STR_ERROR_OTHER = "Command returned the following error:\n%(type)s, %(value)s.\nPlease check stderr for stack trace and report to support."
+STR_LOST_CONNECTION = "Lost connection to debuggee."
 STR_BAD_VERSION = "A debuggee was found with incompatible debugger version %(value)s."
 STR_BAD_VERSION2 = "While attempting to find the specified debuggee at least one debuggee was found that uses incompatible version of RPDB2."
 STR_UNEXPECTED_DATA = "Unexpected data received."
@@ -1653,7 +1656,7 @@ MODE_OFF = 'OFF'
 
 MAX_EVALUATE_LENGTH = 256 * 1024
 MAX_NAMESPACE_ITEMS = 1024
-MAX_SORTABLE_LENGTH = 512 * 1024
+MAX_SORTABLE_LENGTH = 256 * 1024
 REPR_ID_LENGTH = 4096
 
 MAX_NAMESPACE_WARNING = {
@@ -1680,10 +1683,10 @@ XML_DATA = """<?xml version='1.0'?>
 <methodName>dispatcher_method</methodName>
 <params>
 <param>
-<value><string>RPDB_02_00_04</string></value>
+<value><string>%s</string></value>
 </param>
 </params>
-</methodCall>"""
+</methodCall>""" % RPDB_COMPATIBILITY_VERSION
 
 N_WORK_QUEUE_THREADS = 8
 
@@ -1717,7 +1720,8 @@ g_initial_cwd = []
 
 g_error_mapping = {
     socket.error: STR_COMMUNICATION_FAILURE,
-    
+   
+    CConnectionException: STR_LOST_CONNECTION,
     BadVersion: STR_BAD_VERSION,
     UnexpectedData: STR_UNEXPECTED_DATA,
     SpawnUnsupported: STR_SPAWN_UNSUPPORTED,
@@ -1756,6 +1760,8 @@ g_fos_exit = False
 g_module_main = None
 
 g_fsent_psyco_warning = False
+
+g_fignore_atexit = False
 
 
 
@@ -1931,7 +1937,7 @@ def print_debug_exception(fForce = False):
 
 def print_exception(t, v, tb, fForce = False):
     """
-    Print exceptions to stdout when in debug mode.
+    Print exceptions to stderr when in debug mode.
     """
     
     if not g_fDebug and not fForce:
@@ -2085,14 +2091,28 @@ def my_abspath1(path):
 
 
 
-def IsPythonSourceFile(filename):
-    if filename.endswith(PYTHON_FILE_EXTENSION):
+def IsPythonSourceFile(path):
+    if path.endswith(PYTHON_FILE_EXTENSION):
         return True
         
-    if filename.endswith(PYTHONW_FILE_EXTENSION):
+    if path.endswith(PYTHONW_FILE_EXTENSION):
         return True
 
-    return False
+    try:
+        f = open(path, 'r')
+        c = f.read(10000)
+        f.close()
+  
+        ll = c.split('\n')
+
+        for l in ll:
+            if l.startswith('#!') and 'python' in l:
+                return True
+
+        return False
+
+    except:
+        return False
 
 
 
@@ -2931,7 +2951,7 @@ class _RPDB2_FindRepr:
 
             index += 1
             if index > MAX_SORTABLE_LENGTH:
-                return None
+                return
 
 
 
@@ -2964,7 +2984,7 @@ class CThread (threading.Thread):
         threading.Thread.__init__(self, name = name, target = target, args = args)
 
         self.m_fstarted = False
-        self.m_shutdown = shutdown
+        self.m_shutdown_callback = shutdown
 
         self.m_id = self.__getId()
 
@@ -3011,8 +3031,8 @@ class CThread (threading.Thread):
 
 
     def shutdown(self):
-        if self.m_shutdown:
-            self.m_shutdown()
+        if self.m_shutdown_callback:
+            self.m_shutdown_callback()
 
 
     def joinAll(cls):
@@ -3219,12 +3239,12 @@ class CCrypto:
 
     def __sign(self, s):
         i = self.__get_next_index()
-        _s = cPickle.dumps((self.m_index_anchor_ex, i, self.m_rid, s))
+        _s = pickle.dumps((self.m_index_anchor_ex, i, self.m_rid, s))
         
         h = hmac.new(self.m_key, _s, md5)
         _d = h.digest()
         r = (_d, _s)
-        s_signed = cPickle.dumps(r)
+        s_signed = pickle.dumps(r)
 
         return s_signed
 
@@ -3242,7 +3262,7 @@ class CCrypto:
 
     def __verify_signature(self, s, fVerifyIndex):
         try:
-            r = cPickle.loads(s)
+            r = pickle.loads(s)
             
             (_d, _s) = r
             
@@ -3253,7 +3273,7 @@ class CCrypto:
                 self.__wait_a_little()
                 raise AuthenticationFailure
 
-            (anchor, i, id, s_original) = cPickle.loads(_s)
+            (anchor, i, id, s_original) = pickle.loads(_s)
                 
         except AuthenticationFailure:
             raise
@@ -4012,7 +4032,7 @@ class CFileBreakInfo:
             fqn = fqn + [c.co_name]  
             valid_lines = CalcValidLines(c)
             self.m_last_line = max(self.m_last_line, valid_lines[-1])
-            _fqn = string.join(fqn, '.')
+            _fqn = '.'.join(fqn)
             si = (_fqn, valid_lines)  
             subcodeslist = self.__CalcSubCodesList(c)
             t = subcodeslist + [si] + t
@@ -5229,7 +5249,7 @@ class CDebuggerCore:
         self.m_step_tid = None
         self.m_next_frame = None
         self.m_return_frame = None       
-        self.m_saved_step = None
+        self.m_saved_step = (None, None, None)
         self.m_saved_next = None
 
         self.m_bp_manager = CBreakPointsManager()
@@ -5253,7 +5273,7 @@ class CDebuggerCore:
     def send_fork_switch(self):
         """
         Notify client that debuggee is forking and that it should
-        try to reconnect (to parent or child).
+        try to reconnect to the child.
         """
         
         print_debug('Sending fork switch event')
@@ -5356,6 +5376,10 @@ class CDebuggerCore:
         Stop tracing mechanism.
         """
         
+        global g_fignore_atexit
+        
+        g_fignore_atexit = True
+
         threading.settrace(None)
         sys.settrace(None)
         sys.setprofile(None)
@@ -5593,6 +5617,7 @@ class CDebuggerCore:
             
             if self.is_auto_fork_first_stage(ctx.m_thread_id):
                 self.m_saved_step = (self.m_step_tid, self.m_saved_next, self.m_return_frame)
+                self.m_saved_next = None
                 self.m_bp_manager.m_fhard_tbp = True
 
             if self.m_f_first_to_break or (self.m_current_ctx == ctx):                
@@ -5620,7 +5645,7 @@ class CDebuggerCore:
 
         elif self.m_ffork_auto and ffork_second_stage:
             (self.m_step_tid, self.m_next_frame, self.m_return_frame) = self.m_saved_step
-            self.m_saved_step = None
+            self.m_saved_step = (None, None, None)
             self.m_bp_manager.m_fhard_tbp = False
             self.request_go()
 
@@ -5668,6 +5693,9 @@ class CDebuggerCore:
 
         self.m_step_tid = tid
         g_forkpid = os.getpid()
+        
+        if not self.m_ffork_into_child:
+            return
 
         self.send_fork_switch()
         g_server.shutdown()
@@ -5693,8 +5721,8 @@ class CDebuggerCore:
             #
 
             if not self.m_ffork_into_child:
-                CThread.clearJoin()
-                g_server.jumpstart()
+                #CThread.clearJoin()
+                #g_server.jumpstart()
                
                 return True
 
@@ -6086,7 +6114,6 @@ class CDebuggerEngine(CDebuggerCore):
 
     def trap_psyco_module(self):
         global g_fsent_psyco_warning
-        
        
         if g_fsent_psyco_warning or not 'psyco' in sys.modules:
             return
@@ -6210,7 +6237,6 @@ class CDebuggerEngine(CDebuggerCore):
         except:
             print_debug_exception()
             raise
-
 
        
     def send_unhandled_exception_event(self):
@@ -6415,9 +6441,6 @@ class CDebuggerEngine(CDebuggerCore):
             lineno = 1
             nlines = -1
 
-        #if (filename != '') and not IsPythonSourceFile(filename):
-        #    raise IOError
-            
         _lineno = lineno
         r = {}
         frame_filename = None
@@ -6454,6 +6477,8 @@ class CDebuggerEngine(CDebuggerCore):
             __filename = filename
         else:    
             __filename = FindFile(filename, fModules = True)
+            if not IsPythonSourceFile(__filename):
+                raise NotPythonSource
 
         _filename = winlower(__filename)    
 
@@ -6693,7 +6718,7 @@ class CDebuggerEngine(CDebuggerCore):
         if isinstance(r, list) or isinstance(r, tuple):
             for i, v in enumerate(r[0: MAX_NAMESPACE_ITEMS]):
                 e = {}
-                e[DICT_KEY_EXPR] = '%s[%d]' % (expr, i)
+                e[DICT_KEY_EXPR] = '(%s)[%d]' % (expr, i)
                 e[DICT_KEY_NAME] = repr(i)
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
@@ -6723,10 +6748,17 @@ class CDebuggerEngine(CDebuggerCore):
                     snl.append(MAX_NAMESPACE_WARNING)
                     break
 
-                rk = repr_ltd(k, REPR_ID_LENGTH)
-
                 e = {}
-                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
+
+                if type(k) in [bool, int, float, str, unicode]:
+                    rk = repr(k)
+                    if len(rk) < REPR_ID_LENGTH:
+                        e[DICT_KEY_EXPR] = '(%s)[%s]' % (expr, rk)
+
+                if not DICT_KEY_EXPR in e:
+                    rk = repr_ltd(k, REPR_ID_LENGTH)
+                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
+
                 e[DICT_KEY_NAME] = [repr_ltd(k, repr_limit), k][fForceNames]
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
@@ -6750,7 +6782,7 @@ class CDebuggerEngine(CDebuggerCore):
                 break
 
             e = {}
-            e[DICT_KEY_EXPR] = '%s.%s' % (expr, a)
+            e[DICT_KEY_EXPR] = '(%s).%s' % (expr, a)
             e[DICT_KEY_NAME] = a
             e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
             e[DICT_KEY_TYPE] = self.__parse_type(type(v))
@@ -7108,7 +7140,7 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     """
     
     def init_work_queue(self):
-        self.m_fignore_error = True
+        #self.m_fignore_error = True
         self.m_work_queue = CWorkQueue()
     
     def shutdown_work_queue(self):
@@ -7117,12 +7149,6 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     def process_request(self, request, client_address):
         self.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address))
 
-    def handle_error(self, request, client_address):
-        if self.m_fignore_error:
-            self.m_fignore_error = False
-            return
-
-        return SocketServer.ThreadingMixIn.handle_error(self, request, client_address)
 
 
 def my_xmlrpclib_loads(data):
@@ -7171,6 +7197,18 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
 
     if sys.version_info[:2] <= (2, 3):
         _marshaled_dispatch = __marshaled_dispatch
+
+
+    """
+    def handle_error(self, request, client_address):
+        #if self.m_fignore_error:
+        #    self.m_fignore_error = False
+        #    return
+
+        #print_debug("handle_error() in pid %d" % _getpid())
+
+        return SimpleXMLRPCServer.SimpleXMLRPCServer.handle_error(self, request, client_address)
+    """
 
 
 
@@ -7256,6 +7294,7 @@ class CPwdServerProxy:
                     assert False 
 
             except xmlrpclib.ProtocolError:
+                #print_debug("Caught ProtocolError for %s" % name)
                 print_debug_exception()
                 raise CConnectionException
                 
@@ -7304,7 +7343,7 @@ class CIOServer:
         if self.m_stop:
             return
         
-        print_debug('Stopping IO server...')
+        print_debug('Stopping IO server... (pid = %d)' % _getpid())
 
         self.m_stop = True
 
@@ -8421,7 +8460,7 @@ class CSessionManagerInternal:
         try:
             try:
                 bpl = self.get_breakpoints()
-                sbpl = cPickle.dumps(bpl)
+                sbpl = pickle.dumps(bpl)
                 file.write(sbpl)
 
             except:
@@ -8446,7 +8485,7 @@ class CSessionManagerInternal:
         
         try:
             try:
-                bpl = cPickle.load(file)
+                bpl = pickle.load(file)
                 self.delete_breakpoint([], True)
 
             except:
@@ -8540,9 +8579,6 @@ class CSessionManagerInternal:
 
 
     def get_source_file(self, filename, lineno, nlines): 
-        #if (filename != '') and not IsPythonSourceFile(filename):
-        #    raise IOError
-            
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
@@ -10510,6 +10546,11 @@ def __setbreak():
     
 
 def _atexit(fabort = False):
+    if g_fignore_atexit:
+        return
+
+    print_debug("Entered _atexit() in pid %d" % _getpid())
+
     if g_debugger is None:
         return
 
@@ -10826,7 +10867,7 @@ def main(StartClient_func = StartClient):
         if len(args) == 0:
             _args = ''
         else:
-            _args = '"' + string.join(args, '" "') + '"'
+            _args = '"' + '" "'.join(args) + '"'
 
         StartClient_func(_args, fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRemote, host)
    
