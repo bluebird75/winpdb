@@ -1762,6 +1762,7 @@ g_module_main = None
 g_fsent_psyco_warning = False
 
 g_fignore_atexit = False
+g_ignore_broken_pipe = 0
 
 
 
@@ -5687,6 +5688,7 @@ class CDebuggerCore:
 
     def prepare_fork_step(self, tid):
         global g_forkpid
+        global g_ignore_broken_pipe
 
         if tid != g_forktid:
             return
@@ -5700,6 +5702,8 @@ class CDebuggerCore:
         self.send_fork_switch()
         g_server.shutdown()
         CThread.joinAll()
+
+        g_ignore_broken_pipe = time.time()
 
 
     def handle_fork(self, ctx):
@@ -7140,7 +7144,6 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     """
     
     def init_work_queue(self):
-        #self.m_fignore_error = True
         self.m_work_queue = CWorkQueue()
     
     def shutdown_work_queue(self):
@@ -7199,16 +7202,13 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
         _marshaled_dispatch = __marshaled_dispatch
 
 
-    """
     def handle_error(self, request, client_address):
-        #if self.m_fignore_error:
-        #    self.m_fignore_error = False
-        #    return
+        print_debug("handle_error() in pid %d" % _getpid())
 
-        #print_debug("handle_error() in pid %d" % _getpid())
+        if g_ignore_broken_pipe + 5 > time.time():
+            return
 
         return SimpleXMLRPCServer.SimpleXMLRPCServer.handle_error(self, request, client_address)
-    """
 
 
 
@@ -7294,8 +7294,8 @@ class CPwdServerProxy:
                     assert False 
 
             except xmlrpclib.ProtocolError:
-                #print_debug("Caught ProtocolError for %s" % name)
-                print_debug_exception()
+                print_debug("Caught ProtocolError for %s" % name)
+                #print_debug_exception()
                 raise CConnectionException
                 
             return _r
@@ -7767,8 +7767,10 @@ class CSession:
         return self.m_server_info
 
 
-    def restart(self, timeout = 10):
+    def restart(self, sleep = 0, timeout = 10):
         self.m_fRestart = True
+
+        time.sleep(sleep)
 
         t0 = time.time()
 
@@ -8298,12 +8300,12 @@ class CSessionManagerInternal:
                 
                 if True in [isinstance(e, CEventForkSwitch) for e in sel]:
                     print_debug('Received fork switch event.')
-                    self.getSession().restart()
+                    self.getSession().restart(sleep = 3)
                                 
                 if True in [isinstance(e, CEventExecSwitch) for e in sel]:
                     print_debug('Received exec switch event.')
                     try:
-                        self.getSession().restart()
+                        self.getSession().restart(sleep = 3)
                     except CConnectionException:
                         sel.append(CEventExit())
                                 
