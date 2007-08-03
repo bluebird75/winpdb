@@ -2801,11 +2801,16 @@ class CNamespacePanel(wx.Panel, CJobs):
         
     def OnItemActivated(self, event):
         item = event.GetItem()
-        expr = self.m_tree.GetPyData(item)
+        (expr, is_valid) = self.m_tree.GetPyData(item)
         if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK, rpdb2.STR_MAX_NAMESPACE_WARNING_TITLE]:
             return
 
-        expr_dialog = CExpressionDialog(self)
+        if is_valid:
+            default_value = self.m_tree.GetItemText(item, 2)[1:]
+        else:
+            default_value = ''
+
+        expr_dialog = CExpressionDialog(self, default_value)
         pos = self.GetPositionTuple()
         expr_dialog.SetPosition((pos[0] + 50, pos[1] + 50))
         r = expr_dialog.ShowModal()
@@ -2813,11 +2818,10 @@ class CNamespacePanel(wx.Panel, CJobs):
             expr_dialog.Destroy()
             return
 
-        expr = expr_dialog.get_expression()
+        _expr = expr_dialog.get_expression()
         expr_dialog.Destroy()
 
-        _expr = self.m_tree.GetPyData(item)
-        _suite = "%s = %s" % (_expr, expr)
+        _suite = "%s = %s" % (expr, _expr)
         
         self.m_async_sm.with_callback(self.callback_execute).execute(_suite)
 
@@ -2864,7 +2868,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             return n 
 
         child = self.get_children(item)[0]
-        expr = self.m_tree.GetPyData(child)
+        (expr, is_valid) = self.m_tree.GetPyData(child)
 
         if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK]:
             return 0
@@ -2882,7 +2886,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         if self.GetChildrenCount(item) > 0:
             return
         
-        expr = self.m_tree.GetPyData(item)
+        (expr, is_valid) = self.m_tree.GetPyData(item)
 
         l = [e for e in _map if e.get(rpdb2.DICT_KEY_EXPR, None) == expr]
         if l == []:
@@ -2911,7 +2915,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             child = self.m_tree.AppendItem(item, r[rpdb2.DICT_KEY_NAME])
             self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_REPR], 2)
             self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_TYPE], 1)
-            self.m_tree.SetItemPyData(child, r[rpdb2.DICT_KEY_EXPR])
+            self.m_tree.SetItemPyData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
             self.m_tree.SetItemHasChildren(child, (r[rpdb2.DICT_KEY_N_SUBNODES] > 0))
 
         self.m_tree.Expand(item)
@@ -2934,9 +2938,9 @@ class CNamespacePanel(wx.Panel, CJobs):
         child = self.m_tree.AppendItem(item, STR_NAMESPACE_LOADING)
         self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 2)
         self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 1)
-        self.m_tree.SetItemPyData(child, STR_NAMESPACE_LOADING)
+        self.m_tree.SetItemPyData(child, (STR_NAMESPACE_LOADING, False))
 
-        expr = self.m_tree.GetPyData(item)
+        (expr, is_valid) = self.m_tree.GetPyData(item)
 
         f = lambda r, exc_info: self.callback_ns(r, exc_info, expr)        
         self.m_async_sm.with_callback(f).get_namespace([(expr, True)], self.m_fFilter)
@@ -2957,7 +2961,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             child = self.m_tree.AppendItem(item, STR_NAMESPACE_DEADLOCK)
             self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 2)
             self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 1)
-            self.m_tree.SetItemPyData(child, STR_NAMESPACE_DEADLOCK)
+            self.m_tree.SetItemPyData(child, (STR_NAMESPACE_DEADLOCK, False))
             self.m_tree.Expand(item)
             return
             
@@ -2969,7 +2973,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     def find_item(self, expr):
         item = self.m_tree.GetRootItem()
         while item:
-            expr2 = self.m_tree.GetPyData(item)
+            (expr2, is_valid) = self.m_tree.GetPyData(item)
             if expr2 == expr:
                 return item               
                 
@@ -3000,7 +3004,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         while len(s) > 0:
             item = s.pop(0)
-            expr = self.m_tree.GetPyData(item)
+            (expr, is_valid) = self.m_tree.GetPyData(item)
             fExpand = self.m_tree.IsExpanded(item) and self.GetChildrenCount(item) > 0
             if not fExpand:
                 continue
@@ -3063,7 +3067,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.DeleteAllItems()
 
         root = self.m_tree.AddRoot('root')
-        self.m_tree.SetItemPyData(root, self.get_root_expr())
+        self.m_tree.SetItemPyData(root, (self.get_root_expr(), False))
         self.m_tree.SetItemHasChildren(root, True)
 
         s = [root]
@@ -3569,7 +3573,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         
 
 class CExpressionDialog(wx.Dialog):
-    def __init__(self, parent):
+    def __init__(self, parent, default_value):
         wx.Dialog.__init__(self, parent, -1, DLG_EXPR_TITLE)
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
@@ -3582,7 +3586,7 @@ class CExpressionDialog(wx.Dialog):
 
         label = wx.StaticText(self, -1, LABEL_EXPR)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
-        self.m_entry_expr = wx.TextCtrl(self, size = (200, -1))
+        self.m_entry_expr = wx.TextCtrl(self, value = default_value, size = (200, -1))
         self.m_entry_expr.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_expr)
         sizerh.Add(self.m_entry_expr, 0, wx.ALIGN_CENTRE | wx.ALL, 5)

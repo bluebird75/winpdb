@@ -1002,6 +1002,8 @@ class CSessionManager:
         Each dictionary has the following keys and values:
           DICT_KEY_EXPR - the original expression string.
           DICT_KEY_REPR - A repr of the evaluated value of the expression.
+          DICT_KEY_IS_VALID - A boolean that indicates if the repr value is 
+                          valid for the purpose of re-evaluation.
           DICT_KEY_TYPE - A string representing the type of the experession's 
                           evaluated value.
           DICT_KEY_N_SUBNODES - If the evaluated value has children like items 
@@ -1022,6 +1024,8 @@ class CSessionManager:
           DICT_KEY_NAME - a repr of the child name, e.g '0' for the first item
                           in a list.
           DICT_KEY_REPR - A repr of the evaluated value of the expression. 
+          DICT_KEY_IS_VALID - A boolean that indicates if the repr value is 
+                          valid for the purpose of re-evaluation.
           DICT_KEY_TYPE - A string representing the type of the experession's 
                           evaluated value.
           DICT_KEY_N_SUBNODES - If the evaluated value has children like items 
@@ -1644,6 +1648,7 @@ DICT_KEY_EVENT = 'event'
 DICT_KEY_EXPR = 'expr'
 DICT_KEY_NAME = 'name'
 DICT_KEY_REPR = 'repr'
+DICT_KEY_IS_VALID = 'fvalid'
 DICT_KEY_TYPE = 'type'
 DICT_KEY_SUBNODES = 'subnodes'
 DICT_KEY_N_SUBNODES = 'n_subnodes'
@@ -1662,7 +1667,8 @@ REPR_ID_LENGTH = 4096
 MAX_NAMESPACE_WARNING = {
     DICT_KEY_EXPR: STR_MAX_NAMESPACE_WARNING_TITLE, 
     DICT_KEY_NAME: STR_MAX_NAMESPACE_WARNING_TITLE, 
-    DICT_KEY_REPR: STR_MAX_NAMESPACE_WARNING_MSG, 
+    DICT_KEY_REPR: STR_MAX_NAMESPACE_WARNING_MSG,
+    DICT_KEY_IS_VALID: False,
     DICT_KEY_TYPE: STR_MAX_NAMESPACE_WARNING_TYPE, 
     DICT_KEY_N_SUBNODES: 0
     }
@@ -1809,7 +1815,7 @@ def safe_repr(x):
 
 
 
-def repr_list(pattern, l, length):
+def repr_list(pattern, l, length, is_valid):
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -1823,11 +1829,12 @@ def repr_list(pattern, l, length):
         if i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
             continue
         
-        s += repr_ltd(i, length - len(s))
+        s += repr_ltd(i, length - len(s), is_valid)
 
         index += 1
         
         if index < len(l) and len(s) > length:
+            is_valid[0] = False
             if not s.endswith('...'):
                 s += '...'
             break
@@ -1839,7 +1846,7 @@ def repr_list(pattern, l, length):
 
 
 
-def repr_dict(pattern, d, length):
+def repr_dict(pattern, d, length, is_valid):
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -1855,18 +1862,20 @@ def repr_dict(pattern, d, length):
         
         v = d[k]
 
-        s += repr_ltd(k, length - len(s))
+        s += repr_ltd(k, length - len(s), is_valid)
 
         if len(s) > length:
+            is_valid[0] = False
             if not s.endswith('...'):
                 s += '...'
             break
 
-        s +=  ': ' + repr_ltd(v, length - len(s))
+        s +=  ': ' + repr_ltd(v, length - len(s), is_valid)
 
         index += 1
 
         if index < len(d) and len(s) > length:
+            is_valid[0] = False
             if not s.endswith('...'):
                 s += '...'
             break
@@ -1878,44 +1887,61 @@ def repr_dict(pattern, d, length):
 
 
 
-def repr_str(s, length):
+def repr_str(s, length, is_valid):
     if len(s) > length:
+        is_valid[0] = False
         s = s[: length] + '...'
 
     return repr(s)
 
 
 
-def repr_ltd(x, length):
+def repr_base(v, length, is_valid):
+    r = repr(v)
+
+    if len(r) > length:
+        is_valid[0] = False
+        r = r[: length] + '...'
+
+    return r
+
+
+
+def repr_ltd(x, length, is_valid = [True]):
     length = max(0, length)
 
     try:
         if isinstance(x, set):
-            return repr_list('set([%s])', x, length)
+            return repr_list('set([%s])', x, length, is_valid)
 
         if isinstance(x, frozenset):
-            return repr_list('frozenset([%s])', x, length)
+            return repr_list('frozenset([%s])', x, length, is_valid)
 
     except NameError:
         pass
 
     if isinstance(x, sets.Set):
-        return repr_list('sets.Set([%s])', x, length)
+        return repr_list('sets.Set([%s])', x, length, is_valid)
 
     if isinstance(x, sets.ImmutableSet):
-        return repr_list('sets.ImmutableSet([%s])', x, length)
+        return repr_list('sets.ImmutableSet([%s])', x, length, is_valid)
 
     if isinstance(x, list):
-        return repr_list('[%s]', x, length)
+        return repr_list('[%s]', x, length, is_valid)
 
     if isinstance(x, tuple):
-        return repr_list('(%s)', x, length)
+        return repr_list('(%s)', x, length, is_valid)
 
     if isinstance(x, dict):
-        return repr_dict('{%s}', x, length)
+        return repr_dict('{%s}', x, length, is_valid)
 
     if type(x) in [str, unicode]:
-        return repr_str(x, length)
+        return repr_str(x, length, is_valid)
+
+    if type(x) in [bool, int, float, long, type(None)]:
+        return repr_base(x, length, is_valid)
+
+    is_valid[0] = False
 
     y = safe_repr(x)[: length]
     if len(y) == length:
@@ -6737,13 +6763,15 @@ class CDebuggerEngine(CDebuggerCore):
                     if len(snl) >= MAX_NAMESPACE_ITEMS:
                         snl.append(MAX_NAMESPACE_WARNING)
                         break
-
+                    
+                    is_valid = [True]
                     rk = repr_ltd(i, REPR_ID_LENGTH)
 
                     e = {}
                     e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
                     e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
-                    e[DICT_KEY_REPR] = repr_ltd(i, repr_limit)
+                    e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
+                    e[DICT_KEY_IS_VALID] = is_valid[0]
                     e[DICT_KEY_TYPE] = self.__parse_type(type(i))
                     e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
@@ -6766,12 +6794,14 @@ class CDebuggerEngine(CDebuggerCore):
                     snl.append(MAX_NAMESPACE_WARNING)
                     break
 
+                is_valid = [True]
                 rk = repr_ltd(i, REPR_ID_LENGTH)
 
                 e = {}
                 e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
                 e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
-                e[DICT_KEY_REPR] = repr_ltd(i, repr_limit)
+                e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
+                e[DICT_KEY_IS_VALID] = is_valid[0]
                 e[DICT_KEY_TYPE] = self.__parse_type(type(i))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
@@ -6781,10 +6811,12 @@ class CDebuggerEngine(CDebuggerCore):
 
         if isinstance(r, list) or isinstance(r, tuple):
             for i, v in enumerate(r[0: MAX_NAMESPACE_ITEMS]):
+                is_valid = [True]
                 e = {}
                 e[DICT_KEY_EXPR] = '(%s)[%d]' % (expr, i)
                 e[DICT_KEY_NAME] = repr(i)
-                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
+                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
+                e[DICT_KEY_IS_VALID] = is_valid[0]
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
@@ -6816,9 +6848,10 @@ class CDebuggerEngine(CDebuggerCore):
                     snl.append(MAX_NAMESPACE_WARNING)
                     break
 
+                is_valid = [True]
                 e = {}
 
-                if type(k) in [bool, int, float, str, unicode]:
+                if type(k) in [bool, int, float, str, unicode, type(None)]:
                     rk = repr(k)
                     if len(rk) < REPR_ID_LENGTH:
                         e[DICT_KEY_EXPR] = '(%s)[%s]' % (expr, rk)
@@ -6828,7 +6861,8 @@ class CDebuggerEngine(CDebuggerCore):
                     e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
 
                 e[DICT_KEY_NAME] = [repr_ltd(k, repr_limit), k][fForceNames]
-                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
+                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
+                e[DICT_KEY_IS_VALID] = is_valid[0]
                 e[DICT_KEY_TYPE] = self.__parse_type(type(v))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
@@ -6852,10 +6886,12 @@ class CDebuggerEngine(CDebuggerCore):
                 snl.append(MAX_NAMESPACE_WARNING)
                 break
 
+            is_valid = [True]
             e = {}
             e[DICT_KEY_EXPR] = '(%s).%s' % (expr, a)
             e[DICT_KEY_NAME] = a
-            e[DICT_KEY_REPR] = repr_ltd(v, repr_limit)
+            e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
+            e[DICT_KEY_IS_VALID] = is_valid[0]
             e[DICT_KEY_TYPE] = self.__parse_type(type(v))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
@@ -6906,10 +6942,12 @@ class CDebuggerEngine(CDebuggerCore):
 
             __locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
 
+            is_valid = [True]
             r = eval(expr, __globals, __locals)
 
             e[DICT_KEY_EXPR] = expr
-            e[DICT_KEY_REPR] = repr_ltd(r, repr_limit)
+            e[DICT_KEY_REPR] = repr_ltd(r, repr_limit, is_valid)
+            e[DICT_KEY_IS_VALID] = is_valid[0]
             e[DICT_KEY_TYPE] = self.__parse_type(type(r))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(r)
             
