@@ -1816,6 +1816,13 @@ def repr_list(pattern, l, length):
 
     index = 0
     for i in l:
+        #
+        # Remove any trace of session password from data structures that 
+        # go over the network.
+        #
+        if i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
+            continue
+        
         s += repr_ltd(i, length - len(s))
 
         index += 1
@@ -1839,6 +1846,13 @@ def repr_dict(pattern, d, length):
 
     index = 0
     for k in d:
+        #
+        # Remove any trace of session password from data structures that 
+        # go over the network.
+        #
+        if k in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
+            continue
+        
         v = d[k]
 
         s += repr_ltd(k, length - len(s))
@@ -6501,19 +6515,24 @@ class CDebuggerEngine(CDebuggerCore):
             if line == '':
                 break
 
+            #
+            # Remove any trace of session password from data structures that 
+            # go over the network.
+            #
+
             if fhide_pwd_mode:
                 if not ')' in line:
                     line = '...\n'
                 else:
-                    line = '...)' + line.split(')', 1)[1]
+                    line = '...""")' + line.split(')', 1)[1]
                     fhide_pwd_mode = False
 
             elif 'start_embedded_debugger(' in line:
                 ls = line.split('start_embedded_debugger(', 1)
-                line = ls[0] + 'start_embedded_debugger(' + '...'
+                line = ls[0] + 'start_embedded_debugger("""...Removed-password-from-output...'
                 
                 if ')' in ls[1]:
-                    line += ')' + ls[1].split(')', 1)[1]
+                    line += '""")' + ls[1].split(')', 1)[1]
                 else:
                     line += '\n'
                     fhide_pwd_mode = True
@@ -6584,19 +6603,24 @@ class CDebuggerEngine(CDebuggerCore):
             if line == '':
                 break
 
+            #
+            # Remove any trace of session password from data structures that 
+            # go over the network.
+            #
+
             if fhide_pwd_mode:
                 if not ')' in line:
                     line = '...\n'
                 else:
-                    line = '...)' + line.split(')', 1)[1]
+                    line = '...""")' + line.split(')', 1)[1]
                     fhide_pwd_mode = False
 
             elif 'start_embedded_debugger(' in line:
                 ls = line.split('start_embedded_debugger(', 1)
-                line = ls[0] + 'start_embedded_debugger(' + '...'
+                line = ls[0] + 'start_embedded_debugger("""...Removed-password-from-output...'
                 
                 if ')' in ls[1]:
-                    line += ')' + ls[1].split(')', 1)[1]
+                    line += '""")' + ls[1].split(')', 1)[1]
                 else:
                     line += '\n'
                     fhide_pwd_mode = True
@@ -6779,7 +6803,11 @@ class CDebuggerEngine(CDebuggerCore):
                 kl.sort(cmp = SafeCmp)
 
             for k in kl:
-                if k in ['_RPDB2_FindRepr', '_rpdb2_pwd', '_rpdb2_args']:
+                #
+                # Remove any trace of session password from data structures that 
+                # go over the network.
+                #
+                if k in ['_RPDB2_FindRepr', '_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
                     continue
 
                 v = r[k]
@@ -6949,7 +6977,12 @@ class CDebuggerEngine(CDebuggerCore):
         e = ''
 
         try:
-            r = eval(expr, _globals, _locals)
+            if '_rpdb2_pwd' in expr or '_rpdb2_args' in expr:
+                r = '...Removed-password-from-output...'
+            
+            else:
+                r = eval(expr, _globals, _locals)
+
             v = repr_ltd(r, MAX_EVALUATE_LENGTH)
             
             if len(v) > MAX_EVALUATE_LENGTH:
