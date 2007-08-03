@@ -343,7 +343,7 @@ TIMEOUT_FIVE_MINUTES = 5 * 60.0
 
 
 def start_embedded_debugger(
-            pwd, 
+            _rpdb2_pwd, 
             fAllowUnencrypted = True, 
             fAllowRemote = False, 
             timeout = TIMEOUT_FIVE_MINUTES, 
@@ -354,11 +354,11 @@ def start_embedded_debugger(
     Use 'start_embedded_debugger' to invoke the debugger engine in embedded 
     scripts. put the following line as the first line in your script:
 
-    import rpdb2; rpdb2.start_embedded_debugger(pwd)
+    import rpdb2; rpdb2.start_embedded_debugger(_rpdb2_pwd)
 
     This will cause the script to freeze until a debugger console attaches.
 
-    pwd     - The password that governs security of client/server communication
+    _rpdb2_pwd     - The password that governs security of client/server communication
     fAllowUnencrypted - Allow unencrypted communications. Communication will
                         be authenticated but encrypted only if possible.
     fAllowRemote - Allow debugger consoles from remote machines to connect.
@@ -376,7 +376,7 @@ def start_embedded_debugger(
     """
 
     return __start_embedded_debugger(
-                        pwd, 
+                        _rpdb2_pwd, 
                         fAllowUnencrypted, 
                         fAllowRemote, 
                         timeout, 
@@ -400,10 +400,10 @@ def start_embedded_debugger_interactive_password(
     if stdout is not None:
         stdout.write('Please type password:')
         
-    pwd = stdin.readline().rstrip('\n')
+    _rpdb2_pwd = stdin.readline().rstrip('\n')
     
     return __start_embedded_debugger(
-                        pwd, 
+                        _rpdb2_pwd, 
                         fAllowUnencrypted, 
                         fAllowRemote, 
                         timeout, 
@@ -469,7 +469,7 @@ class CSimpleSessionManager:
     
     def __init__(self, fAllowUnencrypted = True):
         self.__sm = CSessionManagerInternal(
-                            pwd = None, 
+                            _rpdb2_pwd = None, 
                             fAllowUnencrypted = fAllowUnencrypted, 
                             fAllowRemote = False, 
                             host = LOCALHOST
@@ -516,7 +516,7 @@ class CSimpleSessionManager:
         exception is caught.
         """
         
-        pwd = self.__sm.get_password()
+        _rpdb2_pwd = self.__sm.get_password()
             
         si = self.__sm.get_server_info()
         rid = si.m_rid
@@ -526,10 +526,10 @@ class CSimpleSessionManager:
             # On posix systems the password is set at the debuggee via
             # a special temporary file.
             #
-            create_pwd_file(rid, pwd)
-            pwd = None
+            create_pwd_file(rid, _rpdb2_pwd)
+            _rpdb2_pwd = None
 
-        return (rid, pwd)
+        return (rid, _rpdb2_pwd)
 
 
     #
@@ -619,9 +619,9 @@ class CSessionManager:
     You can study the way it is used in StartClient()
     """
     
-    def __init__(self, pwd, fAllowUnencrypted, fAllowRemote, host):
+    def __init__(self, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host):
         self.__smi = CSessionManagerInternal(
-                            pwd, 
+                            _rpdb2_pwd, 
                             fAllowUnencrypted, 
                             fAllowRemote, 
                             host
@@ -1092,13 +1092,13 @@ class CSessionManager:
         return self.__smi.set_thread(tid)
 
 
-    def set_password(self, pwd):
+    def set_password(self, _rpdb2_pwd):
         """
         Set the password that will govern the authentication and encryption
         of client-server communication.
         """
         
-        return self.__smi.set_password(pwd)
+        return self.__smi.set_password(_rpdb2_pwd)
 
 
     def get_password(self):
@@ -2594,12 +2594,12 @@ def generate_random_password():
     s = 'abdefghijmnqrt' + 'ABDEFGHJLMNQRTY'
     ds = '23456789_' + s
         
-    pwd = generate_random_char(s)
+    _rpdb2_pwd = generate_random_char(s)
 
     for i in range(0, 7):
-        pwd += generate_random_char(ds)
+        _rpdb2_pwd += generate_random_char(ds)
 
-    return pwd    
+    return _rpdb2_pwd    
 
 
 
@@ -2738,7 +2738,7 @@ def calc_pwd_file_path(rid):
 
             
 
-def create_pwd_file(rid, pwd):
+def create_pwd_file(rid, _rpdb2_pwd):
     """
     Create password file for Posix systems.
     """
@@ -2750,7 +2750,7 @@ def create_pwd_file(rid, pwd):
 
     fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0600)
     
-    os.write(fd, pwd)
+    os.write(fd, _rpdb2_pwd)
     os.close(fd)
     
         
@@ -2765,10 +2765,10 @@ def read_pwd_file(rid):
     path = calc_pwd_file_path(rid)
 
     p = open(path, 'r')
-    pwd = p.read()
+    _rpdb2_pwd = p.read()
     p.close()
 
-    return pwd
+    return _rpdb2_pwd
     
     
     
@@ -3098,9 +3098,9 @@ class CCrypto:
 
     m_keys = {}
     
-    def __init__(self, pwd, fAllowUnencrypted, rid):
-        self.m_pwd = pwd
-        self.m_key = self.__calc_key(pwd)
+    def __init__(self, _rpdb2_pwd, fAllowUnencrypted, rid):
+        self.m_rpdb2_pwd = _rpdb2_pwd
+        self.m_key = self.__calc_key(_rpdb2_pwd)
         
         self.m_fAllowUnencrypted = fAllowUnencrypted
         self.m_rid = rid
@@ -3118,17 +3118,17 @@ class CCrypto:
         self.m_max_index = 0
 
 
-    def __calc_key(self, pwd):
+    def __calc_key(self, _rpdb2_pwd):
         """
         Create and return a key from a password.
         A Weak password means a weak key.
         """
         
-        if pwd in CCrypto.m_keys:
-            return CCrypto.m_keys[pwd]
+        if _rpdb2_pwd in CCrypto.m_keys:
+            return CCrypto.m_keys[_rpdb2_pwd]
 
         d = md5.new()
-        key = pwd 
+        key = _rpdb2_pwd 
 
         #
         # The following loop takes around a second to complete
@@ -3140,7 +3140,7 @@ class CCrypto:
             d.update(key * 64)       
             key = d.digest()
             
-        CCrypto.m_keys[pwd] = key
+        CCrypto.m_keys[_rpdb2_pwd] = key
 
         return key
         
@@ -6488,7 +6488,8 @@ class CDebuggerEngine(CDebuggerCore):
 
         lines = []
         breakpoints = {}
-        
+        fhide_pwd_mode = False
+
         while nlines != 0:
             try:
                 g_traceback_lock.acquire()
@@ -6499,6 +6500,23 @@ class CDebuggerEngine(CDebuggerCore):
 
             if line == '':
                 break
+
+            if fhide_pwd_mode:
+                if not ')' in line:
+                    line = '...\n'
+                else:
+                    line = '...)' + line.split(')', 1)[1]
+                    fhide_pwd_mode = False
+
+            elif 'start_embedded_debugger(' in line:
+                ls = line.split('start_embedded_debugger(', 1)
+                line = ls[0] + 'start_embedded_debugger(' + '...'
+                
+                if ')' in ls[1]:
+                    line += ')' + ls[1].split(')', 1)[1]
+                else:
+                    line += '\n'
+                    fhide_pwd_mode = True
 
             lines.append(line)
 
@@ -6553,6 +6571,7 @@ class CDebuggerEngine(CDebuggerCore):
         fBlender = is_blender_file(frame_filename)
         lines = []
         breakpoints = {}
+        fhide_pwd_mode = False
         
         while nlines != 0:
             try:
@@ -6564,6 +6583,23 @@ class CDebuggerEngine(CDebuggerCore):
 
             if line == '':
                 break
+
+            if fhide_pwd_mode:
+                if not ')' in line:
+                    line = '...\n'
+                else:
+                    line = '...)' + line.split(')', 1)[1]
+                    fhide_pwd_mode = False
+
+            elif 'start_embedded_debugger(' in line:
+                ls = line.split('start_embedded_debugger(', 1)
+                line = ls[0] + 'start_embedded_debugger(' + '...'
+                
+                if ')' in ls[1]:
+                    line += ')' + ls[1].split(')', 1)[1]
+                else:
+                    line += '\n'
+                    fhide_pwd_mode = True
 
             lines.append(line)
 
@@ -6743,7 +6779,7 @@ class CDebuggerEngine(CDebuggerCore):
                 kl.sort(cmp = SafeCmp)
 
             for k in kl:
-                if k == '_RPDB2_FindRepr':
+                if k in ['_RPDB2_FindRepr', '_rpdb2_pwd', '_rpdb2_args']:
                     continue
 
                 v = r[k]
@@ -6776,6 +6812,9 @@ class CDebuggerEngine(CDebuggerCore):
         al.sort(cmp = SafeCmp)
 
         for a in al:
+            if a == 'm_rpdb2_pwd':
+                continue
+
             try:
                 v = getattr(r, a)
             except AttributeError:
@@ -7311,10 +7350,10 @@ class CIOServer:
     Base class for debuggee server.
     """
     
-    def __init__(self, pwd, fAllowUnencrypted, fAllowRemote, rid):
+    def __init__(self, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
         self.m_thread = None
 
-        self.m_crypto = CCrypto(pwd, fAllowUnencrypted, rid)
+        self.m_crypto = CCrypto(_rpdb2_pwd, fAllowUnencrypted, rid)
         
         self.m_fAllowRemote = fAllowRemote
         self.m_rid = rid
@@ -7493,11 +7532,11 @@ class CDebuggeeServer(CIOServer):
     The debuggee XML RPC server class.
     """
     
-    def __init__(self, filename, debugger, pwd, fAllowUnencrypted, fAllowRemote, rid = None):
+    def __init__(self, filename, debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid = None):
         if rid is None:
             rid = generate_rid()
             
-        CIOServer.__init__(self, pwd, fAllowUnencrypted, fAllowRemote, rid)
+        CIOServer.__init__(self, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
         
         self.m_filename = filename
         self.m_pid = _getpid()
@@ -7746,8 +7785,8 @@ class CSession:
     Basic class that communicates with the debuggee server.
     """
     
-    def __init__(self, host, port, pwd, fAllowUnencrypted, rid):
-        self.m_crypto = CCrypto(pwd, fAllowUnencrypted, rid)
+    def __init__(self, host, port, _rpdb2_pwd, fAllowUnencrypted, rid):
+        self.m_crypto = CCrypto(_rpdb2_pwd, fAllowUnencrypted, rid)
 
         self.m_host = host
         self.m_port = port
@@ -7846,14 +7885,14 @@ class CServerList:
         self.m_errors = {}
 
 
-    def calcList(self, pwd, rid):
+    def calcList(self, _rpdb2_pwd, rid):
         sil = []
         sessions = []
         self.m_errors = {}
 
         port = SERVER_PORT_RANGE_START
         while port < SERVER_PORT_RANGE_START + SERVER_PORT_RANGE_LENGTH:
-            s = CSession(self.m_host, port, pwd, fAllowUnencrypted = True, rid = rid)
+            s = CSession(self.m_host, port, _rpdb2_pwd, fAllowUnencrypted = True, rid = rid)
             t = s.ConnectAsync()
             sessions.append((s, t))
             port += 1
@@ -7901,8 +7940,8 @@ class CServerList:
 
 
 class CSessionManagerInternal:
-    def __init__(self, pwd, fAllowUnencrypted, fAllowRemote, host):
-        self.m_pwd = [pwd, None][pwd in [None, '']]
+    def __init__(self, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host):
+        self.m_rpdb2_pwd = [_rpdb2_pwd, None][_rpdb2_pwd in [None, '']]
         self.m_fAllowUnencrypted = fAllowUnencrypted
         self.m_fAllowRemote = fAllowRemote
         self.m_rid = generate_rid()
@@ -7989,13 +8028,13 @@ class CSessionManagerInternal:
         try:
             for i in range(0,STARTUP_RETRIES):
                 try:
-                    self.m_server_list_object.calcList(self.m_pwd, self.m_rid)
+                    self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)
                     return self.m_server_list_object.findServers(rid)[0]
                 except UnknownServer:
                     time.sleep(STARTUP_TIMEOUT)
                     continue
                     
-            self.m_server_list_object.calcList(self.m_pwd, self.m_rid)
+            self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)
             return self.m_server_list_object.findServers(rid)[0]
 
         finally:
@@ -8014,7 +8053,7 @@ class CSessionManagerInternal:
             self.m_printer(STR_SPAWN_UNSUPPORTED)
             raise SpawnUnsupported
             
-        if self.m_pwd is None:
+        if self.m_rpdb2_pwd is None:
             self.set_random_password()
             
         if command_line == '':
@@ -8034,7 +8073,7 @@ class CSessionManagerInternal:
 
         rid = generate_rid()
 
-        create_pwd_file(rid, self.m_pwd)
+        create_pwd_file(rid, self.m_rpdb2_pwd)
         
         self.m_state_manager.set_state(STATE_SPAWNING)
 
@@ -8124,7 +8163,7 @@ class CSessionManagerInternal:
         e = ['', ' --encrypt'][not self.m_fAllowUnencrypted]
         r = ['', ' --remote'][self.m_fAllowRemote]
         c = ['', ' --chdir'][fchdir]
-        p = ['', ' --pwd="%s"' % (self.m_pwd, )][os.name == 'nt']
+        p = ['', ' --pwd="%s"' % (self.m_rpdb2_pwd, )][os.name == 'nt']
         
         debugger = os.path.abspath(__file__)
         if debugger[-1:] == 'c':
@@ -8165,7 +8204,7 @@ class CSessionManagerInternal:
         if key == '':
             raise BadArgument
 
-        if self.m_pwd is None:
+        if self.m_rpdb2_pwd is None:
             self.m_printer(STR_PASSWORD_MUST_BE_SET)
             raise UnsetPassword
         
@@ -8178,7 +8217,7 @@ class CSessionManagerInternal:
         self.m_state_manager.set_state(STATE_ATTACHING)
 
         try:
-            self.m_server_list_object.calcList(self.m_pwd, self.m_rid)                
+            self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)                
             servers = self.m_server_list_object.findServers(key)
             server = servers[0] 
 
@@ -8231,7 +8270,7 @@ class CSessionManagerInternal:
     def __attach(self, server):
         self.__verify_unattached()
 
-        session = CSession(self.m_host, server.m_port, self.m_pwd, self.m_fAllowUnencrypted, self.m_rid)
+        session = CSession(self.m_host, server.m_port, self.m_rpdb2_pwd, self.m_fAllowUnencrypted, self.m_rid)
         session.Connect()
 
         if (session.getServerInfo().m_pid != server.m_pid) or (session.getServerInfo().m_filename != server.m_filename):
@@ -8659,10 +8698,10 @@ class CSessionManagerInternal:
 
 
     def calc_server_list(self):
-        if self.m_pwd is None:
+        if self.m_rpdb2_pwd is None:
             raise UnsetPassword
         
-        server_list = self.m_server_list_object.calcList(self.m_pwd, self.m_rid)
+        server_list = self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)
         errors = self.m_server_list_object.get_errors()
         self.__report_server_errors(errors)
         
@@ -8782,13 +8821,13 @@ class CSessionManagerInternal:
         return self.m_state_manager.get_state()
 
 
-    def set_password(self, pwd):    
+    def set_password(self, _rpdb2_pwd):    
         try:
             self.m_state_manager.acquire()
 
             self.__verify_unattached()
             
-            self.m_pwd = pwd
+            self.m_rpdb2_pwd = _rpdb2_pwd
         finally:
             self.m_state_manager.release()
 
@@ -8799,7 +8838,7 @@ class CSessionManagerInternal:
 
             self.__verify_unattached()
             
-            self.m_pwd = generate_random_password()
+            self.m_rpdb2_pwd = generate_random_password()
             self.m_printer(STR_RANDOM_PASSWORD)        
 
         finally:
@@ -8807,7 +8846,7 @@ class CSessionManagerInternal:
 
             
     def get_password(self):
-        return self.m_pwd
+        return self.m_rpdb2_pwd
 
 
     def set_remote(self, fAllowRemote):
@@ -9780,17 +9819,17 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     def do_password(self, arg):
         if arg == '':
-            pwd = self.m_session_manager.get_password()
-            if pwd is None:
+            _rpdb2_pwd = self.m_session_manager.get_password()
+            if _rpdb2_pwd is None:
                 print >> self.stdout, STR_PASSWORD_NOT_SET
             else:    
-                print >> self.stdout, STR_PASSWORD_SET % (pwd, )
+                print >> self.stdout, STR_PASSWORD_SET % (_rpdb2_pwd, )
             return
 
-        pwd = arg.strip('"\'')
+        _rpdb2_pwd = arg.strip('"\'')
         
-        self.m_session_manager.set_password(pwd)
-        print >> self.stdout, STR_PASSWORD_SET % (pwd, )
+        self.m_session_manager.set_password(_rpdb2_pwd)
+        print >> self.stdout, STR_PASSWORD_SET % (_rpdb2_pwd, )
 
             
     def do_remote(self, arg):
@@ -10571,7 +10610,7 @@ def _atexit(fabort = False):
         
 
 
-def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDebug):
+def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, fDebug):
     global g_server
     global g_debugger
     global g_fDebug
@@ -10606,7 +10645,7 @@ def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDe
         
         g_debugger = CDebuggerEngine(fembedded = True)
 
-        g_server = CDebuggeeServer(filename, g_debugger, pwd, fAllowUnencrypted, fAllowRemote)
+        g_server = CDebuggeeServer(filename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote)
         g_server.start()
 
         g_debugger.settrace(f, timeout = timeout)
@@ -10616,7 +10655,7 @@ def __start_embedded_debugger(pwd, fAllowUnencrypted, fAllowRemote, timeout, fDe
 
 
     
-def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid): 
+def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid): 
     global g_server
     global g_debugger
     global g_module_main
@@ -10647,7 +10686,7 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     g_debugger = CDebuggerEngine()
 
-    g_server = CDebuggeeServer(ExpandedFilename, g_debugger, pwd, fAllowUnencrypted, fAllowRemote, rid)
+    g_server = CDebuggeeServer(ExpandedFilename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
     g_server.start()
 
     try:
@@ -10673,12 +10712,12 @@ def StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, rid):
         
 
 
-def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRemote, host):
+def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host):
     if (not fAllowUnencrypted) and not is_encryption_supported():
         print STR_ENCRYPTION_SUPPORT_ERROR
         return 2
         
-    sm = CSessionManager(pwd, fAllowUnencrypted, fAllowRemote, host)
+    sm = CSessionManager(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
     c = CConsole(sm)
     c.start()
 
@@ -10732,7 +10771,7 @@ def main(StartClient_func = StartClient):
     create_rpdb_settings_folder()
 
     try:
-        options, args = getopt.getopt(
+        options, _rpdb2_args = getopt.getopt(
                             sys.argv[1:], 
                             'hdao:rtep:sc', 
                             ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'debug']
@@ -10749,7 +10788,7 @@ def main(StartClient_func = StartClient):
     
     secret = None
     host = None
-    pwd = None
+    _rpdb2_pwd = None
     fchdir = False
     fAllowRemote = False
     fAllowUnencrypted = True
@@ -10773,19 +10812,23 @@ def main(StartClient_func = StartClient):
         if o in ['-e', '--encrypt']:
             fAllowUnencrypted = False
         if o in ['-p', '--pwd']:
-            pwd = a
+            _rpdb2_pwd = a
         if o in ['--rid']:
             secret = a
         if o in ['-s', '--screen']:
             g_fScreen = True
         if o in ['-c', '--chdir']:
             fchdir = True
+    
+    options = None
+    o = None
+    a = None
 
-    if (pwd is not None) and (os.name != 'nt'):
+    if (_rpdb2_pwd is not None) and (os.name != 'nt'):
         print STR_PASSWORD_NOT_SUPPORTED
         return 2
 
-    if fWrap and (len(args) == 0):
+    if fWrap and (len(_rpdb2_args) == 0):
         print "--debuggee option requires a script name with optional <script-arg> arguments"
         return 2
         
@@ -10793,11 +10836,11 @@ def main(StartClient_func = StartClient):
         print "--debuggee and --attach can not be used together."
         return 2
         
-    if fAttach and (len(args) == 0):
+    if fAttach and (len(_rpdb2_args) == 0):
         print "--attach option requires a script name to attach to."
         return 2
         
-    if fAttach and (len(args) > 1):
+    if fAttach and (len(_rpdb2_args) > 1):
         print "--attach option does not accept <script-arg> arguments."
         return 2
 
@@ -10812,8 +10855,8 @@ def main(StartClient_func = StartClient):
     if host is None:
         host = LOCALHOST    
 
-    fSpawn = (len(args) != 0) and (not fWrap) and (not fAttach)
-    fStart = (len(args) == 0)
+    fSpawn = (len(_rpdb2_args) != 0) and (not fWrap) and (not fAttach)
+    fStart = (len(_rpdb2_args) == 0)
     
     if fchdir and not (fWrap or fSpawn):
         print "-c can only be used when launching or starting a script from command line."
@@ -10823,33 +10866,33 @@ def main(StartClient_func = StartClient):
 
     if fAttach and (os.name == POSIX):
         try:
-            int(args[0])
+            int(_rpdb2_args[0])
 
-            pwd = read_pwd_file(args[0])
-            delete_pwd_file(args[0])
+            _rpdb2_pwd = read_pwd_file(_rpdb2_args[0])
+            delete_pwd_file(_rpdb2_args[0])
 
         except (ValueError, IOError):
             pass
             
     if (secret is not None) and (os.name == POSIX):
-        pwd = read_pwd_file(secret)
+        _rpdb2_pwd = read_pwd_file(secret)
         
-    if (fWrap or fAttach) and (pwd in [None, '']):
+    if (fWrap or fAttach) and (_rpdb2_pwd in [None, '']):
         print STR_PASSWORD_MUST_BE_SET
         
         while True:
-            _pwd = raw_input(STR_PASSWORD_INPUT)
-            pwd = _pwd.rstrip('\n')
-            if pwd != '':
+            _rpdb2_pwd = raw_input(STR_PASSWORD_INPUT)
+            _rpdb2_pwd = _rpdb2_pwd.rstrip('\n')
+            if _rpdb2_pwd != '':
                 break
 
         print STR_PASSWORD_CONFIRM       
                 
     if fWrap or fSpawn:
         try:
-            FindFile(args[0])
+            FindFile(_rpdb2_args[0])
         except IOError:
-            print STR_FILE_NOT_FOUND % (args[0], )
+            print STR_FILE_NOT_FOUND % (_rpdb2_args[0], )
             return 2
             
     if fWrap:
@@ -10857,21 +10900,21 @@ def main(StartClient_func = StartClient):
             print STR_ENCRYPTION_SUPPORT_ERROR
             return 2
 
-        StartServer(args, fchdir, pwd, fAllowUnencrypted, fAllowRemote, secret)
+        StartServer(_rpdb2_args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, secret)
         
     elif fAttach:
-        StartClient_func(args[0], fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(_rpdb2_args[0], fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
         
     elif fStart:
-        StartClient_func('', fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func('', fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
         
     else:
-        if len(args) == 0:
-            _args = ''
+        if len(_rpdb2_args) == 0:
+            _rpdb2_args = ''
         else:
-            _args = '"' + '" "'.join(args) + '"'
+            _rpdb2_args = '"' + '" "'.join(_rpdb2_args) + '"'
 
-        StartClient_func(_args, fAttach, fchdir, pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(_rpdb2_args, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
    
     return 0
 
