@@ -6757,7 +6757,7 @@ class CDebuggerEngine(CDebuggerCore):
                     g = r
                 else:
                     g = [i for i in r]
-                    g.sort(cmp = SafeCmp)
+                    g.sort(SafeCmp)
 
                 for i in g:
                     if len(snl) >= MAX_NAMESPACE_ITEMS:
@@ -6787,7 +6787,7 @@ class CDebuggerEngine(CDebuggerCore):
                 g = r
             else:
                 g = [i for i in r]
-                g.sort(cmp = SafeCmp)
+                g.sort(SafeCmp)
 
             for i in g:
                 if len(snl) >= MAX_NAMESPACE_ITEMS:
@@ -6832,7 +6832,7 @@ class CDebuggerEngine(CDebuggerCore):
                 kl = r
             else:
                 kl = r.keys()
-                kl.sort(cmp = SafeCmp)
+                kl.sort(SafeCmp)
 
             for k in kl:
                 #
@@ -6871,7 +6871,7 @@ class CDebuggerEngine(CDebuggerCore):
             return snl            
 
         al = self.__calc_attribute_list(r, fFilter)
-        al.sort(cmp = SafeCmp)
+        al.sort(SafeCmp)
 
         for a in al:
             if a == 'm_rpdb2_pwd':
