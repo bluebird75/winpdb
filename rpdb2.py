@@ -10574,7 +10574,7 @@ def __execv(path, args):
 
 g_os_execv = None
 
-if __name__ == 'rpdb2' and os.name == POSIX and 'execv' in dir(os) and os.execv != __execv:
+if __name__ == 'rpdb2' and 'execv' in dir(os) and os.execv != __execv:
     g_os_execv = os.execv
     os.execv = __execv
 
@@ -10599,7 +10599,7 @@ def __execve(path, args, env):
 
 g_os_execve = None
 
-if __name__ == 'rpdb2' and os.name == POSIX and 'execve' in dir(os) and os.execve != __execve:
+if __name__ == 'rpdb2' and 'execve' in dir(os) and os.execve != __execve:
     g_os_execve = os.execve
     os.execve = __execve
 
