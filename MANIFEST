@@ -9,3 +9,4 @@ rpdb2.py
 setup.py
 winpdb
 winpdb.py
+winpdb_inst.py

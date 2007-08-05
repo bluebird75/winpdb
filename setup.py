@@ -39,7 +39,7 @@ if os.name == 'nt':
     write_file('winpdb.bat', ['@python -c "import winpdb;winpdb.main()" %*'])
     copy_file('winpdb', 'winpdb_.pyw')
     
-    _scripts = ['winpdb_.pyw', 'winpdb.bat', 'rpdb2.bat']
+    _scripts = ['winpdb_inst.py', 'winpdb_.pyw', 'winpdb.bat', 'rpdb2.bat']
 
 else:
     _scripts = ['winpdb', 'rpdb2']

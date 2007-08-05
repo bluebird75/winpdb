@@ -280,7 +280,8 @@ import sys
 
 WXVER = "2.6"
 
-STR_WXPYTHON_ERROR = """wxPython was not found.
+STR_WXPYTHON_ERROR_TITLE = 'Winpdb Error'
+STR_WXPYTHON_ERROR_MSG = """wxPython was not found.
 wxPython 2.6 or higher is required to run the winpdb GUI.
 You can get more information on wxPython in http://www.wxpython.org/
 To use the debugger without a GUI, run rpdb2."""
@@ -292,8 +293,21 @@ if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
         import wxversion   
         wxversion.ensureMinimal(WXVER)
     except ImportError:
-        print STR_WXPYTHON_ERROR
+        print >> sys.__stderr__, STR_WXPYTHON_ERROR_MSG
+        
+        try:
+            import Tkinter
+            import tkMessageBox
+
+            Tkinter.Tk().wm_withdraw()
+            tkMessageBox.showerror(STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG)
+
+        except:
+            pass
+
         sys.exit(1)
+
+
 
 import wx
 
