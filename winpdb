@@ -24,6 +24,39 @@
 
 
 
+import sys
+import os
+
+
+
+STR_VERSIONS_ERROR_TITLE = 'Winpdb Error'
+STR_VERSIONS_ERROR_MSG = """Winpdb is being run with the wrong version of Python.
+Winpdb path: %s
+Python path: %s""" % (os.path.abspath(__file__), os.path.abspath(sys.executable))
+
+
+
+if os.name == 'nt':
+    path1 = os.path.abspath(os.path.dirname(sys.executable)).lower()
+    path2 = os.path.abspath(os.path.dirname(__file__)).lower()
+
+    if not path2.startswith(path1):
+        print >> sys.__stderr__, STR_VERSIONS_ERROR_MSG
+        
+        try:
+            import Tkinter
+            import tkMessageBox
+
+            Tkinter.Tk().wm_withdraw()
+            tkMessageBox.showerror(STR_VERSIONS_ERROR_TITLE, STR_VERSIONS_ERROR_MSG)
+
+        except:
+            pass
+
+        sys.exit(1)
+
+
+
 import winpdb
 
 

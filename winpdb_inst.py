@@ -28,21 +28,54 @@ import os
 
 
 
+def PrepareFoder():
+    #
+    # First remove previous directory if found under user\start\program_files.
+    #
+
+    path_user = get_special_folder_path('CSIDL_PROGRAMS')
+    dest_dir = os.path.join(path_user, 'Winpdb')
+
+    if os.path.isdir(dest_dir):
+        for f in os.listdir(dest_dir):
+            p = os.path.join(dest_dir, f)
+            os.remove(p)
+
+        os.rmdir(dest_dir)
+
+    #
+    # Then, try to install under all_users\start\program_files.
+    #
+
+    path_all = get_special_folder_path('CSIDL_COMMON_PROGRAMS')
+    dest_dir = os.path.join(path_all, 'Winpdb')
+
+    if os.path.isdir(dest_dir):
+        return dest_dir
+
+    try:
+        os.mkdir(dest_dir)
+        directory_created(dest_dir)
+
+        return dest_dir
+
+    except:
+        pass
+
+    #
+    # And fall-back to install under user\start\program_files.
+    #
+
+    dest_dir = os.path.join(path_user, 'Winpdb')
+    os.mkdir(dest_dir)
+    directory_created(dest_dir)
+
+    return dest_dir
+
+
+
 def InstallWinpdb():
-    folders = ["CSIDL_COMMON_PROGRAMS", "CSIDL_PROGRAMS"]
-
-    for folder in folders:
-        f = get_special_folder_path(folder)
-        dest_dir = os.path.join(f, 'Winpdb')
-        if os.path.isdir(dest_dir):
-            break
-
-        try:
-            os.mkdir(dest_dir)
-            directory_created(dest_dir)
-
-        except OSError:
-            pass
+    dest_dir = PrepareFoder()
 
     homepage_link = os.path.join(dest_dir, 'winpdb-homepage.lnk')
     create_shortcut('http://www.digitalpeers.com/pythondebugger/','Winpdb Homepage', homepage_link)
