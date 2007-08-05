@@ -354,11 +354,11 @@ def start_embedded_debugger(
     Use 'start_embedded_debugger' to invoke the debugger engine in embedded 
     scripts. put the following line as the first line in your script:
 
-    import rpdb2; rpdb2.start_embedded_debugger(_rpdb2_pwd)
+    import rpdb2; rpdb2.start_embedded_debugger(<some-password-string>)
 
     This will cause the script to freeze until a debugger console attaches.
 
-    _rpdb2_pwd     - The password that governs security of client/server communication
+    _rpdb2_pwd - The password that governs security of client/server communication
     fAllowUnencrypted - Allow unencrypted communications. Communication will
                         be authenticated but encrypted only if possible.
     fAllowRemote - Allow debugger consoles from remote machines to connect.
