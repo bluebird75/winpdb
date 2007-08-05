@@ -1,0 +1,11 @@
+artwork/winpdb-icon.svg
+artwork/winpdb-icon-16.png
+artwork/winpdb-icon-32.png
+artwork/winpdb-icon-64.png
+MANIFEST
+README.txt
+rpdb2
+rpdb2.py
+setup.py
+winpdb
+winpdb.py
