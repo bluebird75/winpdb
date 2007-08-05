@@ -5740,6 +5740,7 @@ class CDebuggerCore:
             return
 
         self.send_fork_switch()
+        time.sleep(0.5)
         g_server.shutdown()
         CThread.joinAll()
 
@@ -5799,6 +5800,7 @@ class CDebuggerCore:
         g_execpid = os.getpid()
 
         self.send_exec_switch()
+        time.sleep(0.5)
         g_server.shutdown()
         CThread.joinAll()
 

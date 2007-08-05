@@ -1823,7 +1823,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         
     def do_save(self, event):
-        self.m_async_sm.with_callback(self.callback_save).load_breakpoints()
+        self.m_async_sm.with_callback(self.callback_save).save_breakpoints()
 
 
     def callback_save(self, r, exc_info):
