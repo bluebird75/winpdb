@@ -3403,7 +3403,17 @@ class CEventPsycoWarning(CEvent):
 
 
 
-class CEventForkSwitch(CEvent):
+class CEventSyncReceivers(CEvent):
+    """
+    A base class for events that sync all receivers before being fired.
+    """
+
+    def __init__(self, sync_n):
+        self.m_sync_n = sync_n
+
+
+
+class CEventForkSwitch(CEventSyncReceivers):
     """
     Debuggee is about to fork. Try to reconnect.
     """
@@ -3412,7 +3422,7 @@ class CEventForkSwitch(CEvent):
 
 
 
-class CEventExecSwitch(CEvent):
+class CEventExecSwitch(CEventSyncReceivers):
     """
     Debuggee is about to exec. Try to reconnect.
     """
@@ -3753,10 +3763,12 @@ class CEventQueue:
     def __init__(self, event_dispatcher, max_event_list_length = MAX_EVENT_LIST_LENGTH):
         self.m_event_dispatcher = event_dispatcher
 
-        self.m_event_lock = threading.Condition(threading.Lock())
+        self.m_event_lock = threading.Condition(threading.RLock())
         self.m_max_event_list_length = max_event_list_length
         self.m_event_list = []
         self.m_event_index = 0
+
+        self.m_n_waiters = []
 
  
     def shutdown(self):
@@ -3770,6 +3782,11 @@ class CEventQueue:
     def event_handler(self, event):
         try:
             self.m_event_lock.acquire()
+
+            if isinstance(event, CEventSyncReceivers):
+                t0 = time.time()
+                while len(self.m_n_waiters) < event.m_sync_n and time.time() < t0 + HEARTBEAT_TIMEOUT:
+                    time.sleep(0.1)
 
             self.m_event_list.append(event)
             if len(self.m_event_list) > self.m_max_event_list_length:
@@ -3792,6 +3809,8 @@ class CEventQueue:
         """
         
         try:
+            self.m_n_waiters.append(0)
+
             self.m_event_lock.acquire()
             if event_index >= self.m_event_index:
                 self.m_event_lock.wait(timeout)
@@ -3803,6 +3822,8 @@ class CEventQueue:
             return (self.m_event_index, sub_event_list)
             
         finally:
+            self.m_n_waiters.pop()
+
             self.m_event_lock.release()
 
 
@@ -5311,7 +5332,7 @@ class CDebuggerCore:
         return self.m_fembedded
 
         
-    def send_fork_switch(self):
+    def send_fork_switch(self, sync_n):
         """
         Notify client that debuggee is forking and that it should
         try to reconnect to the child.
@@ -5319,11 +5340,11 @@ class CDebuggerCore:
         
         print_debug('Sending fork switch event')
 
-        event = CEventForkSwitch()
+        event = CEventForkSwitch(sync_n)
         self.m_event_dispatcher.fire_event(event)
 
 
-    def send_exec_switch(self):
+    def send_exec_switch(self, sync_n):
         """
         Notify client that debuggee is doing an exec and that it should 
         try to reconnect (in case the exec failed).
@@ -5331,7 +5352,7 @@ class CDebuggerCore:
         
         print_debug('Sending exec switch event')
 
-        event = CEventExecSwitch()
+        event = CEventExecSwitch(sync_n)
         self.m_event_dispatcher.fire_event(event)
 
 
@@ -5606,14 +5627,15 @@ class CDebuggerCore:
             self.m_heartbeats[id] = time.time()
 
 
-    def are_clients_attached(self):
+    def get_clients_attached(self):
+        n = 0
         t = time.time()
         
         for v in self.m_heartbeats.values():
             if t < v + HEARTBEAT_TIMEOUT:
-                return True
+                n += 1
 
-        return False
+        return n
 
 
     def _break(self, ctx, frame, event, arg):
@@ -5690,7 +5712,7 @@ class CDebuggerCore:
             self.m_bp_manager.m_fhard_tbp = False
             self.request_go()
 
-        elif not self.are_clients_attached():
+        elif self.get_clients_attached() == 0:
             self.request_go()
 
         else:
@@ -5739,7 +5761,8 @@ class CDebuggerCore:
         if not self.m_ffork_into_child:
             return
 
-        self.send_fork_switch()
+        n = self.get_clients_attached()
+        self.send_fork_switch(n)
         time.sleep(0.5)
         g_server.shutdown()
         CThread.joinAll()
@@ -5799,7 +5822,8 @@ class CDebuggerCore:
         self.m_step_tid = tid
         g_execpid = os.getpid()
 
-        self.send_exec_switch()
+        n = self.get_clients_attached()
+        self.send_exec_switch(n)
         time.sleep(0.5)
         g_server.shutdown()
         CThread.joinAll()
@@ -7879,6 +7903,10 @@ class CSession:
         return self.m_server_info
 
 
+    def pause(self):
+        self.m_fRestart = True
+
+
     def restart(self, sleep = 0, timeout = 10):
         self.m_fRestart = True
 
@@ -7887,15 +7915,20 @@ class CSession:
         t0 = time.time()
 
         try:
-            while time.time() < t0 + timeout:
-                try:
-                    self.Connect()
-                    return
+            try:
+                while time.time() < t0 + timeout:
+                    try:
+                        self.Connect()
+                        return
 
-                except socket.error:
-                    continue
+                    except socket.error:
+                        continue
 
-            raise CConnectionException
+                raise CConnectionException
+
+            except:
+                self.m_fShutDown = True
+                raise
 
         finally:
             self.m_fRestart = False
@@ -8412,15 +8445,16 @@ class CSessionManagerInternal:
                 
                 if True in [isinstance(e, CEventForkSwitch) for e in sel]:
                     print_debug('Received fork switch event.')
-                    self.getSession().restart(sleep = 3)
+                    
+                    self.getSession().pause()
+                    threading.Thread(target = self.restart_session_job).start()
                                 
                 if True in [isinstance(e, CEventExecSwitch) for e in sel]:
                     print_debug('Received exec switch event.')
-                    try:
-                        self.getSession().restart(sleep = 3)
-                    except CConnectionException:
-                        sel.append(CEventExit())
-                                
+                    
+                    self.getSession().pause()
+                    threading.Thread(target = self.restart_session_job, args = (True, )).start()
+                    
                 if True in [isinstance(e, CEventExit) for e in sel]:
                     self.getSession().shut_down()
                     self.m_fStop = True
@@ -8433,8 +8467,10 @@ class CSessionManagerInternal:
                 nfailures = 0
                 
             except CConnectionException:
-                self.report_exception(*sys.exc_info())
-                threading.Thread(target = self.detach_job).start()
+                if not self.m_fStop:
+                    self.report_exception(*sys.exc_info())
+                    threading.Thread(target = self.detach_job).start()
+
                 return
                 
             except socket.error:
@@ -8442,8 +8478,10 @@ class CSessionManagerInternal:
                     nfailures += 1
                     continue
                     
-                self.report_exception(*sys.exc_info())
-                threading.Thread(target = self.detach_job).start()
+                if not self.m_fStop:
+                    self.report_exception(*sys.exc_info())
+                    threading.Thread(target = self.detach_job).start()
+                
                 return
 
 
@@ -8455,7 +8493,26 @@ class CSessionManagerInternal:
         self.m_printer(STR_DEBUGGEE_TERMINATED)        
         threading.Thread(target = self.detach_job).start()
 
-    
+   
+    def restart_session_job(self, fSendExitOnFailure = False):
+        try:
+            self.getSession().restart(sleep = 3)
+            return
+
+        except:
+            pass
+
+        self.m_fStop = True
+
+        if fSendExitOnFailure:
+            e = CEventExit()
+            self.m_event_dispatcher_proxy.fire_event(e)
+            return
+
+        self.m_printer(STR_LOST_CONNECTION)
+        self.detach_job()
+
+
     def detach_job(self):
         try:
             self.detach()
@@ -10777,9 +10834,6 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
     # An exception in this line occurs if
     # there is a syntax error in the debugged script or if
     # there was a problem loading the debugged script.
-    #
-    # Use analyze mode for post mortem.
-    # type 'help analyze' for more information.
     #
     imp.load_source('__main__', ExpandedFilename)    
         
