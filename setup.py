@@ -30,7 +30,10 @@ import os
 
 
 
-LONG_DESC = """Winpdb is a platform independent GPL Python debugger with support for multiple threads, namespace modification, embedded debugging, encrypted communication and is up to 20 times faster than pdb."""
+LONG_DESC = """Winpdb is a platform independent GPL Python debugger 
+with support for multiple threads, namespace modification, 
+embedded debugging, encrypted communication 
+and is up to 20 times faster than pdb."""
 
 
 
@@ -48,7 +51,7 @@ else:
 
 setup(
     name = 'winpdb',
-    version = '1.1.5',
+    version = '1.2.0',
     description = 'A platform independent GPL Python debugger.',
     long_description = LONG_DESC,
     author = 'Nir Aides',
