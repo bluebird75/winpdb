@@ -1479,7 +1479,7 @@ STR_NO_THREADS = "Operation failed since no traced threads were found."
 STR_AUTOMATIC_LAUNCH_UNKNOWN = "RPDB doesn't know how to launch a new terminal on this platform. Please start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
 STR_STARTUP_NOTICE = "Attaching to debuggee..."
 STR_SPAWN_UNSUPPORTED = "Launch command supported on 'posix' and 'nt', systems only. Please start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
-STR_STARTUP_SPAWN_NOTICE = "Spawning debuggee..."
+STR_STARTUP_SPAWN_NOTICE = "Starting debuggee..."
 STR_KILL_NOTICE = "Stopping debuggee..."
 STR_STARTUP_FAILURE = "Debuggee failed to start in a timely manner."
 STR_OUTPUT_WARNING = "Textual output will be done at the debuggee."
@@ -1497,6 +1497,7 @@ STR_BAD_FILENAME = "Bad File Name."
 STR_SOME_BREAKPOINTS_NOT_LOADED = "Some breakpoints were not loaded, because of an error."
 STR_BAD_EXPRESSION = "Bad expression '%s'."
 STR_FILE_NOT_FOUND = "File '%s' not found."
+STR_DISPLAY_ERROR = "If the X server (Windowing system) is not started you need to use the screen utility and invoke rpdb2 in screen mode with the -s command-line flag as follows: screen rpdb2 -s ..."
 STR_EXCEPTION_NOT_FOUND = "No exception was found."
 STR_SCOPE_NOT_FOUND = "Scope '%s' not found."
 STR_NO_SUCH_BREAKPOINT = "Breakpoint not found."
@@ -5704,16 +5705,17 @@ class CDebuggerCore:
         self.handle_exec(ctx)
 
         if self.is_auto_fork_first_stage(ctx.m_thread_id):
-            self.request_go()
+            self.request_go_quiet()
 
         elif self.m_ffork_auto and ffork_second_stage:
             (self.m_step_tid, self.m_next_frame, self.m_return_frame) = self.m_saved_step
             self.m_saved_step = (None, None, None)
             self.m_bp_manager.m_fhard_tbp = False
-            self.request_go()
+            self.request_go_quiet()
 
         elif self.get_clients_attached() == 0:
-            self.request_go()
+            #print_debug('state: %s' % self.m_state_manager.get_state())
+            self.request_go_quiet()
 
         else:
             if f_full_notification:
@@ -5936,6 +5938,14 @@ class CDebuggerCore:
             self.m_state_manager.release()
 
         self.send_events(None)
+
+
+    def request_go_quiet(self, fLock = True):
+        try:
+            self.request_go(fLock)
+        
+        except DebuggerNotBroken:
+            pass
 
 
     def request_go(self, fLock = True):
@@ -9055,6 +9065,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_eInLoop = threading.Event()
         self.cmdqueue.insert(0, '')
 
+        self.m_fdefault_std = (stdin == None)
+
 
     def set_filename(self, filename):
         self.m_filename = filename
@@ -9213,6 +9225,12 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.printer(STR_BAD_ARGUMENT)            
         except IOError:
             self.printer(STR_FILE_NOT_FOUND % (arg, ))
+        except UnknownServer:
+            if os.name == POSIX and not g_fScreen:
+                self.printer(STR_DISPLAY_ERROR)
+
+            self.fPrintBroken = False
+            raise
         except:
             self.fPrintBroken = False
             raise
@@ -10036,7 +10054,7 @@ Session Control:
 host        - Display or change host.
 attach      - Display scripts or attach to a script on host.
 detach      - Detach from script.
-launch      - Spawn a script and attach to it.
+launch      - Start a script and attach to it.
 restart     - Restart a script.
 stop        - Shutdown the debugged script.
 exit        - Exit from debugger.
@@ -10209,7 +10227,7 @@ Shutdown the debugged script."""
     def help_launch(self):
         print >> self.stdout, """launch [-k] <script_name> [<script_args>]
 
-Spawn script <script_name> and attach to it.
+Start script <script_name> and attach to it.
 
 -k  Don't change the current working directory. By default the working
     directory of the launched script is set to its folder."""
@@ -10878,7 +10896,9 @@ def PrintUsage(fExtended = False):
     -p, --pwd       Password. This flag is available only on NT systems. 
                     On other systems the password will be queried interactively 
                     if it is needed.
-    -s, --screen    Use the Unix screen utility when spawning the debuggee.
+    -s, --screen    Use the Unix screen utility when starting the debuggee.
+                    Note that the debugger should be started as follows:
+                    screen rpdb2 -s [options] [<script-name> [<script-args>...]]
     -c, --chdir     Change the working directory to that of the launched 
                     script.
     --debug         Debug prints.

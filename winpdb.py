@@ -286,6 +286,10 @@ wxPython 2.6 or higher is required to run the winpdb GUI.
 You can get more information on wxPython in http://www.wxpython.org/
 To use the debugger without a GUI, run rpdb2."""
 
+STR_X_ERROR_MSG = """It was not possible to start Winpdb. 
+A possible reason is that the X server (Windowing system) is not started.
+Start the X server or try to use rpdb2 instead of winpdb."""
+
 
 
 if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
@@ -3876,7 +3880,17 @@ class CLaunchDialog(wx.Dialog):
 
 def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, host):
     sm = rpdb2.CSessionManager(pwd, fAllowUnencrypted, fRemote, host)
-    app = CWinpdbApp(sm, fchdir, command_line, fAttach, fAllowUnencrypted)
+
+    try:
+        app = CWinpdbApp(sm, fchdir, command_line, fAttach, fAllowUnencrypted)
+
+    except SystemError:
+        if os.name == rpdb2.POSIX:
+            print >> sys.__stderr__, STR_X_ERROR_MSG
+            sys.exit(1)
+
+        raise
+        
     app.MainLoop()
 
 
