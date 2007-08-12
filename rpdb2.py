@@ -10758,6 +10758,25 @@ def _atexit(fabort = False):
         
 
 
+def myimport(*args, **kwargs):
+    if len(args) != 1 or len(kwargs) != 0:
+        return __import__(*args, **kwargs)
+
+    name = args[0]
+    if name in sys.modules:
+        return
+
+    return __import__(name)
+
+
+
+def workaround_import_deadlock():
+    xmlrpclib.loads(XML_DATA)    
+    pickle.loads('(S\'\\xb3\\x95\\xf9\\x1d\\x105c\\xc6\\xe2t\\x9a\\xa5_`\\xa59\'\np0\nS"(I0\\nI1\\nS\'5657827\'\\np0\\n(S\'server_info\'\\np1\\n(tI0\\ntp2\\ntp3\\n."\np1\ntp2\n.0000000')
+    pickle.__import__ = myimport
+
+
+
 def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, fDebug):
     global g_server
     global g_debugger
@@ -10773,8 +10792,8 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
             return
 
         g_fDebug = fDebug
-        
-        xmlrpclib.loads(XML_DATA)    
+       
+        workaround_import_deadlock()
 
         if (not fAllowUnencrypted) and not is_encryption_supported():
             raise EncryptionNotSupported
