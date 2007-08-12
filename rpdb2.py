@@ -272,6 +272,7 @@ import traceback
 import commands
 import tempfile
 import __main__
+import compiler
 import weakref
 import httplib
 import os.path
@@ -2151,7 +2152,8 @@ def IsPythonSourceFile(path):
             if l.startswith('#!') and 'python' in l:
                 return True
 
-        return False
+        compiler.parseFile(path) 
+        return True
 
     except:
         return False

@@ -2150,7 +2150,7 @@ class CSourceManager:
             dlg.Destroy()
             return
 
-        elif t in (IOError, socket.error, rpdb2.CConnectionException):
+        elif t in (IOError, socket.error, rpdb2.CConnectionException, rpdb2.NotPythonSource):
             if fComplain:
                 dlg = wx.MessageDialog(None, STR_FILE_LOAD_ERROR % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
