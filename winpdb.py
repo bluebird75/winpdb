@@ -434,9 +434,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.2.0"
-WINPDB_VERSION = "WINPDB_1_2_0"
-VERSION = (1, 2, 0, 0, '')
+WINPDB_TITLE = "Winpdb 1.2.2"
+WINPDB_VERSION = "WINPDB_1_2_2"
+VERSION = (1, 2, 2, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -3892,8 +3892,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_2_0":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_0", rpdb2.get_version())
+    if rpdb2.get_version() != "RPDB_2_2_2":
+        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_2", rpdb2.get_version())
         return
         
     return rpdb2.main(StartClient)

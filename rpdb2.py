@@ -1,25 +1,25 @@
 #! /usr/bin/env python
 
 """
-rpdb2.py - version 2.2.0
+    rpdb2.py - version 2.2.2
 
-A remote Python debugger for CPython
+    A remote Python debugger for CPython
 
-Copyright (C) 2005-2007 Nir Aides
+    Copyright (C) 2005-2007 Nir Aides
 
-This program is free software; you can redistribute it and/or modify it 
-under the terms of the GNU General Public License as published by the 
-Free Software Foundation; either version 2 of the License, or any later 
-version.
+    This program is free software; you can redistribute it and/or modify it 
+    under the terms of the GNU General Public License as published by the 
+    Free Software Foundation; either version 2 of the License, or any later 
+    version.
 
-This program is distributed in the hope that it will be useful, 
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
-See the GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful, 
+    but WITHOUT ANY WARRANTY; without even the implied warranty of 
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+    See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License along 
-with this program; if not, write to the Free Software Foundation, Inc., 
-51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
+    You should have received a copy of the GNU General Public License along 
+    with this program; if not, write to the Free Software Foundation, Inc., 
+    51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 
 COPYRIGHT_NOTICE = """Copyright (C) 2005-2007 Nir Aides"""
@@ -444,9 +444,9 @@ def setbreak():
 
 
 
-VERSION = (2, 2, 0, 0, '')
-RPDB_VERSION = "RPDB_2_2_0"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_2_0"
+VERSION = (2, 2, 2, 0, '')
+RPDB_VERSION = "RPDB_2_2_2"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_2_2"
 
 
 
@@ -1477,9 +1477,11 @@ PRINT_NOTICE_PROMPT = "Hit Return for more, or q (and Return) to quit:"
 PRINT_NOTICE_LINES_PER_SECTION = 20
 
 STR_NO_THREADS = "Operation failed since no traced threads were found."
-STR_AUTOMATIC_LAUNCH_UNKNOWN = "RPDB doesn't know how to launch a new terminal on this platform. Please start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
 STR_STARTUP_NOTICE = "Attaching to debuggee..."
-STR_SPAWN_UNSUPPORTED = "Launch command supported on 'posix' and 'nt', systems only. Please start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
+STR_SPAWN_UNSUPPORTED = "The debugger does not know how to open a new console on this system. You can start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
+STR_SPAWN_UNSUPPORTED_SCREEN_SUFFIX =  """Alternatively, you can use the screen utility and invoke rpdb2 in screen mode with the -s command-line flag as follows: 
+screen rpdb2 -s some-script.py script-arg1 script-arg2..."""
+STR_AUTOMATIC_LAUNCH_UNKNOWN = STR_SPAWN_UNSUPPORTED
 STR_STARTUP_SPAWN_NOTICE = "Starting debuggee..."
 STR_KILL_NOTICE = "Stopping debuggee..."
 STR_STARTUP_FAILURE = "Debuggee failed to start in a timely manner."
@@ -1498,7 +1500,8 @@ STR_BAD_FILENAME = "Bad File Name."
 STR_SOME_BREAKPOINTS_NOT_LOADED = "Some breakpoints were not loaded, because of an error."
 STR_BAD_EXPRESSION = "Bad expression '%s'."
 STR_FILE_NOT_FOUND = "File '%s' not found."
-STR_DISPLAY_ERROR = "If the X server (Windowing system) is not started you need to use the screen utility and invoke rpdb2 in screen mode with the -s command-line flag as follows: screen rpdb2 -s ..."
+STR_DISPLAY_ERROR = """If the X server (Windowing system) is not started you need to use rpdb2 with the screen utility and invoke rpdb2 in screen mode with the -s command-line flag as follows: 
+screen rpdb2 -s some-script.py script-arg1 script-arg2..."""
 STR_EXCEPTION_NOT_FOUND = "No exception was found."
 STR_SCOPE_NOT_FOUND = "Scope '%s' not found."
 STR_NO_SUCH_BREAKPOINT = "Breakpoint not found."
@@ -1707,6 +1710,7 @@ g_server = None
 g_debugger = None
 
 g_fScreen = False
+g_fDefaultStd = True
 
 #
 # In debug mode errors and tracebacks are printed to stdout
@@ -8180,7 +8184,7 @@ class CSessionManagerInternal:
         (path, filename, args) = split_command_line_path_filename_args(command_line)
 
         #if not IsPythonSourceFile(filename):
-        #    raise IOError
+        #    raise NotPythonSource
 
         _filename = os.path.join(path, filename) 
            
@@ -8197,18 +8201,8 @@ class CSessionManagerInternal:
 
         try:
             try:
-                try:
-                    self._spawn_server(fchdir, ExpandedFilename, args, rid)            
-                except SpawnUnsupported:    
-                    self.m_printer(STR_SPAWN_UNSUPPORTED)
-                    raise
-
-                try:
-                    server = self.__wait_for_debuggee(rid)
-                except UnknownServer:
-                    self.m_printer(STR_STARTUP_FAILURE)
-                    raise
-                    
+                self._spawn_server(fchdir, ExpandedFilename, args, rid)            
+                server = self.__wait_for_debuggee(rid)
                 self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True)
 
                 self.m_last_command_line = command_line
@@ -8364,6 +8358,13 @@ class CSessionManagerInternal:
 
     def report_exception(self, _type, value, tb):
         msg = g_error_mapping.get(_type, STR_ERROR_OTHER)
+        
+        if _type == SpawnUnsupported and os.name == POSIX and not g_fScreen and g_fDefaultStd:
+            msg += ' ' + STR_SPAWN_UNSUPPORTED_SCREEN_SUFFIX
+
+        if _type == UnknownServer and os.name == POSIX and not g_fScreen and g_fDefaultStd:
+            msg += ' ' + STR_DISPLAY_ERROR
+
         _str = msg % {'type': _type, 'value': value, 'traceback': tb}        
         self.m_printer(_str)
 
@@ -9034,6 +9035,8 @@ class CSessionManagerInternal:
 
 class CConsoleInternal(cmd.Cmd, threading.Thread):
     def __init__(self, session_manager, stdin = None, stdout = None, fSplit = False):
+        global g_fDefaultStd
+
         cmd.Cmd.__init__(self, stdin = stdin, stdout = stdout)
         threading.Thread.__init__(self)
         
@@ -9067,7 +9070,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_eInLoop = threading.Event()
         self.cmdqueue.insert(0, '')
 
-        self.m_fdefault_std = (stdin == None)
+        g_fDefaultStd = (stdin == None)
 
 
     def set_filename(self, filename):
@@ -9227,12 +9230,6 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.printer(STR_BAD_ARGUMENT)            
         except IOError:
             self.printer(STR_FILE_NOT_FOUND % (arg, ))
-        except UnknownServer:
-            if os.name == POSIX and not g_fScreen:
-                self.printer(STR_DISPLAY_ERROR)
-
-            self.fPrintBroken = False
-            raise
         except:
             self.fPrintBroken = False
             raise
@@ -10895,8 +10892,13 @@ def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fA
         elif command_line != '':
             sm.launch(fchdir, command_line)
             
+    except (socket.error, CConnectionException):
+        sm.report_exception(*sys.exc_info())
+    except CException:
+        sm.report_exception(*sys.exc_info())
     except:
-        pass
+        sm.report_exception(*sys.exc_info())
+        print_debug_exception(True)
         
     c.join()
 
