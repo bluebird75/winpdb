@@ -36,9 +36,35 @@ Python path: %s""" % (os.path.abspath(__file__), os.path.abspath(sys.executable)
 
 
 
+def expandPath(p):
+    if not '~' in p:
+        return p
+
+    d, b = os.path.split(p)
+
+    if '~' in d:
+        d = expandPath(d)
+
+    if not '~' in b:
+        return os.path.join(d, b)
+
+    _prefix, _index = b.split('~', 1)
+    prefix = _prefix.lower()
+    index = int(_index)
+
+    for f in os.listdir(d):
+        if not f.replace(' ', '').lower().startswith(prefix):
+            continue
+
+        index -= 1
+        if index = 0:
+            return os.path.join(d, f)
+            
+
+
 if os.name == 'nt':
-    path1 = os.path.abspath(os.path.dirname(sys.executable)).lower()
-    path2 = os.path.abspath(os.path.dirname(__file__)).lower()
+    path1 = expandPath(os.path.abspath(os.path.dirname(sys.executable))).lower()
+    path2 = expandPath(os.path.abspath(os.path.dirname(__file__))).lower()
 
     if not path2.startswith(path1):
         print >> sys.__stderr__, STR_VERSIONS_ERROR_MSG
