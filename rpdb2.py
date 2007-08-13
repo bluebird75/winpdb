@@ -1215,13 +1215,6 @@ class CConsole:
 
 
 
-class NotPythonSource(IOError):
-    """
-    Raised when an attempt to load non Python source is made.
-    """
-    
-
-
 class CException(Exception):
     """
     Base exception class for the debugger.
@@ -1230,6 +1223,13 @@ class CException(Exception):
     def __init__(self, *args):
         Exception.__init__(self, *args)
 
+
+
+class NotPythonSource(CException):
+    """
+    Raised when an attempt to load non Python source is made.
+    """
+    
 
 
 class InvalidScopeName(CException):

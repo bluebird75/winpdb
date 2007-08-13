@@ -1810,7 +1810,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def callback_load(self, r, exc_info):
         (t, v, tb) = exc_info
            
-        if t in (socket.error, rpdb2.CException):    
+        if t == socket.error or isinstance(v, rpdb2.CException):    
             error = rpdb2.STR_BREAKPOINTS_LOAD_PROBLEM
         elif t == IOError:     
             error = rpdb2.STR_BREAKPOINTS_NOT_FOUND
@@ -1829,7 +1829,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def callback_save(self, r, exc_info):
         (t, v, tb) = exc_info
            
-        if t in (socket.error, rpdb2.CException, IOError):    
+        if t in (socket.error, IOError) or isinstance(v, rpdb2.CException):    
             error = rpdb2.STR_BREAKPOINTS_SAVE_PROBLEM
         else:
             return
@@ -2150,7 +2150,7 @@ class CSourceManager:
             dlg.Destroy()
             return
 
-        elif t in (IOError, socket.error, rpdb2.CConnectionException, rpdb2.NotPythonSource):
+        elif t in (IOError, socket.error, rpdb2.NotPythonSource) or isinstance(v, rpdb2.CConnectionException):
             if fComplain:
                 dlg = wx.MessageDialog(None, STR_FILE_LOAD_ERROR % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
