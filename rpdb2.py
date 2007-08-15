@@ -8304,6 +8304,8 @@ class CSessionManagerInternal:
             s = 'cd "%s" ; %s' % (os.getcwdu(), command)
             command = CalcMacTerminalCommand(s)
 
+        print_debug('Terminal open string: %s' % repr(command))
+
         if name == MAC:
             terminalcommand.run(command)
         else:
