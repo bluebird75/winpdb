@@ -7,7 +7,7 @@ Contact: Nir Aides
 Email:   nir@digitalpeers.com
 Website: http://www.digitalpeers.com/pythondebugger/
          http://sourceforge.net/projects/winpdb/
-Version: 1.2.2		 
+Version: 1.2.3		 
 
 
 

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.2.2
+    rpdb2.py - version 2.2.3
 
     A remote Python debugger for CPython
 
@@ -444,9 +444,9 @@ def setbreak():
 
 
 
-VERSION = (2, 2, 2, 0, '')
-RPDB_VERSION = "RPDB_2_2_2"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_2_2"
+VERSION = (2, 2, 3, 0, '')
+RPDB_VERSION = "RPDB_2_2_3"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_2_3"
 
 
 
@@ -1225,6 +1225,15 @@ class CException(Exception):
 
 
 
+class BadMBCSPath(CException):
+    """
+    Raised on Windows systems when the python executable or debugger script
+    path can not be encoded with the file system code page. This means that
+    the Windows code page is misconfigured.
+    """
+
+
+
 class NotPythonSource(CException):
     """
     Raised when an attempt to load non Python source is made.
@@ -1521,6 +1530,7 @@ STR_ALREADY_ATTACHED = "Already attached. Detach from debuggee and try again."
 STR_NOT_ATTACHED = "Not attached to any script. Attach to a script and try again."
 STR_COMMUNICATION_FAILURE = "Failed to communicate with debugged script."
 STR_ERROR_OTHER = "Command returned the following error:\n%(type)s, %(value)s.\nPlease check stderr for stack trace and report to support."
+STR_BAD_MBCS_PATH = "The debugger can not launch the script since the path to the Python executable or the debugger scripts can not be encoded into the default system code page. Please check the settings of 'Language for non-Unicode programs' in the Advanced tab of the Windows Regional and Language Options dialog."
 STR_LOST_CONNECTION = "Lost connection to debuggee."
 STR_BAD_VERSION = "A debuggee was found with incompatible debugger version %(value)s."
 STR_BAD_VERSION2 = "While attempting to find the specified debuggee at least one debuggee was found that uses incompatible version of RPDB2."
@@ -1743,7 +1753,8 @@ g_error_mapping = {
     EncryptionExpected: STR_ENCRYPTION_EXPECTED,
     DecryptionFailure: STR_DECRYPTION_FAILURE,
     AuthenticationBadData: STR_ACCESS_DENIED,
-    AuthenticationFailure: STR_ACCESS_DENIED,   
+    AuthenticationFailure: STR_ACCESS_DENIED,
+    BadMBCSPath: STR_BAD_MBCS_PATH,
 
     AlreadyAttached: STR_ALREADY_ATTACHED,    
     NotAttached: STR_NOT_ATTACHED,
@@ -1775,6 +1786,10 @@ g_fsent_psyco_warning = False
 
 g_fignore_atexit = False
 g_ignore_broken_pipe = 0
+
+
+g_frames_path = {}
+g_found_unicode_files = {}
 
 
 
@@ -1827,26 +1842,31 @@ def repr_list(pattern, l, length, is_valid):
     s = ''
 
     index = 0
-    for i in l:
-        #
-        # Remove any trace of session password from data structures that 
-        # go over the network.
-        #
-        if i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
-            continue
-        
-        s += repr_ltd(i, length - len(s), is_valid)
 
-        index += 1
-        
-        if index < len(l) and len(s) > length:
-            is_valid[0] = False
-            if not s.endswith('...'):
-                s += '...'
-            break
+    try:
+        for i in l:
+            #
+            # Remove any trace of session password from data structures that 
+            # go over the network.
+            #
+            if i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
+                continue
+            
+            s += repr_ltd(i, length - len(s), is_valid)
 
-        if index < len(l):
-            s += ', '
+            index += 1
+            
+            if index < len(l) and len(s) > length:
+                is_valid[0] = False
+                if not s.endswith('...'):
+                    s += '...'
+                break
+
+            if index < len(l):
+                s += ', '
+
+    except AttributeError:
+        is_valid[0] = False 
 
     return pattern % s
 
@@ -1858,36 +1878,41 @@ def repr_dict(pattern, d, length, is_valid):
     s = ''
 
     index = 0
-    for k in d:
-        #
-        # Remove any trace of session password from data structures that 
-        # go over the network.
-        #
-        if k in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
-            continue
-        
-        v = d[k]
 
-        s += repr_ltd(k, length - len(s), is_valid)
+    try:
+        for k in d:
+            #
+            # Remove any trace of session password from data structures that 
+            # go over the network.
+            #
+            if k in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
+                continue
+            
+            v = d[k]
 
-        if len(s) > length:
-            is_valid[0] = False
-            if not s.endswith('...'):
-                s += '...'
-            break
+            s += repr_ltd(k, length - len(s), is_valid)
 
-        s +=  ': ' + repr_ltd(v, length - len(s), is_valid)
+            if len(s) > length:
+                is_valid[0] = False
+                if not s.endswith('...'):
+                    s += '...'
+                break
 
-        index += 1
+            s +=  ': ' + repr_ltd(v, length - len(s), is_valid)
 
-        if index < len(d) and len(s) > length:
-            is_valid[0] = False
-            if not s.endswith('...'):
-                s += '...'
-            break
+            index += 1
 
-        if index < len(d):
-            s += ', '
+            if index < len(d) and len(s) > length:
+                is_valid[0] = False
+                if not s.endswith('...'):
+                    s += '...'
+                break
+
+            if index < len(d):
+                s += ', '
+
+    except AttributeError:
+        is_valid[0] = False 
 
     return pattern % s
 
@@ -2070,9 +2095,13 @@ def calc_frame_path(frame):
     if filename.startswith('<'):
         return filename
 
+    if filename in g_frames_path:
+        return g_frames_path[filename]
+
     if os.path.isabs(filename):
         abspath = my_abspath(filename)
-        lowered = winlower(abspath)        
+        lowered = winlower(abspath)
+        g_frames_path[filename] = lowered
         return lowered
         
     globals_file = frame.f_globals.get('__file__', None)
@@ -2083,11 +2112,13 @@ def calc_frame_path(frame):
         path = os.path.join(dirname, basename)        
         abspath = my_abspath(path)
         lowered = winlower(abspath)        
+        g_frames_path[filename] = lowered
         return lowered
 
     try:
         abspath = FindFile(filename, fModules = True)
         lowered = winlower(abspath)    
+        g_frames_path[filename] = lowered
         return lowered
 
     except IOError:
@@ -2144,6 +2175,8 @@ def IsPythonSourceFile(path):
         
     if path.endswith(PYTHONW_FILE_EXTENSION):
         return True
+
+    path = g_found_unicode_files.get(path, path)
 
     try:
         f = open(path, 'r')
@@ -2301,6 +2334,9 @@ def FindFile(
     4. PATH
     """
 
+    if filename in g_found_unicode_files:
+        return filename
+
     if filename.startswith('<'):
         raise IOError
         
@@ -2326,43 +2362,62 @@ def FindFile(
             pass
 
     if os.path.isabs(filename) or filename.startswith('.'):
-        abspath = my_abspath(filename)
-        lowered = winlower(abspath)
-        scriptname = CalcScriptName(lowered, fAllowAnyExt)
-        
-        if os.path.isfile(scriptname):
-            return scriptname
+        try:
+            abspath = my_abspath(filename)
+            lowered = winlower(abspath)
+            scriptname = CalcScriptName(lowered, fAllowAnyExt)
+            
+            if os.path.isfile(scriptname):
+                return scriptname
 
-        #
-        # Check .pyw files
-        #
-        scriptname += 'w'
-        if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
-            return scriptname
-        
-        raise IOError
+            #
+            # Check .pyw files
+            #
+            scriptname += 'w'
+            if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
+                return scriptname
+            
+            scriptname = None
+            raise IOError
+
+        finally:
+            if type(scriptname) == unicode:
+                fse = sys.getfilesystemencoding()
+                _l = scriptname.encode(fse)
+                g_found_unicode_files[_l] = scriptname
+                return _l
 
     scriptname = CalcScriptName(filename, fAllowAnyExt)
-    cwd = os.getcwd()
-    env_path = os.environ['PATH']
-    paths = sources_paths + [cwd] + g_initial_cwd + sys.path + env_path.split(os.pathsep)
     
-    for p in paths:
-        f = os.path.join(p, scriptname)
-        abspath = my_abspath(f)
-        lowered = winlower(abspath)
-        
-        if os.path.isfile(lowered):
-            return lowered
+    cwd = [os.getcwd(), os.getcwdu()]
+    env_path = os.environ['PATH']
+    paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep)
+    
+    try:
+        for p in paths:
+            f = os.path.join(p, scriptname)
+            abspath = my_abspath(f)
+            lowered = winlower(abspath)
+            
+            if os.path.isfile(lowered):
+                return lowered
 
-        #
-        # Check .pyw files
-        #
-        lowered += 'w'
-        if lowered.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(lowered):
-            return lowered
+            #
+            # Check .pyw files
+            #
+            lowered += 'w'
+            if lowered.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(lowered):
+                return lowered
 
-    raise IOError
+        lowered = None
+        raise IOError
+
+    finally:
+        if type(lowered) == unicode:
+            fse = sys.getfilesystemencoding()
+            _l = lowered.encode(fse)
+            g_found_unicode_files[_l] = lowered
+            return _l
 
 
 
@@ -2563,6 +2618,7 @@ def get_source_line(filename, lineno, fBlender):
         except IndexError:
             return '' 
 
+    filename = g_found_unicode_files.get(filename, filename)
     line = linecache.getline(filename, lineno) 
     return line
 
@@ -2976,7 +3032,7 @@ class _RPDB2_FindRepr:
     def __getitem__(self, key):
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit) == key:
+            if repr_ltd(i, self.m_repr_limit).replace('"', '&quot') == key:
                 if isinstance(self.m_object, dict):
                     return self.m_object[i]
 
@@ -2993,7 +3049,7 @@ class _RPDB2_FindRepr:
 
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit) == key:
+            if repr_ltd(i, self.m_repr_limit).replace('"', '&quot') == key:
                 self.m_object[i] = value
                 return
 
@@ -4072,7 +4128,8 @@ class CFileBreakInfo:
             lines = get_blender_source(self.m_filename)
             source = '\n'.join(lines) + '\n'
         else:    
-            f = open(self.m_filename, "r")
+            fn = g_found_unicode_files.get(self.m_filename, self.m_filename)
+            f = open(fn, "r")
             source = f.read()
             f.close()
         
@@ -6223,6 +6280,8 @@ class CDebuggerEngine(CDebuggerCore):
 
 
     def set_breakpoint(self, filename, scope, lineno, fEnabled, expr, frame_index, fException):
+        print_debug('Setting breakpoint to: %s, %s, %d' % (repr(filename), scope, lineno))
+
         if expr != '':
             try:
                 compile(expr, '', 'eval')
@@ -6758,28 +6817,32 @@ class CDebuggerEngine(CDebuggerCore):
     def __calc_number_of_subnodes(self, r):
         if self.__parse_type(type(r)) in BASIC_TYPES_LIST:
             return 0
-        
+       
         try:
-            if isinstance(r, set) or isinstance(r, frozenset):
+            try:
+                if isinstance(r, set) or isinstance(r, frozenset):
+                    return len(r)
+
+            except NameError:
+                pass
+
+            if isinstance(r, sets.BaseSet):
                 return len(r)
 
-        except NameError:
-            pass
+            if isinstance(r, dict):
+                return len(r)
 
-        if isinstance(r, sets.BaseSet):
-            return len(r)
+            if isinstance(r, list):
+                return len(r)
 
-        if isinstance(r, dict):
-            return len(r)
+            if isinstance(r, tuple):
+                return len(r)
 
-        if isinstance(r, list):
-            return len(r)
+            if hasattr(r, '__class__') or hasattr(r, '__bases__'):
+                return 1
 
-        if isinstance(r, tuple):
-            return len(r)
-
-        if hasattr(r, '__class__') or hasattr(r, '__bases__'):
-            return 1
+        except AttributeError:
+            return 0
 
         return 0
 
@@ -6810,7 +6873,7 @@ class CDebuggerEngine(CDebuggerCore):
                     rk = repr_ltd(i, REPR_ID_LENGTH)
 
                     e = {}
-                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
+                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
                     e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
                     e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
                     e[DICT_KEY_IS_VALID] = is_valid[0]
@@ -6840,7 +6903,7 @@ class CDebuggerEngine(CDebuggerCore):
                 rk = repr_ltd(i, REPR_ID_LENGTH)
 
                 e = {}
-                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
+                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
                 e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
                 e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
@@ -6900,7 +6963,7 @@ class CDebuggerEngine(CDebuggerCore):
 
                 if not DICT_KEY_EXPR in e:
                     rk = repr_ltd(k, REPR_ID_LENGTH)
-                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk)
+                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
 
                 e[DICT_KEY_NAME] = [repr_ltd(k, repr_limit), k][fForceNames]
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
@@ -8276,18 +8339,28 @@ class CSessionManagerInternal:
         r = ['', ' --remote'][self.m_fAllowRemote]
         c = ['', ' --chdir'][fchdir]
         p = ['', ' --pwd="%s"' % (self.m_rpdb2_pwd, )][os.name == 'nt']
-        
+       
+        b = ''
+        if ExpandedFilename in g_found_unicode_files:
+            u = g_found_unicode_files[ExpandedFilename]
+            _u = u.encode('utf8')
+            _b = base64.urlsafe_b64encode(_u).strip('\n').replace('=', '#')
+            b = ' --base64=%s' % _b
+
         debugger = os.path.abspath(__file__)
         if debugger[-1:] == 'c':
             debugger = debugger[:-1]
 
         debug_prints = ['', ' --debug'][g_fDebug]    
             
-        options = '"%s"%s --debugee%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, rid, ExpandedFilename, args)
+        options = '"%s"%s --debugee%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, b, rid, ExpandedFilename, args)
 
         python_exec = sys.executable
         if python_exec.endswith('w.exe'):
             python_exec = python_exec[:-5] + '.exe'
+
+        if '?' in python_exec or '?' in debugger:
+            raise BadMBCSPath
 
         if name == POSIX:
             shell = CalcUserShell()
@@ -8306,6 +8379,10 @@ class CSessionManagerInternal:
 
         print_debug('Terminal open string: %s' % repr(command))
 
+        if type(command) == unicode:
+            fse = sys.getfilesystemencoding()
+            command = command.encode(fse)
+        
         if name == MAC:
             terminalcommand.run(command)
         else:
@@ -10827,12 +10904,23 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
     global g_server
     global g_debugger
     global g_module_main
-    
+   
     try:
         ExpandedFilename = FindFile(args[0])
+        _path = g_found_unicode_files.get(ExpandedFilename, ExpandedFilename)
+        
+        if fchdir:   
+            os.chdir(os.path.dirname(_path))
+
+        if type(_path) == unicode:
+            prefix = os.path.join(os.getcwdu(), '')
+            _path = _path.replace(winlower(prefix), '')
+        
     except IOError:
         print 'File', args[0], ' not found.'
         return
+
+    print_debug('Starting server with: %s' % ExpandedFilename)
 
     #
     # Replace the rpdb2.py directory with the script directory in 
@@ -10844,9 +10932,6 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
         spe = os.path.realpath(ExpandedFilename)
 
     sys.path[0] = os.path.dirname(spe)
-
-    if fchdir:   
-        os.chdir(os.path.dirname(ExpandedFilename))
 
     sys.argv = args
 
@@ -10873,7 +10958,7 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
     # there is a syntax error in the debugged script or if
     # there was a problem loading the debugged script.
     #
-    imp.load_source('__main__', ExpandedFilename)    
+    imp.load_source('__main__', _path)    
         
 
 
@@ -10946,7 +11031,7 @@ def main(StartClient_func = StartClient):
         options, _rpdb2_args = getopt.getopt(
                             sys.argv[1:], 
                             'hdao:rtep:sc', 
-                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'debug']
+                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'debug']
                             )
 
     except getopt.GetoptError, e:
@@ -10958,6 +11043,7 @@ def main(StartClient_func = StartClient):
     fSpawn = False
     fStart = False
     
+    encoded_path = None
     secret = None
     host = None
     _rpdb2_pwd = None
@@ -10991,6 +11077,8 @@ def main(StartClient_func = StartClient):
             g_fScreen = True
         if o in ['-c', '--chdir']:
             fchdir = True
+        if o in ['--base64']:
+            encoded_path = a
     
     options = None
     o = None
@@ -11062,6 +11150,11 @@ def main(StartClient_func = StartClient):
                 
     if fWrap or fSpawn:
         try:
+            if encoded_path != None:
+                _u = base64.urlsafe_b64decode(encoded_path.replace('#', '='))
+                _path = _u.decode('utf8')
+                _rpdb2_args[0] = _path
+
             FindFile(_rpdb2_args[0])
         except IOError:
             print STR_FILE_NOT_FOUND % (_rpdb2_args[0], )

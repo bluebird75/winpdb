@@ -434,9 +434,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.2.2"
-WINPDB_VERSION = "WINPDB_1_2_2"
-VERSION = (1, 2, 2, 0, '')
+WINPDB_TITLE = "Winpdb 1.2.3"
+WINPDB_VERSION = "WINPDB_1_2_3"
+VERSION = (1, 2, 3, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -2926,7 +2926,8 @@ class CNamespacePanel(wx.Panel, CJobs):
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
        
         for r in snl:
-            child = self.m_tree.AppendItem(item, r[rpdb2.DICT_KEY_NAME])
+            identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
+            child = self.m_tree.AppendItem(item, identation + r[rpdb2.DICT_KEY_NAME])
             self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_REPR], 2)
             self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_TYPE], 1)
             self.m_tree.SetItemPyData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
@@ -3892,8 +3893,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_2_2":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_2", rpdb2.get_version())
+    if rpdb2.get_version() != "RPDB_2_2_3":
+        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_3", rpdb2.get_version())
         return
         
     return rpdb2.main(StartClient)
