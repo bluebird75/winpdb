@@ -284,6 +284,7 @@ import thread
 import random
 import base64
 import atexit
+import locale
 import errno
 import time
 import copy
@@ -1836,7 +1837,7 @@ def safe_repr(x):
 
 
 
-def repr_list(pattern, l, length, is_valid):
+def repr_list(pattern, l, length, is_valid, fraw = False):
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -1852,7 +1853,7 @@ def repr_list(pattern, l, length, is_valid):
             if i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
                 continue
             
-            s += repr_ltd(i, length - len(s), is_valid)
+            s += repr_ltd(i, length - len(s), is_valid, fraw = fraw)
 
             index += 1
             
@@ -1872,7 +1873,7 @@ def repr_list(pattern, l, length, is_valid):
 
 
 
-def repr_dict(pattern, d, length, is_valid):
+def repr_dict(pattern, d, length, is_valid, fraw = False):
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -1890,7 +1891,7 @@ def repr_dict(pattern, d, length, is_valid):
             
             v = d[k]
 
-            s += repr_ltd(k, length - len(s), is_valid)
+            s += repr_ltd(k, length - len(s), is_valid, fraw = fraw)
 
             if len(s) > length:
                 is_valid[0] = False
@@ -1898,7 +1899,7 @@ def repr_dict(pattern, d, length, is_valid):
                     s += '...'
                 break
 
-            s +=  ': ' + repr_ltd(v, length - len(s), is_valid)
+            s +=  ': ' + repr_ltd(v, length - len(s), is_valid, fraw = fraw)
 
             index += 1
 
@@ -1919,6 +1920,35 @@ def repr_dict(pattern, d, length, is_valid):
 
 
 def repr_str(s, length, is_valid):
+    try:
+        u = s.decode('utf8')
+        r = repr_unicode(u, length, is_valid)
+        return r[1:]
+
+    except:
+        return repr_str_raw(s, length, is_valid)
+
+
+
+def repr_unicode(s, length, is_valid):
+    rs = ''
+
+    for c in s:
+        if len(rs) > length:
+            is_valid[0] = False
+            rs += '...'
+            break
+
+        if ord(c) < 128:
+            rs += repr(c)[2:-1]
+        else:
+            rs += c.encode('utf8')
+
+    return "u'%s'" % rs
+    
+
+
+def repr_str_raw(s, length, is_valid):
     if len(s) > length:
         is_valid[0] = False
         s = s[: length] + '...'
@@ -1938,36 +1968,42 @@ def repr_base(v, length, is_valid):
 
 
 
-def repr_ltd(x, length, is_valid = [True]):
+def repr_ltd(x, length, is_valid = [True], fraw = False):
     length = max(0, length)
 
     try:
         if isinstance(x, set):
-            return repr_list('set([%s])', x, length, is_valid)
+            return repr_list('set([%s])', x, length, is_valid, fraw = fraw)
 
         if isinstance(x, frozenset):
-            return repr_list('frozenset([%s])', x, length, is_valid)
+            return repr_list('frozenset([%s])', x, length, is_valid, fraw = fraw)
 
     except NameError:
         pass
 
     if isinstance(x, sets.Set):
-        return repr_list('sets.Set([%s])', x, length, is_valid)
+        return repr_list('sets.Set([%s])', x, length, is_valid, fraw = fraw)
 
     if isinstance(x, sets.ImmutableSet):
-        return repr_list('sets.ImmutableSet([%s])', x, length, is_valid)
+        return repr_list('sets.ImmutableSet([%s])', x, length, is_valid, fraw = fraw)
 
     if isinstance(x, list):
-        return repr_list('[%s]', x, length, is_valid)
+        return repr_list('[%s]', x, length, is_valid, fraw = fraw)
 
     if isinstance(x, tuple):
-        return repr_list('(%s)', x, length, is_valid)
+        return repr_list('(%s)', x, length, is_valid, fraw = fraw)
 
     if isinstance(x, dict):
-        return repr_dict('{%s}', x, length, is_valid)
+        return repr_dict('{%s}', x, length, is_valid, fraw = fraw)
 
-    if type(x) in [str, unicode]:
+    if fraw and type(x) in [str, unicode]:
+        return repr_str_raw(x, length, is_valid)
+
+    if type(x) == str:
         return repr_str(x, length, is_valid)
+
+    if type(x) == unicode:
+        return repr_unicode(x, length, is_valid)
 
     if type(x) in [bool, int, float, long, type(None)]:
         return repr_base(x, length, is_valid)
@@ -3032,7 +3068,7 @@ class _RPDB2_FindRepr:
     def __getitem__(self, key):
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, fraw = True).replace('"', '&quot') == key:
                 if isinstance(self.m_object, dict):
                     return self.m_object[i]
 
@@ -3049,7 +3085,7 @@ class _RPDB2_FindRepr:
 
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, fraw = True).replace('"', '&quot') == key:
                 self.m_object[i] = value
                 return
 
@@ -3066,7 +3102,7 @@ def SafeCmp(x, y):
     except:
         pass
 
-    return cmp(repr_ltd(x, 256), repr_ltd(y, 256))
+    return cmp(repr_ltd(x, 256, fraw = True), repr_ltd(y, 256, fraw = True))
 
 
 
@@ -6870,7 +6906,7 @@ class CDebuggerEngine(CDebuggerCore):
                         break
                     
                     is_valid = [True]
-                    rk = repr_ltd(i, REPR_ID_LENGTH)
+                    rk = repr_ltd(i, REPR_ID_LENGTH, fraw = True)
 
                     e = {}
                     e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
@@ -6900,7 +6936,7 @@ class CDebuggerEngine(CDebuggerCore):
                     break
 
                 is_valid = [True]
-                rk = repr_ltd(i, REPR_ID_LENGTH)
+                rk = repr_ltd(i, REPR_ID_LENGTH, fraw = True)
 
                 e = {}
                 e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
@@ -6962,7 +6998,7 @@ class CDebuggerEngine(CDebuggerCore):
                         e[DICT_KEY_EXPR] = '(%s)[%s]' % (expr, rk)
 
                 if not DICT_KEY_EXPR in e:
-                    rk = repr_ltd(k, REPR_ID_LENGTH)
+                    rk = repr_ltd(k, REPR_ID_LENGTH, fraw = True)
                     e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
 
                 e[DICT_KEY_NAME] = [repr_ltd(k, repr_limit), k][fForceNames]
@@ -9942,6 +9978,19 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.printer(STR_BAD_ARGUMENT)
             return
             
+        print_debug('do_exec() called with arg: ' + repr(arg))
+
+        if type(arg) == str:
+            try:
+                encoding = self.stdin.encoding
+            except:
+                encoding = locale.getdefaultlocale()[1]
+
+            try:
+               arg = arg.decode(encoding)
+            except:
+                pass
+
         print >> self.stdout, STR_OUTPUT_WARNING
 
         sync_event = threading.Event()
@@ -10884,7 +10933,7 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         # relative paths in __file__ members of modules in the following case.
         #
         if sys.path[0] == '':
-            g_initial_cwd = [os.getcwd()]
+            g_initial_cwd = [os.getcwd(), os.getcwdu()]
             
         atexit.register(_atexit)
         

@@ -338,6 +338,7 @@ import weakref
 import base64
 import socket
 import string
+import locale
 import Queue
 import rpdb2
 import time
@@ -640,6 +641,8 @@ POSITION_TIMEOUT = 2.0
 
 
 g_ignored_warnings = {'': True}
+
+g_fUnicode = 'unicode' in wx.PlatformInfo
 
 
 
@@ -2581,6 +2584,11 @@ class CConsole(wx.Panel, CCaptionManager):
 
 
     def write(self, str):
+        str = str.decode('utf8')
+        if not g_fUnicode:
+            encoding = locale.getdefaultlocale()[1]
+            str = str.encode(encoding, 'replace')
+            
         sl = str.split('\n')
         
         _str = ''
@@ -2926,9 +2934,17 @@ class CNamespacePanel(wx.Panel, CJobs):
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
        
         for r in snl:
+            _name = r[rpdb2.DICT_KEY_NAME].decode('utf8')
+            _repr = r[rpdb2.DICT_KEY_REPR].decode('utf8')
+            
+            if not g_fUnicode:
+                encoding = locale.getdefaultlocale()[1]
+                _name = _name.encode(encoding, 'replace')
+                _repr = _repr.encode(encoding, 'replace')
+
             identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
-            child = self.m_tree.AppendItem(item, identation + r[rpdb2.DICT_KEY_NAME])
-            self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_REPR], 2)
+            child = self.m_tree.AppendItem(item, identation + _name)
+            self.m_tree.SetItemText(child, ' ' + _repr, 2)
             self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_TYPE], 1)
             self.m_tree.SetItemPyData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
             self.m_tree.SetItemHasChildren(child, (r[rpdb2.DICT_KEY_N_SUBNODES] > 0))
