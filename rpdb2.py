@@ -9210,6 +9210,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_encoding = self.stdin.encoding
         except:
             self.m_encoding = locale.getdefaultlocale()[1]
+            if self.m_encoding == None:
+                self.m_encoding = 'ascii'
 
 
     def set_filename(self, filename):

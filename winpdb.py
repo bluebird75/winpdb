@@ -2588,6 +2588,8 @@ class CConsole(wx.Panel, CCaptionManager):
             str = str.decode('utf8')
             if not g_fUnicode:
                 encoding = locale.getdefaultlocale()[1]
+                if encoding == None:
+                    encoding = 'ascii'
                 str = str.encode(encoding, 'replace')
         except:
             pass
@@ -2851,6 +2853,8 @@ class CNamespacePanel(wx.Panel, CJobs):
         if not g_fUnicode and type(_suite) == str:
             try:
                 encoding = locale.getdefaultlocale()[1]
+                if encoding == None:
+                    encoding = 'ascii'
                 _suite = _suite.decode(encoding, 'replace')
             except:
                 pass
@@ -2949,6 +2953,8 @@ class CNamespacePanel(wx.Panel, CJobs):
             
             if not g_fUnicode:
                 encoding = locale.getdefaultlocale()[1]
+                if encoding == None:
+                    encoding = 'ascii'
                 _name = _name.encode(encoding, 'replace')
                 _repr = _repr.encode(encoding, 'replace')
 
