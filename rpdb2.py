@@ -1953,8 +1953,14 @@ def repr_unicode(s, length, is_valid):
         else:
             rs += c.encode('utf8')
 
-    return "u'%s'" % rs
-    
+    if not "'" in rs:
+        return "u'%s'" % rs
+
+    if not '"' in rs:
+        return 'u"%s"' % rs
+   
+    return "u'%s'" % rs.replace("'", "\\'")
+
 
 
 def repr_str_raw(s, length, is_valid):
@@ -7193,7 +7199,9 @@ class CDebuggerEngine(CDebuggerCore):
         Execute suite (Python statement) in context of frame at 
         depth 'frame-index'.
         """
-        
+       
+        print_debug('exec called with: ' + repr(suite))
+
         (_globals, _locals, _original_locals_copy) = self.__get_locals_globals(frame_index, fException)
 
         if frame_index > 0 and not _globals is _locals:
