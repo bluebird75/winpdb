@@ -1789,8 +1789,17 @@ g_fignore_atexit = False
 g_ignore_broken_pipe = 0
 
 
-g_frames_path = {}
+#
+# Unicode version of path names that do not encode well witn the windows 
+# 'mbcs' encoding. This dict is used to work with such path names on
+# windows.
+#
 g_found_unicode_files = {}
+
+g_frames_path = {}
+
+g_safe_base64_to = string.maketrans('/+=', '_-#')
+g_safe_base64_from = string.maketrans('_-#', '/+=')
 
 
 
@@ -2420,7 +2429,8 @@ def FindFile(
             if type(scriptname) == unicode:
                 fse = sys.getfilesystemencoding()
                 _l = scriptname.encode(fse)
-                g_found_unicode_files[_l] = scriptname
+                if '?' in _l:
+                    g_found_unicode_files[_l] = scriptname
                 return _l
 
     scriptname = CalcScriptName(filename, fAllowAnyExt)
@@ -2452,7 +2462,8 @@ def FindFile(
         if type(lowered) == unicode:
             fse = sys.getfilesystemencoding()
             _l = lowered.encode(fse)
-            g_found_unicode_files[_l] = lowered
+            if '?' in _l:
+                g_found_unicode_files[_l] = lowered
             return _l
 
 
@@ -8380,7 +8391,7 @@ class CSessionManagerInternal:
         if ExpandedFilename in g_found_unicode_files:
             u = g_found_unicode_files[ExpandedFilename]
             _u = u.encode('utf8')
-            _b = base64.urlsafe_b64encode(_u).strip('\n').replace('=', '#')
+            _b = base64.encodestring(_u).strip('\n').translate(g_safe_base64_to)
             b = ' --base64=%s' % _b
 
         debugger = os.path.abspath(__file__)
@@ -9187,12 +9198,20 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         g_fDefaultStd = (stdin == None)
 
+        try:
+            self.m_encoding = self.stdin.encoding
+        except:
+            self.m_encoding = locale.getdefaultlocale()[1]
+
 
     def set_filename(self, filename):
         self.m_filename = filename
 
 
     def precmd(self, line):
+        if type(line) == str:
+            line = line.decode(self.m_encoding, 'replace')
+
         self.m_fAddPromptBeforeMsg = True
         if not self.m_eInLoop.isSet():
             self.m_eInLoop.set()
@@ -9978,19 +9997,6 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.printer(STR_BAD_ARGUMENT)
             return
             
-        print_debug('do_exec() called with arg: ' + repr(arg))
-
-        if type(arg) == str:
-            try:
-                encoding = self.stdin.encoding
-            except:
-                encoding = locale.getdefaultlocale()[1]
-
-            try:
-               arg = arg.decode(encoding)
-            except:
-                pass
-
         print >> self.stdout, STR_OUTPUT_WARNING
 
         sync_event = threading.Event()
@@ -11200,7 +11206,7 @@ def main(StartClient_func = StartClient):
     if fWrap or fSpawn:
         try:
             if encoded_path != None:
-                _u = base64.urlsafe_b64decode(encoded_path.replace('#', '='))
+                _u = base64.decodestring(encoded_path.translate(g_safe_base64_from))
                 _path = _u.decode('utf8')
                 _rpdb2_args[0] = _path
 

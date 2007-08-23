@@ -2584,10 +2584,13 @@ class CConsole(wx.Panel, CCaptionManager):
 
 
     def write(self, str):
-        str = str.decode('utf8')
-        if not g_fUnicode:
-            encoding = locale.getdefaultlocale()[1]
-            str = str.encode(encoding, 'replace')
+        try:
+            str = str.decode('utf8')
+            if not g_fUnicode:
+                encoding = locale.getdefaultlocale()[1]
+                str = str.encode(encoding, 'replace')
+        except:
+            pass
             
         sl = str.split('\n')
         
@@ -2844,6 +2847,13 @@ class CNamespacePanel(wx.Panel, CJobs):
         expr_dialog.Destroy()
 
         _suite = "%s = %s" % (expr, _expr)
+
+        if not g_fUnicode and type(_suite) == str:
+            try:
+                encoding = locale.getdefaultlocale()[1]
+                _suite = _suite.decode(encoding, 'replace')
+            except:
+                pass
         
         self.m_async_sm.with_callback(self.callback_execute).execute(_suite)
 
