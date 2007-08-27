@@ -2232,6 +2232,8 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.SetSizer(_sizerv)
         _sizerv.Fit(self)
 
+        self.m_sizerv = sizerv
+
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeyPressed)
         self.Bind(wx.EVT_KEY_UP, self.OnKeyReleased)
         self.Bind(wx.EVT_WINDOW_DESTROY, self.OnDestroyWindow)
@@ -2389,9 +2391,11 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
     
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
-        
-        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + rpdb2.clip_filename(_filename))
-        
+       
+        label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(_filename)
+        self.m_caption.m_static_text.SetLabel(label)
+        self.m_sizerv.Layout()
+
         self.m_cur_filename = _filename
 
         self.set_markers()
@@ -2427,8 +2431,10 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
         
-        self.m_caption.m_static_text.SetLabel(CAPTION_SOURCE + ' ' + rpdb2.clip_filename(filename))
-        
+        label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(filename)
+        self.m_caption.m_static_text.SetLabel(label)
+        self.m_sizerv.Layout()
+
         self.m_cur_filename = filename
 
         self.m_pos_filename = filename
