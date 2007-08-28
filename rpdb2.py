@@ -8160,17 +8160,16 @@ class CServerList:
 
 
     def findServers(self, key):
-        fname = False
-
         try:
             n = int(key)
-        except ValueError:   
-            fname = True
-
-        if fname:
-            _s = [s for s in self.m_list if key in s.m_filename]
-        else:
             _s = [s for s in self.m_list if (s.m_pid == n) or (s.m_rid == key)]
+
+        except ValueError: 
+            if type(key) == unicode:
+                fse = sys.getfilesystemencoding()
+                key = key.encode(fse)
+
+            _s = [s for s in self.m_list if key in s.m_filename]
 
         if _s == []:
             raise UnknownServer

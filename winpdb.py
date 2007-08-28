@@ -396,6 +396,8 @@ STR_BLENDER_SOURCE_WARNING = "You attached to a Blender Python script. To be abl
 STR_EMBEDDED_WARNING = "You attached to an embedded debugger. Winpdb may become unresponsive during periods in which the Python interpreter is inactive."
 STR_EXIT_WARNING = """The debugger is attached to a script. Would you like to stop the script? 
 If you click 'No' the debugger will attempt to detach before exiting."""
+STR_WXPYTHON_ANSI_WARNING_TITLE = 'wxPython ANSI Warning'
+STR_WXPYTHON_ANSI_WARNING_MSG = """The version of wxPython that was found does not support Unicode. You may experience some functionality limitations when debugging Unicode programs with this version of wxPython. If you need to debug Unicode programs it is recommended that you install the Unicode version of wxPython."""
 
 DLG_EXPR_TITLE = "Enter Expression"
 DLG_PWD_TITLE = "Password"
@@ -3926,6 +3928,11 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
         raise
         
+    if not 'unicode' in wx.PlatformInfo:
+        dlg = wx.MessageDialog(None, STR_WXPYTHON_ANSI_WARNING_MSG, STR_WXPYTHON_ANSI_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg.ShowModal()
+        dlg.Destroy()
+    
     app.MainLoop()
 
 
