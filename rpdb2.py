@@ -298,6 +298,11 @@ import imp
 import os
 
 try:
+    import popen2
+except:
+    pass
+
+try:
     from Crypto.Cipher import DES
 except ImportError:
     pass
@@ -1148,6 +1153,33 @@ class CSessionManager:
         return self.__smi.get_remote()
 
 
+    def set_environ(self, envmap):
+        """
+        Set the environment variables mapping. This dictionary will be used 
+        when a new script is launched to modify its environment.
+        Example for a mapping on Windows: {'Path': '%Path%;c:\\mydir'}
+        Example for a mapping on Linux: {'PATH': '$PATH:~/mydir'}
+
+        Keys and Values must be either strings or Unicode strings.
+        Other types will raise the BadArgument exception.
+
+        Unicode string will be encoded with the default locale before 
+        being applied.
+
+        Other kind of invalid arguments will be silently ignored.
+        """
+        
+        return self.__smi.set_environ(envmap)
+
+
+    def get_environ(self):
+        """
+        Return the current environment mapping.
+        """
+        
+        return self.__smi.get_environ()
+
+
     def stop_debuggee(self):
         """
         Stop the debuggee with the os.abort() command.
@@ -1594,6 +1626,7 @@ STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
+STR_ENVIRONMENT = 'Environment mapping is: %s'
 STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
 STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
 STR_FORK_MODE = "Fork mode is set to: %s, %s."
@@ -1771,6 +1804,7 @@ g_error_mapping = {
 #
 g_forkpid = None
 g_forktid = None
+g_fignorefork = False
 
 g_exectid = None
 g_execpid = None
@@ -7282,6 +7316,50 @@ class CDebuggerEngine(CDebuggerCore):
         self.m_event_dispatcher.fire_event(event)
 
 
+    def set_environ(self, envmap):
+        global g_fignorefork
+
+        print_debug('Entered set_environ() with envmap = %s' % repr(envmap))
+
+        if len(envmap) == 0:
+            return
+
+        encoding = locale.getdefaultlocale()[1]
+        if encoding == None:
+            encoding = 'ascii'
+
+        for k, v in envmap.items():
+            if type(k) == unicode:
+                try:
+                    k = k.encode(encoding)
+                except:
+                    continue
+
+            if type(v) == unicode:
+                try:
+                    v = v.encode(encoding)
+                except:
+                    continue
+
+            command = 'echo %s' % v
+            
+            try:
+                g_fignorefork = True
+                (i, o, e) = os.popen3(command)
+
+            finally:
+                g_fignorefork = False
+
+            value = o.read()[:-1]
+
+            os.environ[k] = value
+
+        try:
+            os.wait()
+        except:
+            pass
+
+
     
 #
 # ------------------------------------- RPC Server --------------------------------------------
@@ -7922,6 +8000,11 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
+    def export_set_environ(self, envmap):
+        self.m_debugger.set_environ(envmap)
+        return 0
+
+
         
 #
 # ------------------------------------- RPC Client --------------------------------------------
@@ -8240,6 +8323,8 @@ class CSessionManagerInternal:
 
         self.m_ffork_into_child = False
         self.m_ffork_auto = False
+
+        self.m_environment = {}
         
     
     def __del__(self):
@@ -8321,7 +8406,7 @@ class CSessionManagerInternal:
             try:
                 self._spawn_server(fchdir, ExpandedFilename, args, rid)            
                 server = self.__wait_for_debuggee(rid)
-                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True)
+                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True)
 
                 self.m_last_command_line = command_line
                 self.m_last_fchdir = fchdir
@@ -8444,7 +8529,7 @@ class CSessionManagerInternal:
             os.popen(command)
 
     
-    def attach(self, key, name = None, fsupress_pwd_warning = False):
+    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False):
         self.__verify_unattached()
 
         if key == '':
@@ -8473,7 +8558,7 @@ class CSessionManagerInternal:
             if not key in [server.m_rid, str(server.m_pid)]:
                 self.__report_server_errors(errors, fsupress_pwd_warning)
 
-            self.__attach(server)
+            self.__attach(server, fsetenv)
             if len(servers) > 1:
                 self.m_printer(STR_MULTIPLE_DEBUGGEES % (key, ))
             self.m_printer(STR_ATTACH_CRYPTO_MODE % ([' ' + STR_ATTACH_CRYPTO_MODE_NOT, ''][self.get_encryption()], ))    
@@ -8520,7 +8605,7 @@ class CSessionManagerInternal:
             self.report_exception(t, v, tb)    
 
         
-    def __attach(self, server):
+    def __attach(self, server, fsetenv):
         self.__verify_unattached()
 
         session = CSession(self.m_host, server.m_port, self.m_rpdb2_pwd, self.m_fAllowUnencrypted, self.m_rid)
@@ -8535,6 +8620,9 @@ class CSessionManagerInternal:
 
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
         self.getSession().getProxy().set_fork_mode(self.m_ffork_into_child, self.m_ffork_auto)
+
+        if fsetenv and len(self.m_environment) != 0:
+            self.getSession().getProxy().set_environ(self.m_environment)
 
         self.request_break()
         self.refresh(True)
@@ -9139,6 +9227,23 @@ class CSessionManagerInternal:
 
     def get_remote(self):
         return self.m_fAllowRemote
+
+
+    def set_environ(self, envmap):
+        self.m_environment = {}
+
+        for k, v in envmap.items(): 
+            if not type(k) in [str, unicode]:
+                raise BadArgument
+
+            if not type(v) in [str, unicode]:
+                raise BadArgument
+
+            self.m_environment[k] = v
+
+
+    def get_environ(self):
+        return self.m_environment
 
 
     def stop_debuggee(self):
@@ -10141,6 +10246,26 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         print >> self.stdout, STR_REMOTE_MODE % (str(fAllowRemote), )
 
 
+    def do_env(self, arg):
+        if arg == '':
+            env = self.m_session_manager.get_environ()
+            print >> self.stdout, STR_ENVIRONMENT % repr(env)
+            return
+
+        try:
+            expr = arg.strip()[1:]
+            envmap = eval(expr)
+            if type(envmap) != dict:
+                self.printer(STR_BAD_ARGUMENT)
+                return
+
+        except:
+            self.printer(STR_BAD_ARGUMENT)
+            return
+
+        self.m_session_manager.set_environ(envmap)
+
+
     def do_stop(self, arg):        
         self.m_session_manager.stop_debuggee()
             
@@ -10194,6 +10319,7 @@ remote      - Get or set "allow connections from remote machines" mode.
 Session Control:
 -----------------
 
+env         - Display or set the environment setting for new sessions.
 host        - Display or change host.
 attach      - Display scripts or attach to a script on host.
 detach      - Detach from script.
@@ -10710,7 +10836,33 @@ Type 'help up' or 'help down' for more information on focused frames."""
 
     help_x = help_exec
 
-    
+
+    def help_env(self):
+        print >> self.stdout, """env [= mapping]
+
+Set the environment variables mapping. This setting will be 
+used when a new script is launched to modify its environment.
+
+Example for a mapping on Windows: 
+env = {'Path': '%Path%;c:\\mydir'}
+
+Example for a mapping on Linux: 
+env = {'PATH': '$PATH:~/mydir'}
+
+Keys and Values must be either strings or Unicode strings.
+Other types will raise the BadArgument exception.
+
+Unicode string will be encoded with the default locale before 
+being applied.
+
+Other kind of invalid arguments will be silently ignored.
+
+Without an argument returns the current mapping.
+
+Note that the mapping will be used to modify the environment
+after the debugger has imported the modules it requires."""  
+
+
 
 #
 # ---------------------------------------- Replacement Functions ------------------------------------
@@ -10720,7 +10872,9 @@ Type 'help up' or 'help down' for more information on focused frames."""
 
 def __fork():
     global g_forktid
-    g_forktid = setbreak()
+    
+    if not g_fignorefork:
+        g_forktid = setbreak()
 
     #
     # os.fork() has been called. 
@@ -10778,7 +10932,7 @@ if __name__ == 'rpdb2' and '_exit' in dir(os) and os._exit != __exit:
 def __execv(path, args):
     global g_exectid
     
-    if os.path.isfile(path):
+    if os.path.isfile(path) and not g_fignorefork:
         g_exectid = setbreak()
 
     #
@@ -10803,7 +10957,7 @@ if __name__ == 'rpdb2' and 'execv' in dir(os) and os.execv != __execv:
 def __execve(path, args, env):
     global g_exectid
 
-    if os.path.isfile(path):
+    if os.path.isfile(path) and not g_fignorefork:
         g_exectid = setbreak()
 
     #
