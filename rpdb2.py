@@ -1423,6 +1423,7 @@ osSpawn = {
     'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%(exec)s" %(options)s"', 
     NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%(exec)s" %(options)s"', 
     POSIX: "%(term)s -e %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
+    'Terminal': "Terminal --disable-server -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
     GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
     MAC: '%(exec)s %(options)s',
     DARWIN: '%(exec)s %(options)s',
@@ -8420,8 +8421,8 @@ class CSessionManagerInternal:
             shell = CalcUserShell()
             terminal_command = CalcTerminalCommand()
 
-            if terminal_command == GNOME_DEFAULT_TERM:
-                command = osSpawn[GNOME_DEFAULT_TERM] % {'shell': shell, 'exec': python_exec, 'options': options}
+            if terminal_command in osSpawn:
+                command = osSpawn[terminal_command] % {'shell': shell, 'exec': python_exec, 'options': options}
             else:    
                 command = osSpawn[name] % {'term': terminal_command, 'shell': shell, 'exec': python_exec, 'options': options}
         else:    

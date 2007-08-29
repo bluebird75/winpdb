@@ -283,7 +283,9 @@ WXVER = "2.6"
 STR_WXPYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_WXPYTHON_ERROR_MSG = """wxPython was not found.
 wxPython 2.6 or higher is required to run the winpdb GUI.
-You can get more information on wxPython in http://www.wxpython.org/
+wxPython is the graphical user interface toolkit used by Winpdb.
+You can find more information on wxPython at http://www.wxpython.org/
+The Unicode version of wxPython is recommended for Winpdb.
 To use the debugger without a GUI, run rpdb2."""
 
 STR_X_ERROR_MSG = """It was not possible to start Winpdb. 
@@ -397,7 +399,7 @@ STR_EMBEDDED_WARNING = "You attached to an embedded debugger. Winpdb may become 
 STR_EXIT_WARNING = """The debugger is attached to a script. Would you like to stop the script? 
 If you click 'No' the debugger will attempt to detach before exiting."""
 STR_WXPYTHON_ANSI_WARNING_TITLE = 'wxPython ANSI Warning'
-STR_WXPYTHON_ANSI_WARNING_MSG = """The version of wxPython that was found does not support Unicode. You may experience some functionality limitations when debugging Unicode programs with this version of wxPython. If you need to debug Unicode programs it is recommended that you install the Unicode version of wxPython."""
+STR_WXPYTHON_ANSI_WARNING_MSG = """The version of wxPython that was found does not support Unicode. wxPython is the graphical user interface toolkit used by Winpdb. You may experience some functionality limitations when debugging Unicode programs with this version of wxPython. If you need to debug Unicode programs it is recommended that you install the Unicode version of wxPython. You can find more information on wxPython at http://www.wxpython.org/"""
 
 DLG_EXPR_TITLE = "Enter Expression"
 DLG_PWD_TITLE = "Password"
