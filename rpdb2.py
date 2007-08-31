@@ -1452,8 +1452,8 @@ POSIX = 'posix'
 # accommodate scenarios of scripts with child processes.
 #
 osSpawn = {
-    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%(exec)s" %(options)s"', 
-    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd /k ""%(exec)s" %(options)s"', 
+    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd.exe /K ""%(exec)s" %(options)s"', 
+    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd.exe /K ""%(exec)s" %(options)s"', 
     POSIX: "%(term)s -e %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
     'Terminal': "Terminal --disable-server -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
     GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &", 
