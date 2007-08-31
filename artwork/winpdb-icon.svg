@@ -9,15 +9,17 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="744.09448819"
-   height="1052.3622047"
+   width="512"
+   height="512"
    id="svg2"
    sodipodi:version="0.32"
    inkscape:version="0.45"
-   sodipodi:docname="ladybug.xcf"
+   sodipodi:docname="ladybug.svg"
    sodipodi:docbase="/home/nir/other/artwork/ladybug3"
-   inkscape:output_extension="org.ekips.output.gimp_xcf"
-   inkscape:dataloss="true">
+   inkscape:output_extension="org.inkscape.output.svg.inkscape"
+   inkscape:dataloss="true"
+   sodipodi:modified="true"
+   version="1.0">
   <defs
      id="defs4">
     <linearGradient
@@ -193,16 +195,18 @@
      objecttolerance="10"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.349112"
-     inkscape:cx="339.87285"
-     inkscape:cy="673.84992"
+     inkscape:zoom="0.63096148"
+     inkscape:cx="372.04724"
+     inkscape:cy="526.18109"
      inkscape:document-units="px"
      inkscape:current-layer="g14354"
      inkscape:window-width="1280"
      inkscape:window-height="883"
      inkscape:window-x="0"
      inkscape:window-y="25"
-     showgrid="true" />
+     showgrid="true"
+     width="512px"
+     height="512px" />
   <metadata
      id="metadata7">
     <rdf:RDF>
@@ -217,16 +221,18 @@
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
-     id="layer1">
+     id="layer1"
+     transform="translate(-87.855967,-126.49464)">
     <g
        id="g14354"
        transform="translate(-8.3889169,22.769917)"
        inkscape:export-xdpi="90"
        inkscape:export-ydpi="90">
       <g
-         id="g17330">
+         id="g17330"
+         transform="translate(4,4)">
         <path
-           style="fill:#ffd040;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:12;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+           style="fill:#ffd040;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:12;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
            inkscape:transform-center-x="33.688005"
            inkscape:transform-center-y="159.70301"
            d="M 455.22102,246.63 C 552.01044,269.08478 612.34,365.86269 589.88522,462.65211 C 567.43042,559.44153 470.65251,619.77109 373.8631,597.31631 C 306.80336,581.7587 257.67364,533.91666 240.34088,467.29366 L 455.92581,379.9982 L 455.22102,246.63 z "
@@ -269,7 +275,8 @@
            sodipodi:nodetypes="ccc" />
       </g>
       <g
-         id="g3317">
+         id="g3317"
+         transform="translate(4,4)">
         <g
            id="g14331"
            transform="matrix(0.5910958,0,0,0.5967394,59.73685,227.47039)">
