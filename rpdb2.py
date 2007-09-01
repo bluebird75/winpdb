@@ -3158,6 +3158,20 @@ def SafeCmp(x, y):
 
 
 
+def recalc_sys_path(old_pythonpath):
+    del sys.path[1: 1 + len(old_pythonpath)]
+
+    pythonpath = os.environ.get('PYTHONPATH', '')
+    ppl = pythonpath.split(os.path.pathsep)
+
+    for i, p in enumerate(ppl):
+        abspath = my_abspath(p)
+        lowered = winlower(abspath)
+
+        sys.path.insert(1 + i, lowered)
+
+
+
 #
 # ---------------------------------- CThread ---------------------------------------
 #
@@ -7324,6 +7338,8 @@ class CDebuggerEngine(CDebuggerCore):
         if len(envmap) == 0:
             return
 
+        old_pythonpath = os.environ.get('PYTHONPATH', '')
+
         encoding = locale.getdefaultlocale()[1]
         if encoding == None:
             encoding = 'ascii'
@@ -7358,6 +7374,9 @@ class CDebuggerEngine(CDebuggerCore):
             os.wait()
         except:
             pass
+
+        if 'PYTHONPATH' in envmap.keys():
+            recalc_sys_path(old_pythonpath)
 
 
     
