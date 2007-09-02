@@ -408,10 +408,8 @@ DLG_LAUNCH_TITLE = "Launch"
 DLG_ATTACH_TITLE = "Attach"
 STATIC_EXPR = """The new expression will be evaluated at the debuggee
 and its value will be set to the item."""
-STATIC_PWD = """The password is used to secure communication between
-the debugger console and the debuggee. Debuggees with
-un-matching passwords will not appear in the attach
-query list."""
+STATIC_PWD = """The password is used to secure communication between the debugger console and the debuggee. Debuggees with un-matching passwords will not appear in the attach query list."""
+STATIC_LAUNCH_ENV = """To set environment variables for the new script use the 'env' console command."""
 STATIC_OPEN = """The source file entered will be fetched from the debugee."""
 LABEL_EXPR = "New Expression:"
 LABEL_PWD = "Set password:"
@@ -3684,8 +3682,9 @@ class CPwdDialog(wx.Dialog):
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
 
-        label = wx.StaticText(self, -1, STATIC_PWD)
-        sizerv.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
+        label = wx.StaticText(self, -1, STATIC_PWD, size = (300, -1))
+        label.Wrap(300)
+        sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
 
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
@@ -3807,6 +3806,7 @@ class COpenDialog(wx.Dialog):
 class CLaunchDialog(wx.Dialog):
     def __init__(self, parent, fchdir = True, command_line = ''):
         wx.Dialog.__init__(self, parent, -1, DLG_LAUNCH_TITLE)
+        
         sizerv = wx.BoxSizer(wx.VERTICAL)
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
@@ -3827,8 +3827,11 @@ class CLaunchDialog(wx.Dialog):
         self.m_cb.SetValue(fchdir)
         sizerv.Add(self.m_cb, 0, wx.ALIGN_LEFT | wx.ALL, 5)
         
+        label = wx.StaticText(self, -1, STATIC_LAUNCH_ENV, size = (400, -1))
+        label.Wrap(400)
+        sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        
         btnsizer = wx.StdDialogButtonSizer()
-        sizerv.Add(btnsizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
         self.m_ok = wx.Button(self, wx.ID_OK)
         self.Bind(wx.EVT_BUTTON, self.do_ok, self.m_ok)
@@ -3842,9 +3845,11 @@ class CLaunchDialog(wx.Dialog):
         btnsizer.AddButton(btn)
         btnsizer.Realize()
 
+        sizerv.Add(btnsizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
         self.SetSizer(sizerv)
         sizerv.Fit(self)        
-
+        
 
     def OnText(self, event):
         if event.GetString() == '':

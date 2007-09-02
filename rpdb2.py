@@ -1155,13 +1155,16 @@ class CSessionManager:
 
     def set_environ(self, envmap):
         """
-        Set the environment variables mapping. This dictionary will be used 
+        Set the environment variables mapping. This mapping is used 
         when a new script is launched to modify its environment.
-        Example for a mapping on Windows: {'Path': '%Path%;c:\\mydir'}
-        Example for a mapping on Linux: {'PATH': '$PATH:~/mydir'}
+        
+        Example for a mapping on Windows: [('Path', '%Path%;c:\\mydir')]
+        Example for a mapping on Linux: [('PATH', '$PATH:~/mydir')]
 
-        Keys and Values must be either strings or Unicode strings.
-        Other types will raise the BadArgument exception.
+        The mapping should be a list of tupples where each tupple is
+        composed of a key and a value. Keys and Values must be either 
+        strings or Unicode strings. Other types will raise the BadArgument 
+        exception.
 
         Unicode string will be encoded with the default locale before 
         being applied.
@@ -1626,7 +1629,8 @@ STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
-STR_ENVIRONMENT = 'Environment mapping is: %s'
+STR_ENVIRONMENT = 'The current environment mapping is:'
+STR_ENVIRONMENT_EMPTY = 'The current environment mapping is not set.'
 STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
 STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
 STR_FORK_MODE = "Fork mode is set to: %s, %s."
@@ -7344,7 +7348,7 @@ class CDebuggerEngine(CDebuggerCore):
         if encoding == None:
             encoding = 'ascii'
 
-        for k, v in envmap.items():
+        for k, v in envmap:
             if type(k) == unicode:
                 try:
                     k = k.encode(encoding)
@@ -7375,7 +7379,7 @@ class CDebuggerEngine(CDebuggerCore):
         except:
             pass
 
-        if 'PYTHONPATH' in envmap.keys():
+        if 'PYTHONPATH' in [k for (k, v) in envmap]:
             recalc_sys_path(old_pythonpath)
 
 
@@ -8343,7 +8347,7 @@ class CSessionManagerInternal:
         self.m_ffork_into_child = False
         self.m_ffork_auto = False
 
-        self.m_environment = {}
+        self.m_environment = []
         
     
     def __del__(self):
@@ -9249,16 +9253,16 @@ class CSessionManagerInternal:
 
 
     def set_environ(self, envmap):
-        self.m_environment = {}
+        self.m_environment = []
 
-        for k, v in envmap.items(): 
+        for k, v in envmap: 
             if not type(k) in [str, unicode]:
                 raise BadArgument
 
             if not type(v) in [str, unicode]:
                 raise BadArgument
 
-            self.m_environment[k] = v
+            self.m_environment.append((k, v))
 
 
     def get_environ(self):
@@ -10266,23 +10270,37 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
 
     def do_env(self, arg):
+        env = self.m_session_manager.get_environ()
+
         if arg == '':
-            env = self.m_session_manager.get_environ()
-            print >> self.stdout, STR_ENVIRONMENT % repr(env)
+            if len(env) == 0:
+                print >> self.stdout, STR_ENVIRONMENT_EMPTY
+                return
+
+            print >> self.stdout, STR_ENVIRONMENT
+            for k, v in env:
+                print >> self.stdout, '%s=%s' % (k, v)
+            return
+
+        if arg[:2] == '-d':
+            k = arg[2:].strip()
+            _env = [(_k, _v) for (_k, _v) in env if _k != k]
+            self.m_session_manager.set_environ(_env)
             return
 
         try:
-            expr = arg.strip()[1:]
-            envmap = eval(expr)
-            if type(envmap) != dict:
-                self.printer(STR_BAD_ARGUMENT)
-                return
+            k, v = arg.split('=')
+            k = k.strip()
+            v = v.strip()
 
-        except:
+        except ValueError:
             self.printer(STR_BAD_ARGUMENT)
             return
 
-        self.m_session_manager.set_environ(envmap)
+        _env = [(_k, _v) for (_k, _v) in env if _k != k]
+        _env.append((k, v))
+
+        self.m_session_manager.set_environ(_env)
 
 
     def do_stop(self, arg):        
@@ -10857,29 +10875,27 @@ Type 'help up' or 'help down' for more information on focused frames."""
 
 
     def help_env(self):
-        print >> self.stdout, """env [= mapping]
+        print >> self.stdout, """env [-d key | key = value] 
 
-Set the environment variables mapping. This setting will be 
-used when a new script is launched to modify its environment.
+Set the environment variables mapping. This mapping is used 
+when a new script is launched to modify its environment.
 
 Example for a mapping on Windows: 
-env = {'Path': '%Path%;c:\\mydir'}
+env Path = %Path%;c:\\mydir
 
 Example for a mapping on Linux: 
-env = {'PATH': '$PATH:~/mydir'}
+env PATH = $PATH:~/mydir
 
-Keys and Values must be either strings or Unicode strings.
-Other types will raise the BadArgument exception.
+To delete the mapping for PATH
+env -d PATH
 
-Unicode string will be encoded with the default locale before 
-being applied.
+Without an argument returns the current list of mappings.
 
-Other kind of invalid arguments will be silently ignored.
-
-Without an argument returns the current mapping.
-
-Note that the mapping will be used to modify the environment
-after the debugger has imported the modules it requires."""  
+Note that the mapping will be evaluated and used to modify 
+the environment after the debugger engine at the debuggee
+has imported the modules it requires. The order in which the
+mappings will be evaluated and applied is: 
+last set, last evaluated."""  
 
 
 
