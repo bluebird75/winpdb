@@ -409,7 +409,13 @@ DLG_ATTACH_TITLE = "Attach"
 STATIC_EXPR = """The new expression will be evaluated at the debuggee
 and its value will be set to the item."""
 STATIC_PWD = """The password is used to secure communication between the debugger console and the debuggee. Debuggees with un-matching passwords will not appear in the attach query list."""
+STATIC_PWD_SPLIT = """The password is used to secure communication 
+between the debugger console and the debuggee. 
+Debuggees with un-matching passwords will not 
+appear in the attach query list."""
 STATIC_LAUNCH_ENV = """To set environment variables for the new script use the 'env' console command."""
+STATIC_LAUNCH_ENV_SPLIT = """To set environment variables for the new script use the 'env' 
+console command."""
 STATIC_OPEN = """The source file entered will be fetched from the debugee."""
 LABEL_EXPR = "New Expression:"
 LABEL_PWD = "Set password:"
@@ -3683,8 +3689,12 @@ class CPwdDialog(wx.Dialog):
         sizerv = wx.BoxSizer(wx.VERTICAL)
 
         label = wx.StaticText(self, -1, STATIC_PWD, size = (300, -1))
-        label.Wrap(300)
-        sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        try:
+            label.Wrap(300)
+        except:
+            label.SetLabel(STATIC_PWD_SPLIT)
+
+        sizerv.Add(label, 1, wx.ALIGN_LEFT | wx.ALL, 5)
 
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
@@ -3828,8 +3838,12 @@ class CLaunchDialog(wx.Dialog):
         sizerv.Add(self.m_cb, 0, wx.ALIGN_LEFT | wx.ALL, 5)
         
         label = wx.StaticText(self, -1, STATIC_LAUNCH_ENV, size = (400, -1))
-        label.Wrap(400)
-        sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        try:
+            label.Wrap(400)
+        except:
+            label.SetLabel(STATIC_LAUNCH_ENV_SPLIT)
+
+        sizerv.Add(label, 1, wx.ALIGN_LEFT | wx.ALL, 5)
         
         btnsizer = wx.StdDialogButtonSizer()
 

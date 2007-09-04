@@ -1347,6 +1347,11 @@ class CConnectionException(CException):
 
 
 
+class FirewallBlock(CConnectionException):
+    """Firewall is blocking socket communication."""
+
+
+
 class BadVersion(CConnectionException):
     """Bad Version."""
     def __init__(self, version):
@@ -1569,6 +1574,7 @@ STR_COMMUNICATION_FAILURE = "Failed to communicate with debugged script."
 STR_ERROR_OTHER = "Command returned the following error:\n%(type)s, %(value)s.\nPlease check stderr for stack trace and report to support."
 STR_BAD_MBCS_PATH = "The debugger can not launch the script since the path to the Python executable or the debugger scripts can not be encoded into the default system code page. Please check the settings of 'Language for non-Unicode programs' in the Advanced tab of the Windows Regional and Language Options dialog."
 STR_LOST_CONNECTION = "Lost connection to debuggee."
+STR_FIREWALL_BLOCK = "A firewall is blocking the local communication chanel (socket) that is required between the debugger and the debugged script. Please make sure that the firewall allows that communication."
 STR_BAD_VERSION = "A debuggee was found with incompatible debugger version %(value)s."
 STR_BAD_VERSION2 = "While attempting to find the specified debuggee at least one debuggee was found that uses incompatible version of RPDB2."
 STR_UNEXPECTED_DATA = "Unexpected data received."
@@ -1783,6 +1789,7 @@ g_error_mapping = {
     socket.error: STR_COMMUNICATION_FAILURE,
    
     CConnectionException: STR_LOST_CONNECTION,
+    FirewallBlock: STR_FIREWALL_BLOCK,
     BadVersion: STR_BAD_VERSION,
     UnexpectedData: STR_UNEXPECTED_DATA,
     SpawnUnsupported: STR_SPAWN_UNSUPPORTED,
@@ -3173,6 +3180,171 @@ def recalc_sys_path(old_pythonpath):
         lowered = winlower(abspath)
 
         sys.path.insert(1 + i, lowered)
+
+
+
+class CFirewallTest:
+    m_port = None
+    m_thread_server = None
+    m_thread_client = None
+    m_lock = threading.RLock()
+
+
+    def __init__(self, baseport = 52000, timeout = 4):
+        self.LOOPBACK = '127.0.0.1'
+        self.TIMEOUT = timeout
+
+        self.m_baseport = baseport
+        self.m_result = None
+
+        self.m_last_server_error = None
+        self.m_last_client_error = None
+
+
+    def run(self):
+        CFirewallTest.m_lock.acquire()
+
+        try:
+            #
+            # If either the server or client are alive after a timeout
+            # it means they are blocked by a firewall. Return False.
+            #
+            server = CFirewallTest.m_thread_server
+            if server != None and server.isAlive():
+                server.join(self.TIMEOUT * 1.5)
+                if server.isAlive():
+                    return False
+
+            client = CFirewallTest.m_thread_client
+            if client != None and client.isAlive():
+                client.join(self.TIMEOUT * 1.5)
+                if client.isAlive():
+                    return False
+
+            CFirewallTest.m_port = None
+            self.m_result = None
+
+            t0 = time.time()
+            server = threading.Thread(target = self.__server)
+            server.start()
+            CFirewallTest.m_thread_server = server
+
+            #
+            # If server exited or failed to setup after a timeout 
+            # it means it was blocked by a firewall.
+            #
+            while CFirewallTest.m_port == None and server.isAlive():
+                if time.time() - t0 > self.TIMEOUT * 1.5:
+                    return False
+
+                time.sleep(0.1)
+
+            if not server.isAlive():
+                return False
+
+            t0 = time.time()
+            client = threading.Thread(target = self.__client)
+            client.start()
+            CFirewallTest.m_thread_client = client
+
+            while self.m_result == None and client.isAlive():
+                if time.time() - t0 > self.TIMEOUT * 1.5:
+                    return False
+
+                time.sleep(0.1)
+
+            return self.m_result
+
+        finally:
+            CFirewallTest.m_lock.release()
+
+
+    def __client(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(self.TIMEOUT)
+
+        try:
+            try:
+                s.connect((self.LOOPBACK, CFirewallTest.m_port))
+
+                s.send('Hello, world')
+                data = self.__recv(s, 1024)
+                self.m_result = True
+
+            except socket.error, e:
+                self.m_last_client_error = e
+                self.m_result = False
+
+        finally:
+            s.close()
+
+
+    def __server(self):
+        port = self.m_baseport
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(self.TIMEOUT)
+
+        while True:
+            try:
+                s.bind((self.LOOPBACK, port))
+                break
+                
+            except socket.error, e:
+                if self.__GetSocketError(e) != errno.EADDRINUSE:
+                    self.m_last_server_error = e
+                    s.close()
+                    return
+                    
+                port += 1
+        
+        CFirewallTest.m_port = port
+
+        try:
+            try:
+                conn = None
+                s.listen(1)
+                conn, addr = s.accept()
+                
+                while True:
+                    data = self.__recv(conn, 1024)
+                    if not data: 
+                        return
+
+                    conn.send(data)
+
+            except socket.error, e:
+                self.m_last_server_error = e
+
+        finally:
+            if conn != None:
+                conn.close()
+            s.close()
+
+
+    def __recv(self, s, len):
+        t0 = time.time()
+        
+        while True:
+            try:
+                data = s.recv(1024)
+                return data
+
+            except socket.error, e:
+                if self.__GetSocketError(e) != errno.EWOULDBLOCK:
+                    print_debug('socket error was caught, %s' % repr(e))
+                    raise
+                
+                if time.time() - t0 > self.TIMEOUT:
+                    raise
+
+                continue
+
+
+    def __GetSocketError(self, e):
+        if (not isinstance(e.args, tuple)) or (len(e.args) == 0):
+            return -1
+
+        return e.args[0]
 
 
 
@@ -8400,7 +8572,11 @@ class CSessionManagerInternal:
         if not os.name in [POSIX, 'nt']:
             self.m_printer(STR_SPAWN_UNSUPPORTED)
             raise SpawnUnsupported
-            
+        
+        firewall_test = CFirewallTest()
+        if not firewall_test.run():
+            raise FirewallBlock
+
         if self.m_rpdb2_pwd is None:
             self.set_random_password()
             
@@ -8429,7 +8605,7 @@ class CSessionManagerInternal:
             try:
                 self._spawn_server(fchdir, ExpandedFilename, args, rid)            
                 server = self.__wait_for_debuggee(rid)
-                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True)
+                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True, ffirewall_test = False)
 
                 self.m_last_command_line = command_line
                 self.m_last_fchdir = fchdir
@@ -8552,7 +8728,7 @@ class CSessionManagerInternal:
             os.popen(command)
 
     
-    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False):
+    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True):
         self.__verify_unattached()
 
         if key == '':
@@ -8561,7 +8737,12 @@ class CSessionManagerInternal:
         if self.m_rpdb2_pwd is None:
             self.m_printer(STR_PASSWORD_MUST_BE_SET)
             raise UnsetPassword
-        
+       
+        if ffirewall_test:
+            firewall_test = CFirewallTest()
+            if not firewall_test.run():
+                raise FirewallBlock
+
         if name is None:
             name = key
 
@@ -9089,6 +9270,10 @@ class CSessionManagerInternal:
         if self.m_rpdb2_pwd is None:
             raise UnsetPassword
         
+        firewall_test = CFirewallTest()
+        if not firewall_test.run():
+            raise FirewallBlock
+
         server_list = self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)
         errors = self.m_server_list_object.get_errors()
         self.__report_server_errors(errors)
