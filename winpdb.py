@@ -340,7 +340,6 @@ import weakref
 import base64
 import socket
 import string
-import locale
 import Queue
 import rpdb2
 import time
@@ -1079,20 +1078,36 @@ class CMainWindow(CMenuBar, CToolBar, CStatusBar, CJobs):
 
 
 class CAsyncSessionManagerCall:
-    def __init__(self, session_manager, job_manager, f, callback):
+    def __init__(self, session_manager, job_manager, f, callback, ftrace = False):
         self.m_session_manager = session_manager
         self.m_job_manager = job_manager
         self.m_f = f
         self.m_callback = callback
+        self.m_ftrace = ftrace
 
 
     def __wrapper(self, *args):
         if self.m_callback != None:
-            return self.m_f(*args)
+            try:
+                if self.m_ftrace:
+                    rpdb2.print_debug('Calling %s' % repr(self.m_f))
+
+                return self.m_f(*args)
+
+            finally:
+                if self.m_ftrace:
+                    rpdb2.print_debug('Returned from %s' % repr(self.m_f))
             
         try:
             self.m_f(*args)
             
+        except rpdb2.FirewallBlock:
+            self.m_session_manager.report_exception(*sys.exc_info())
+
+            dlg = wx.MessageDialog(self.m_job_manager, rpdb2.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+            dlg.ShowModal()
+            dlg.Destroy()
+
         except (socket.error, rpdb2.CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
         except rpdb2.CException:
@@ -1111,9 +1126,10 @@ class CAsyncSessionManagerCall:
 
 
 class CAsyncSessionManager:
-    def __init__(self, session_manager, job_manager, callback = None):
+    def __init__(self, session_manager, job_manager, callback = None, ftrace = False):
         self.m_session_manager = session_manager
         self.m_callback = callback
+        self.m_ftrace = ftrace
 
         self.m_weakref_job_manager = None
         
@@ -1121,13 +1137,13 @@ class CAsyncSessionManager:
             self.m_weakref_job_manager = weakref.ref(job_manager)
 
 
-    def with_callback(self, callback):
+    def with_callback(self, callback, ftrace = False):
         if self.m_weakref_job_manager != None:
             job_manager = self.m_weakref_job_manager()
         else:
             job_manager = None
         
-        asm = CAsyncSessionManager(self.m_session_manager, job_manager, callback)
+        asm = CAsyncSessionManager(self.m_session_manager, job_manager, callback, ftrace)
         return asm
 
 
@@ -1141,7 +1157,7 @@ class CAsyncSessionManager:
         else:
             job_manager = None
         
-        return CAsyncSessionManagerCall(self.m_session_manager, job_manager, f, self.m_callback)
+        return CAsyncSessionManagerCall(self.m_session_manager, job_manager, f, self.m_callback, self.m_ftrace)
 
     
         
@@ -2132,10 +2148,9 @@ class CSourceManager:
         raise KeyError
 
         
-    def load_source(self, filename, callback, args, fComplain): 
+    def load_source(self, filename, callback, args, fComplain):
         f = lambda r, exc_info: self.callback_load_source(r, exc_info, filename, callback, args, fComplain)        
-
-        self.m_async_sm.with_callback(f).get_source_file(filename, -1, -1)
+        self.m_async_sm.with_callback(f, ftrace = True).get_source_file(filename, -1, -1)
 
         
     def callback_load_source(self, r, exc_info, filename, callback, args, fComplain):
@@ -2173,6 +2188,13 @@ class CSourceManager:
                 dlg.ShowModal()
                 dlg.Destroy()
             
+            _filename = filename
+            source = STR_FILE_LOAD_ERROR2 % (filename, )
+            _time = time.time()
+        
+        else:
+            rpdb2.print_debug('get_source_file() returned the following error: %s' % repr(t))
+
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
             _time = time.time()
@@ -2597,18 +2619,18 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_console.join()
 
 
-    def write(self, str):
+    def write(self, _str):
         try:
-            str = str.decode('utf8')
+            if type(_str) == str:
+                _str = _str.decode('utf8')
+
             if not g_fUnicode:
-                encoding = locale.getdefaultlocale()[1]
-                if encoding == None:
-                    encoding = 'ascii'
-                str = str.encode(encoding, 'replace')
+                encoding = wx.GetDefaultPyEncoding()
+                _str = _str.encode(encoding, 'replace')
         except:
             pass
             
-        sl = str.split('\n')
+        sl = _str.split('\n')
         
         _str = ''
         
@@ -2866,9 +2888,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         if not g_fUnicode and type(_suite) == str:
             try:
-                encoding = locale.getdefaultlocale()[1]
-                if encoding == None:
-                    encoding = 'ascii'
+                encoding = wx.GetDefaultPyEncoding()
                 _suite = _suite.decode(encoding, 'replace')
             except:
                 pass
@@ -2962,13 +2982,14 @@ class CNamespacePanel(wx.Panel, CJobs):
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
        
         for r in snl:
+            #
+            # The following string are encoded as utf8 by repr_ltd()
+            #
             _name = r[rpdb2.DICT_KEY_NAME].decode('utf8')
             _repr = r[rpdb2.DICT_KEY_REPR].decode('utf8')
             
             if not g_fUnicode:
-                encoding = locale.getdefaultlocale()[1]
-                if encoding == None:
-                    encoding = 'ascii'
+                encoding = wx.GetDefaultPyEncoding()
                 _name = _name.encode(encoding, 'replace')
                 _repr = _repr.encode(encoding, 'replace')
 
@@ -3570,6 +3591,11 @@ class CAttachDialog(wx.Dialog, CJobs):
         (t, v, tb) = exc_info
 
         if t != None:
+            if t == rpdb2.FirewallBlock:
+                dlg = wx.MessageDialog(self, rpdb2.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+                dlg.ShowModal()
+                dlg.Destroy()
+
             self.m_session_manager.report_exception(t, v, tb)
             rpdb2.print_debug_exception(True)
             return

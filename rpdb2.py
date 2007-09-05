@@ -1981,6 +1981,10 @@ def repr_str(s, length, is_valid):
         return r[1:]
 
     except:
+        #
+        # If a string is not encoded as utf8 its repr() will be done with
+        # the regular repr() function.
+        #
         return repr_str_raw(s, length, is_valid)
 
 
@@ -8290,6 +8294,39 @@ class CLocalTimeoutTransport(xmlrpclib.Transport):
 
     
     
+class CLocalTransport(xmlrpclib.Transport):
+    """
+    Modification of xmlrpclib.Transport to work around Zonealarm sockets
+    bug.
+    """
+    
+    def __parse_response(self, file, sock):
+        # read response from input file/socket, and parse it
+
+        p, u = self.getparser()
+
+        while 1:
+            if sock:
+                response = sock.recv(1024)
+            else:
+                time.sleep(0.001)
+                response = file.read(1024)
+            if not response:
+                break
+            if self.verbose:
+                print "body:", repr(response)
+            p.feed(response)
+
+        file.close()
+        p.close()
+
+        return u.close()
+
+    if os.name == 'nt':
+        _parse_response = __parse_response
+
+
+    
 class CSession:
     """
     Basic class that communicates with the debuggee server.
@@ -8388,7 +8425,7 @@ class CSession:
         server = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), CTimeoutTransport())
         server_info = server.server_info()
 
-        self.m_proxy = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), target_rid = server_info.m_rid)
+        self.m_proxy = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), CLocalTransport(), target_rid = server_info.m_rid)
         self.m_server_info = server_info
 
                 
