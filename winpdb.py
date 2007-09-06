@@ -1017,11 +1017,11 @@ class CJobs:
             time.sleep(0.1)    
 
         
-    def job_post(self, job, args, callback = None):
-        threading.Thread(target = self.job_do, args = (job, args, callback)).start()
+    def job_post(self, job, args, kwargs = {}, callback = None):
+        threading.Thread(target = self.job_do, args = (job, args, kwargs, callback)).start()
 
         
-    def job_do(self, job, args, callback):
+    def job_do(self, job, args, kwargs, callback):
         try:
             self.__m_jobs_lock.acquire()
 
@@ -1040,7 +1040,7 @@ class CJobs:
         exc_info = (None, None, None)
         
         try:
-            r = job(*args)
+            r = job(*args, **kwargs)
         except:
             exc_info = sys.exc_info()
 
@@ -1086,20 +1086,20 @@ class CAsyncSessionManagerCall:
         self.m_ftrace = ftrace
 
 
-    def __wrapper(self, *args):
+    def __wrapper(self, *args, **kwargs):
         if self.m_callback != None:
             try:
                 if self.m_ftrace:
                     rpdb2.print_debug('Calling %s' % repr(self.m_f))
 
-                return self.m_f(*args)
+                return self.m_f(*args, **kwargs)
 
             finally:
                 if self.m_ftrace:
                     rpdb2.print_debug('Returned from %s' % repr(self.m_f))
             
         try:
-            self.m_f(*args)
+            self.m_f(*args, **kwargs)
             
         except rpdb2.FirewallBlock:
             self.m_session_manager.report_exception(*sys.exc_info())
@@ -1117,11 +1117,11 @@ class CAsyncSessionManagerCall:
             rpdb2.print_debug_exception(True)
 
     
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         if self.m_job_manager == None:
             return
             
-        self.m_job_manager.job_post(self.__wrapper, args, self.m_callback)
+        self.m_job_manager.job_post(self.__wrapper, args, kwargs, self.m_callback)
 
 
 
@@ -1359,10 +1359,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_console.start()
 
         if fAttach:
-            self.m_async_sm.attach(command_line)
+            self.m_async_sm.attach(command_line, encoding = rpdb2.detect_locale())
             
         elif command_line != '':
-            self.m_async_sm.launch(fchdir, command_line)
+            self.m_async_sm.launch(fchdir, command_line, encoding = rpdb2.detect_locale())
 
         
     #
@@ -3761,6 +3761,7 @@ class CPwdDialog(wx.Dialog):
         
         self.m_ok = wx.Button(self, wx.ID_OK)
         self.m_ok.SetDefault()
+        self.Bind(wx.EVT_BUTTON, self.do_ok, self.m_ok)
         if pwd == '':
             self.m_ok.Disable()
         btnsizer.AddButton(self.m_ok)
@@ -3785,6 +3786,24 @@ class CPwdDialog(wx.Dialog):
     def get_password(self):
         return self.m_entry_pwd.GetValue()
 
+
+    def do_validate(self):
+        if rpdb2.is_valid_pwd(self.get_password()):
+            return True
+
+        dlg = wx.MessageDialog(self, rpdb2.STR_PASSWORD_BAD, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+        dlg.ShowModal()
+        dlg.Destroy()
+        
+        return False
+        
+
+    def do_ok(self, event):
+        f = self.do_validate()
+        if not f:
+            return
+
+        event.Skip()
 
     
 class COpenDialog(wx.Dialog):

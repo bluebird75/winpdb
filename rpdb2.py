@@ -405,18 +405,23 @@ def start_embedded_debugger_interactive_password(
     if g_server is not None:
         return
 
-    if stdout is not None:
-        stdout.write('Please type password:')
+    while True:
+        if stdout is not None:
+            stdout.write('Please type password:')
+            
+        _rpdb2_pwd = stdin.readline().rstrip('\n')
         
-    _rpdb2_pwd = stdin.readline().rstrip('\n')
-    
-    return __start_embedded_debugger(
-                        _rpdb2_pwd, 
-                        fAllowUnencrypted, 
-                        fAllowRemote, 
-                        timeout, 
-                        fDebug
-                        )
+        try:
+            return __start_embedded_debugger(
+                                _rpdb2_pwd, 
+                                fAllowUnencrypted, 
+                                fAllowRemote, 
+                                timeout, 
+                                fDebug
+                                )
+
+        except BadArgument:
+            stdout.write(STR_PASSWORD_BAD)
     
 
 
@@ -496,10 +501,10 @@ class CSimpleSessionManager:
         self.__sm.register_callback(self.__termination_callback, event_type_dict, fSingleUse = False)
 
 
-    def launch(self, fchdir, command_line):
+    def launch(self, fchdir, command_line, encoding = 'utf-8'):
         self.m_fRunning = False
         self.m_termination_lineno = None
-        self.__sm.launch(fchdir, command_line, fload_breakpoints = False)
+        self.__sm.launch(fchdir, command_line, fload_breakpoints = False, encoding = encoding)
 
 
     def request_go(self):
@@ -684,14 +689,17 @@ class CSessionManager:
         return self.__smi.refresh()
 
 
-    def launch(self, fchdir, command_line):
+    def launch(self, fchdir, command_line, encoding = 'utf-8'):
         """
         Launch debuggee in a new process and attach.
         fchdir - Change current directory to that of the debuggee.
         command_line - command line arguments pass to the script as a string.
+
+        if command line is not a unicode string it will be decoded into unicode
+        with the given encoding
         """
         
-        return self.__smi.launch(fchdir, command_line)
+        return self.__smi.launch(fchdir, command_line, encoding = encoding)
 
         
     def restart(self):
@@ -713,13 +721,16 @@ class CSessionManager:
         return self.__smi.get_launch_args()
 
         
-    def attach(self, key, name = None):
+    def attach(self, key, name = None, encoding = 'utf-8'):
         """
         Attach to a debuggee (establish communication with the debuggee-server)
         key - a string specifying part of the filename or PID of the debuggee.
+
+        if command line is not a unicode string it will be decoded into unicode
+        with the given encoding
         """
         
-        return self.__smi.attach(key, name)
+        return self.__smi.attach(key, name, encoding = encoding)
 
 
     def detach(self):
@@ -1644,6 +1655,7 @@ STR_BREAKPOINTS_TEMPLATE = """ %2d  %-8s  %5d  %s
 STR_ENCRYPTION_SUPPORT_ERROR = "Encryption is not supported since the python-crypto package was not found. Either install the python-crypto package or allow unencrypted connections."
 STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
+STR_PASSWORD_BAD = 'The password should begin with a letter and continue with any combination of digits, letters or underscores (\'_\'). Only English characters are accepted for letters.'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
 STR_ENVIRONMENT = 'The current environment mapping is:'
@@ -2203,6 +2215,22 @@ def split_path(path):
 
 
 
+def my_os_path_join(dirname, basename):
+    if type(dirname) == str and type(basename) == str:
+        return os.path.join(dirname, basename)
+
+    encoding = sys.getfilesystemencoding()
+
+    if type(dirname) == str:
+        dirname = dirname.decode(encoding)
+
+    if type(basename) == str:
+        basename = basename.decode(encoding)
+
+    return os.path.join(dirname, basename)
+
+
+
 def calc_frame_path(frame):
     filename = frame.f_code.co_filename
     
@@ -2212,23 +2240,23 @@ def calc_frame_path(frame):
     if filename in g_frames_path:
         return g_frames_path[filename]
 
+    globals_file = frame.f_globals.get('__file__', None)
+    
+    if globals_file != None and os.path.isabs(globals_file):    
+        dirname = os.path.dirname(globals_file)
+        basename = os.path.basename(filename)
+        path = my_os_path_join(dirname, basename)        
+        abspath = my_abspath(path)
+        lowered = winlower(abspath)        
+        g_frames_path[filename] = lowered
+        return lowered
+
     if os.path.isabs(filename):
         abspath = my_abspath(filename)
         lowered = winlower(abspath)
         g_frames_path[filename] = lowered
         return lowered
         
-    globals_file = frame.f_globals.get('__file__', None)
-    
-    if globals_file != None and os.path.isabs(globals_file):    
-        dirname = os.path.dirname(globals_file)
-        basename = os.path.basename(filename)
-        path = os.path.join(dirname, basename)        
-        abspath = my_abspath(path)
-        lowered = winlower(abspath)        
-        g_frames_path[filename] = lowered
-        return lowered
-
     try:
         abspath = FindFile(filename, fModules = True)
         lowered = winlower(abspath)    
@@ -2362,12 +2390,12 @@ def FindModuleDir(module_name):
     
     if not hasattr(m, '__file__') or m.__file__ == None:
         parent_dir = FindModuleDir(parent)
-        module_dir = os.path.join(parent_dir, winlower(child))
+        module_dir = my_os_path_join(parent_dir, winlower(child))
         return module_dir
 
     if not os.path.isabs(m.__file__):
         parent_dir = FindModuleDir(parent)
-        module_dir = os.path.join(parent_dir, winlower(child))
+        module_dir = my_os_path_join(parent_dir, winlower(child))
         return module_dir        
         
     (root, ext) = os.path.splitext(m.__file__)
@@ -2409,7 +2437,7 @@ def FindFileAsModule(filename):
         if suffix == '':
             path = module_dir + ext
         else:    
-            path = os.path.join(module_dir, suffix.strip('\\')) + ext
+            path = my_os_path_join(module_dir, suffix.strip('\\')) + ext
         
         scriptname = CalcScriptName(path, fAllowAnyExt = False)
         if os.path.isfile(scriptname):
@@ -2481,6 +2509,8 @@ def FindFile(
 
     if os.path.isabs(filename) or filename.startswith('.'):
         try:
+            scriptname = None
+
             abspath = my_abspath(filename)
             lowered = winlower(abspath)
             scriptname = CalcScriptName(lowered, fAllowAnyExt)
@@ -2495,7 +2525,6 @@ def FindFile(
             if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
                 return scriptname
             
-            scriptname = None
             raise IOError
 
         finally:
@@ -2513,8 +2542,10 @@ def FindFile(
     paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep)
     
     try:
+        lowered = None
+
         for p in paths:
-            f = os.path.join(p, scriptname)
+            f = my_os_path_join(p, scriptname)
             abspath = my_abspath(f)
             lowered = winlower(abspath)
             
@@ -2528,7 +2559,6 @@ def FindFile(
             if lowered.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(lowered):
                 return lowered
 
-        lowered = None
         raise IOError
 
     finally:
@@ -2814,6 +2844,23 @@ def ParseEncoding(txt):
 
 
 
+def detect_locale():
+    encoding = locale.getdefaultlocale()[1]
+
+    try:
+        codecs.lookup(encoding)
+        return encoding
+
+    except:
+        pass
+
+    if encoding.lower().startswith('utf_8'):
+        return 'utf-8'
+
+    return 'ascii'
+
+
+
 def _getpid():
     try:
         return os.getpid()
@@ -2896,17 +2943,20 @@ def generate_random_password():
 
 
 
-def is_valid_pwd(pwd):
-    try:
-        if type(pwd) == str:
-            pwd = pwd.decode('ascii')
+def is_valid_pwd(_rpdb2_pwd):
+    if _rpdb2_pwd in [None, '']:
+        return False
 
-        pwd = pwd.encode('ascii')
+    try:
+        if type(_rpdb2_pwd) == str:
+            _rpdb2_pwd = _rpdb2_pwd.decode('ascii')
+
+        _rpdb2_pwd = _rpdb2_pwd.encode('ascii')
 
     except:
         return False
 
-    for c in pwd:
+    for c in _rpdb2_pwd:
         if c.isalnum():
             continue
 
@@ -6899,10 +6949,13 @@ class CDebuggerEngine(CDebuggerCore):
             if path in path_dict:
                 continue
 
-            try:
-                expanded_path = FindFile(path, fModules = True)
-            except IOError:
-                expanded_path = path
+            if path in g_frames_path:
+                expanded_path = g_frames_path[path]
+            else:
+                try:
+                    expanded_path = FindFile(path, fModules = True)
+                except IOError:
+                    expanded_path = path
 
             lowered = winlower(expanded_path)
             _unicode = lowered.decode(sys.getfilesystemencoding())
@@ -7624,9 +7677,7 @@ class CDebuggerEngine(CDebuggerCore):
 
         old_pythonpath = os.environ.get('PYTHONPATH', '')
 
-        encoding = locale.getdefaultlocale()[1]
-        if encoding == None:
-            encoding = 'ascii'
+        encoding = detect_locale() 
 
         for k, v in envmap:
             if type(k) == unicode:
@@ -8710,7 +8761,7 @@ class CSessionManagerInternal:
         return self.getSession().get_encryption()
 
     
-    def launch(self, fchdir, command_line, fload_breakpoints = True):
+    def launch(self, fchdir, command_line, fload_breakpoints = True, encoding = 'utf-8'):
         self.__verify_unattached()
 
         if not os.name in [POSIX, 'nt']:
@@ -8722,7 +8773,7 @@ class CSessionManagerInternal:
             raise FirewallBlock
 
         if type(command_line) == str:
-            command_line = command_line.decode('utf-8')
+            command_line = command_line.decode(encoding)
 
         if self.m_rpdb2_pwd is None:
             self.set_random_password()
@@ -8735,7 +8786,7 @@ class CSessionManagerInternal:
         #if not IsPythonSourceFile(filename):
         #    raise NotPythonSource
 
-        _filename = os.path.join(path, filename) 
+        _filename = my_os_path_join(path, filename) 
            
         ExpandedFilename = FindFile(_filename)
         self.set_host(LOCALHOST)
@@ -8833,9 +8884,17 @@ class CSessionManagerInternal:
             _b = base64.encodestring(_u).strip('\n').translate(g_safe_base64_to)
             b = ' --base64=%s' % _b
 
+        fse = sys.getfilesystemencoding()
+
+        if type(ExpandedFilename) == str:    
+            ExpandedFilename = ExpandedFilename.decode(fse)
+
         debugger = os.path.abspath(__file__)
         if debugger[-1:] == 'c':
             debugger = debugger[:-1]
+
+        if type(debugger) == str:
+            debugger = debugger.decode(fse)
 
         debug_prints = ['', ' --debug'][g_fDebug]    
             
@@ -8844,6 +8903,9 @@ class CSessionManagerInternal:
         python_exec = sys.executable
         if python_exec.endswith('w.exe'):
             python_exec = python_exec[:-5] + '.exe'
+
+        if type(python_exec) == str:
+            python_exec = python_exec.decode(fse)
 
         if '?' in python_exec or '?' in debugger:
             raise BadMBCSPath
@@ -8866,8 +8928,8 @@ class CSessionManagerInternal:
         print_debug('Terminal open string: %s' % repr(command))
 
         if type(command) == unicode:
-            fse = sys.getfilesystemencoding()
-            command = command.encode(fse)
+            encoding = detect_locale()
+            command = command.encode(encoding)
         
         if name == MAC:
             terminalcommand.run(command)
@@ -8875,15 +8937,15 @@ class CSessionManagerInternal:
             os.popen(command)
 
     
-    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True):
+    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True, encoding = 'utf-8'):
         self.__verify_unattached()
 
         if key == '':
             raise BadArgument
 
         if type(key) == str:
-            key = key.decode('utf-8')
-
+            key = key.decode(encoding)
+        
         if self.m_rpdb2_pwd is None:
             self.m_printer(STR_PASSWORD_MUST_BE_SET)
             raise UnsetPassword
@@ -9710,8 +9772,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_eInLoop = threading.Event()
         self.cmdqueue.insert(0, '')
 
-        self.m_stdout = CStdoutWrapper(stdout, self.__detect_encoding(stdout))
-        self.m_encoding = self.__detect_encoding(stdin)
+        self.m_stdout = CStdoutWrapper(self.stdout, self.__detect_encoding(self.stdout))
+        self.m_encoding = self.__detect_encoding(self.stdin)
 
         g_fDefaultStd = (stdin == None)
 
@@ -9722,13 +9784,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         except:
             pass
 
-        try:
-            encoding = locale.getdefaultlocale()[1]
-            codecs.lookup(encoding)
-            return encoding
-
-        except:
-            return 'ascii'
+        return detect_locale()
 
 
     def set_encoding(self, _encoding, funicode_output):
@@ -10649,8 +10705,12 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         _rpdb2_pwd = arg.strip('"\'')
         
-        self.m_session_manager.set_password(_rpdb2_pwd)
-        print >> self.m_stdout, STR_PASSWORD_SET % (_rpdb2_pwd, )
+        try:
+            self.m_session_manager.set_password(_rpdb2_pwd)
+            print >> self.m_stdout, STR_PASSWORD_SET % (_rpdb2_pwd, )
+
+        except BadArgument:
+            print >> self.m_stdout, STR_PASSWORD_BAD
 
             
     def do_remote(self, arg):
@@ -11525,6 +11585,9 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
             g_debugger.setbreak(f)
             return
 
+        if not is_valid_pwd(_rpdb2_pwd):
+            raise BadArgument(STR_PASSWORD_BAD)
+
         g_fDebug = fDebug
        
         workaround_import_deadlock()
@@ -11622,7 +11685,7 @@ def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fA
     if (not fAllowUnencrypted) and not is_encryption_supported():
         print STR_ENCRYPTION_SUPPORT_ERROR
         return 2
-        
+    
     sm = CSessionManager(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
     c = CConsole(sm)
     c.start()
@@ -11631,9 +11694,9 @@ def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fA
 
     try:
         if fAttach:
-            sm.attach(command_line)
+            sm.attach(command_line, encoding = detect_locale())
         elif command_line != '':
-            sm.launch(fchdir, command_line)
+            sm.launch(fchdir, command_line, encoding = detect_locale())
             
     except (socket.error, CConnectionException):
         sm.report_exception(*sys.exc_info())
@@ -11744,6 +11807,10 @@ def main(StartClient_func = StartClient):
         print STR_PASSWORD_NOT_SUPPORTED
         return 2
 
+    if _rpdb2_pwd is not None and not is_valid_pwd(_rpdb2_pwd):
+        print STR_PASSWORD_BAD
+        return 2
+
     if fWrap and (len(_rpdb2_args) == 0):
         print "--debuggee option requires a script name with optional <script-arg> arguments"
         return 2
@@ -11793,14 +11860,16 @@ def main(StartClient_func = StartClient):
     if (secret is not None) and (os.name == POSIX):
         _rpdb2_pwd = read_pwd_file(secret)
         
-    if (fWrap or fAttach) and (_rpdb2_pwd in [None, '']):
+    if (fWrap or fAttach) and not is_valid_pwd(_rpdb2_pwd):
         print STR_PASSWORD_MUST_BE_SET
         
         while True:
             _rpdb2_pwd = raw_input(STR_PASSWORD_INPUT)
             _rpdb2_pwd = _rpdb2_pwd.rstrip('\n')
-            if _rpdb2_pwd != '':
+            if is_valid_pwd(_rpdb2_pwd):
                 break
+
+            print STR_PASSWORD_BAD
 
         print STR_PASSWORD_CONFIRM       
                 
