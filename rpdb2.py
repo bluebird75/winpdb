@@ -2104,6 +2104,17 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
     if len(y) == length:
         y += '...'
 
+    try:
+        y.decode('utf-8')
+        return y
+        
+    except:
+        pass
+
+    encoding = sys.getfilesystemencoding()
+    y = y.decode(encoding, 'replace')
+    y = y.encode('utf-8')
+    
     return y
 
 
