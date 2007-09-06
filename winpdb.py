@@ -2161,13 +2161,10 @@ class CSourceManager:
             source_lines = r[rpdb2.DICT_KEY_LINES]
             _source = string.join(source_lines, '')
 
-            de = wx.GetDefaultPyEncoding()
-            se = rpdb2.ParseEncoding(_source)
-            if se is None:
-                se = de
-                
-            u = _source.decode(se, 'ignore')
-            source = u.encode(de, 'ignore')
+            source = _source.decode('utf-8')
+            if not g_fUnicode:
+                source = source.encode(wx.GetDefaultPyEncoding(), 'replace')
+
             _time = 0
         
         elif t == rpdb2.NotPythonSource and fComplain:
@@ -2538,6 +2535,7 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_history_index = 0
         
         self.m_console = rpdb2.CConsole(self.m_session_manager, stdin = self, stdout = self, fSplit = True)
+        self.m_console.set_encoding(wx.GetDefaultPyEncoding(), g_fUnicode)
 
         self.m_queue = Queue.Queue()
         
@@ -2622,7 +2620,7 @@ class CConsole(wx.Panel, CCaptionManager):
     def write(self, _str):
         try:
             if type(_str) == str:
-                _str = _str.decode('utf8')
+                _str = _str.decode('utf-8')
 
             if not g_fUnicode:
                 encoding = wx.GetDefaultPyEncoding()
@@ -2754,6 +2752,13 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         index = self.m_threads.FindItemData(-1, thread_id)
         if index < 0:
             return -1
+
+        if type(thread_name) == str:
+            thread_name = thread_name.decode('utf-8')
+        
+        if not g_fUnicode:
+            encoding = wx.GetDefaultPyEncoding()
+            thread_name = thread_name.encode(encoding, 'replace')
 
         self.m_threads.SetStringItem(index, 1, thread_name)
         self.m_threads.SetStringItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
@@ -2983,10 +2988,10 @@ class CNamespacePanel(wx.Panel, CJobs):
        
         for r in snl:
             #
-            # The following string are encoded as utf8 by repr_ltd()
+            # The following string are encoded as utf-8 by repr_ltd()
             #
-            _name = r[rpdb2.DICT_KEY_NAME].decode('utf8')
-            _repr = r[rpdb2.DICT_KEY_REPR].decode('utf8')
+            _name = r[rpdb2.DICT_KEY_NAME].decode('utf-8')
+            _repr = r[rpdb2.DICT_KEY_REPR].decode('utf-8')
             
             if not g_fUnicode:
                 encoding = wx.GetDefaultPyEncoding()
@@ -3347,12 +3352,21 @@ class CStackViewer(wx.Panel, CCaptionManager):
         i = 0
         while i < len(s):
             e = s[-(1 + i)]
+            
+            filename = e[0]
 
+            if type(filename) == str:
+                filename = filename.decode('utf-8')
+            
+            if not g_fUnicode:
+                encoding = wx.GetDefaultPyEncoding()
+                filename = filename.encode(encoding, 'replace')
+            
             index = self.m_stack.InsertStringItem(sys.maxint, repr(i))
-            self.m_stack.SetStringItem(index, 1, os.path.basename(e[0]))
+            self.m_stack.SetStringItem(index, 1, os.path.basename(filename))
             self.m_stack.SetStringItem(index, 2, repr(e[1]))
             self.m_stack.SetStringItem(index, 3, e[2])
-            self.m_stack.SetStringItem(index, 4, os.path.dirname(e[0]))
+            self.m_stack.SetStringItem(index, 4, os.path.dirname(filename))
             self.m_stack.SetItemData(index, i)
 
             i += 1
@@ -3626,7 +3640,16 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         for i, s in enumerate(self.m_server_list):
             index = self.m_listbox_scripts.InsertStringItem(sys.maxint, repr(s.m_pid))
-            self.m_listbox_scripts.SetStringItem(index, 1, s.m_filename)
+            
+            filename = s.m_filename
+            if type(filename) == str:
+                filename.decode('utf-8')
+
+            if not g_fUnicode:
+                encoding = wx.GetDefaultPyEncoding()
+                filename = filename.encode(encoding, 'replace')
+
+            self.m_listbox_scripts.SetStringItem(index, 1, filename)
             self.m_listbox_scripts.SetItemData(index, i)
 
         self.m_listbox_scripts.set_columns_width()
@@ -3835,7 +3858,12 @@ class COpenDialog(wx.Dialog):
 
 
     def get_file_name(self):
-        return self.m_entry.GetValue()
+        filename = self.m_entry.GetValue()
+        if type(filename) == str:
+            encoding = wx.GetDefaultPyEncoding()
+            filename = filename.decode(encoding)
+
+        return filename
 
 
 
@@ -3958,7 +3986,12 @@ class CLaunchDialog(wx.Dialog):
 
         
     def get_command_line(self):
-        return (self.m_entry_commandline.GetValue(), self.m_cb.GetValue())
+        command_line = self.m_entry_commandline.GetValue()
+        if type(command_line) == str:
+            encoding = wx.GetDefaultPyEncoding()
+            command_line = command_line.decode(encoding)
+
+        return (command_line, self.m_cb.GetValue())
 
 
 
