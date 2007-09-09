@@ -272,7 +272,6 @@ import traceback
 import commands
 import tempfile
 import __main__
-import compiler
 import weakref
 import httplib
 import os.path
@@ -297,6 +296,7 @@ import imp
 import os
 
 try:
+    import compiler
     import sets
 except:
     pass
@@ -1889,9 +1889,6 @@ g_file_encoding = {}
 
 g_frames_path = {}
 
-g_safe_base64_to = string.maketrans('/+=', '_-#')
-g_safe_base64_from = string.maketrans('_-#', '/+=')
-
 
 
 #
@@ -1908,16 +1905,19 @@ def is_py3k():
 if is_py3k():
     unicode = 'unicode'
 
+    class _sets:
+        pass
+
     class sets:
-        Set = type(sets)
-        BaseSet = type(sets)
-        ImmutableSet = type(sets)
+        Set = type(_sets)
+        BaseSet = type(_sets)
+        ImmutableSet = type(_sets)
 
 else:
     bytes = 'bytes'
 
     def foo(s, e):
-        return s.decode('utf-8')
+        return s.encode(e)
 
     sys.modules['__builtin__'].bytes = foo
 
@@ -1993,6 +1993,11 @@ def as_bytes(s):
 
 
 
+g_safe_base64_to = string.maketrans(as_bytes('/+='), as_bytes('_-#'))
+g_safe_base64_from = string.maketrans(as_bytes('_-#'), as_bytes('/+='))
+
+
+
 def detect_locale():
     encoding = locale.getdefaultlocale()[1]
 
@@ -2039,8 +2044,7 @@ def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
 
 def safe_repr(x):
     try:
-        y = repr(x)
-        return y
+        return repr(x)
 
     except:
         return 'N/A'
@@ -2129,10 +2133,28 @@ def repr_dict(pattern, d, length, is_valid, fraw = False):
 
 
 
+def repr_bytes(s, length, is_valid):
+    try:
+        s = s.decode('utf-8')
+
+        r = repr_unicode(s, length, is_valid)
+        return 'b' + r[1:]
+
+    except:
+        #
+        # If a string is not encoded as utf-8 its repr() will be done with
+        # the regular repr() function.
+        #
+        return 'b' + repr_str_raw(s, length, is_valid)
+
+
+
 def repr_str(s, length, is_valid):
     try:
-        u = s.decode('utf-8')
-        r = repr_unicode(u, length, is_valid)
+        if not is_unicode(s):
+            s = s.decode('utf-8')
+
+        r = repr_unicode(s, length, is_valid)
         return r[1:]
 
     except:
@@ -2156,7 +2178,7 @@ def repr_unicode(s, length, is_valid):
         if ord(c) < 128:
             rs += repr(c)[2:-1]
         else:
-            rs += c.encode('utf-8')
+            rs += c
 
     if not "'" in rs:
         return "u'%s'" % rs
@@ -2173,7 +2195,7 @@ def repr_str_raw(s, length, is_valid):
         is_valid[0] = False
         s = s[: length] + '...'
 
-    return repr(s)
+    return as_unicode(repr(s))
 
 
 
@@ -2184,7 +2206,7 @@ def repr_base(v, length, is_valid):
         is_valid[0] = False
         r = r[: length] + '...'
 
-    return r
+    return as_unicode(r)
 
 
 
@@ -2219,11 +2241,14 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
     if fraw and type(x) in [str, unicode]:
         return repr_str_raw(x, length, is_valid)
 
-    if type(x) == str:
-        return repr_str(x, length, is_valid)
-
     if type(x) == unicode:
         return repr_unicode(x, length, is_valid)
+
+    if type(x) == bytes:
+        return repr_bytes(x, length, is_valid)
+
+    if type(x) == str:
+        return repr_str(x, length, is_valid)
 
     if type(x) in [bool, int, float, long, type(None)]:
         return repr_base(x, length, is_valid)
@@ -2235,7 +2260,9 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
         y += '...'
 
     try:
-        y.decode('utf-8')
+        if not is_unicode(y):
+            y = y.decode('utf-8')
+        
         return y
         
     except:
@@ -2243,7 +2270,6 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
 
     encoding = sys.getfilesystemencoding()
     y = y.decode(encoding, 'replace')
-    y = y.encode('utf-8')
     
     return y
 
@@ -2471,6 +2497,9 @@ def IsPythonSourceFile(path):
         for l in ll:
             if l.startswith('#!') and 'python' in l:
                 return True
+
+        if is_py3k():
+            return False
 
         compiler.parseFile(path) 
         return True
@@ -3144,15 +3173,15 @@ def create_rpdb_settings_folder():
 
     rsf = os.path.join(home, RPDB_SETTINGS_FOLDER)
     if not os.path.exists(rsf):
-        os.mkdir(rsf, 0700)
+        os.mkdir(rsf, int('0700', 8))
 
     pwds = os.path.join(home, RPDB_PWD_FOLDER)    
     if not os.path.exists(pwds):
-        os.mkdir(pwds, 0700)
+        os.mkdir(pwds, int('0700', 8))
 
     bpl = os.path.join(home, RPDB_BPL_FOLDER)    
     if not os.path.exists(bpl):
-        os.mkdir(bpl, 0700)
+        os.mkdir(bpl, int('0700', 8))
 
 
 
@@ -3205,7 +3234,7 @@ def calc_bpl_filename(filename):
         # Folder creation is done here since this is a temp folder.
         #
         try:
-            os.mkdir(bpldir, 0700)
+            os.mkdir(bpldir, int('0700', 8))
         except:
             print_debug_exception()
             raise CException
@@ -3242,7 +3271,7 @@ def create_pwd_file(rid, _rpdb2_pwd):
 
     path = calc_pwd_file_path(rid)
 
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0600)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT, int('0600', 8))
     
     os.write(fd, _rpdb2_pwd)
     os.close(fd)
@@ -3529,7 +3558,8 @@ class CFirewallTest:
                 data = self.__recv(s, 1024)
                 self.m_result = True
 
-            except socket.error, e:
+            except socket.error:
+                e = sys.exc_info()[1]
                 self.m_last_client_error = e
                 self.m_result = False
 
@@ -3547,7 +3577,8 @@ class CFirewallTest:
                 s.bind((self.LOOPBACK, port))
                 break
                 
-            except socket.error, e:
+            except socket.error:
+                e = sys.exc_info()[1]
                 if self.__GetSocketError(e) != errno.EADDRINUSE:
                     self.m_last_server_error = e
                     s.close()
@@ -3570,7 +3601,8 @@ class CFirewallTest:
 
                     conn.send(data)
 
-            except socket.error, e:
+            except socket.error:
+                e = sys.exc_info()[1]
                 self.m_last_server_error = e
 
         finally:
@@ -3587,7 +3619,8 @@ class CFirewallTest:
                 data = s.recv(1024)
                 return data
 
-            except socket.error, e:
+            except socket.error:
+                e = sys.exc_info()[1]
                 if self.__GetSocketError(e) != errno.EWOULDBLOCK:
                     print_debug('socket error was caught, %s' % repr(e))
                     raise
@@ -7722,7 +7755,8 @@ class CDebuggerEngine(CDebuggerCore):
                 _locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
 
             try:
-                exec suite in _globals, _locals
+                exec(suite, _globals, _locals)
+
             finally:
                 if '_RPDB2_FindRepr' in suite and not '_RPDB2_FindRepr' in _original_locals_copy:
                     del _locals['_RPDB2_FindRepr']
@@ -8019,7 +8053,8 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
             # wrap response in a singleton tuple
             response = (response,)
             response = xmlrpclib.dumps(response, methodresponse=1)
-        except xmlrpclib.Fault, fault:
+        except xmlrpclib.Fault:
+            fault = sys.exc_info()[1]
             response = xmlrpclib.dumps(fault)
         except:
             # report exception back to server
@@ -8092,11 +8127,13 @@ class CPwdServerProxy:
                 if _e is not None:
                     raise _e
 
-            except AuthenticationBadIndex, e:
+            except AuthenticationBadIndex:
+                e = sys.exc_info()[1]
                 self.m_crypto.set_index(e.m_max_index, e.m_anchor)
                 continue
 
-            except xmlrpclib.Fault, fault:
+            except xmlrpclib.Fault:
+                fault = sys.exc_info()[1] 
                 if class_name(BadVersion) in fault.faultString:
                     s = fault.faultString.split("'")
                     version = ['', s[1]][len(s) > 0]
@@ -8230,7 +8267,8 @@ class CIOServer:
             # Decrypt parameters.
             #
             ((name, _params, target_rid), client_id, fEncryption) = self.m_crypto.undo_crypto(_params)
-        except AuthenticationBadIndex, e:
+        except AuthenticationBadIndex:
+            e = sys.exc_info()[1]
             #print_debug_exception()
 
             #
@@ -8265,7 +8303,8 @@ class CIOServer:
 
             r = func(*_params)
 
-        except Exception, _e:
+        except Exception:
+            _e = sys.exc_info()[1]
             print_debug_exception()
             e = _e            
 
@@ -8291,7 +8330,8 @@ class CIOServer:
                 server = CXMLRPCServer((host, port), logRequests = 0)
                 return (port, server)
                 
-            except socket.error, e:
+            except socket.error:
+                e = sys.exc_info()[1]
                 if GetSocketError(e) != errno.EADDRINUSE:
                     raise
                     
@@ -8522,7 +8562,8 @@ class CTimeoutHTTPConnection(httplib.HTTPConnection):
                 if self.debuglevel > 0:
                     print_debug("connect: (%s, %s)" % (self.host, self.port))
                 self.sock.connect(sa)
-            except socket.error, msg:
+            except socket.error:
+                msg = sys.exc_info()[1]
                 if self.debuglevel > 0:
                     print_debug('connect fail: ' + repr((self.host, self.port)))
                 if self.sock:
@@ -8531,7 +8572,7 @@ class CTimeoutHTTPConnection(httplib.HTTPConnection):
                 continue
             break
         if not self.sock:
-            raise socket.error, msg
+            raise socket.error(msg)
 
 
 
@@ -10180,7 +10221,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         try:
             self.m_session_manager.set_host(arg)
 
-        except socket.gaierror, e:
+        except socket.gaierror:
+            e = sys.exc_info()[1]
             self.printer(MSG_ERROR_HOST_TEXT % (arg, e))
 
         
@@ -11786,7 +11828,9 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     sys.path[0] = os.path.dirname(spe)
 
-    sys.argv = args
+    encoding = detect_locale()
+    argv = [as_string(arg, encoding) for arg in args]
+    sys.argv = argv
 
     atexit.register(_atexit)
 
@@ -11890,7 +11934,8 @@ def main(StartClient_func = StartClient):
                             ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'debug']
                             )
 
-    except getopt.GetoptError, e:
+    except getopt.GetoptError:
+        e = sys.exc_info()[1]
         _print(e)
         return 2
         
