@@ -1904,6 +1904,7 @@ def is_py3k():
 
 if is_py3k():
     unicode = 'unicode'
+    long = 'long'
 
     class _sets:
         pass
@@ -2167,6 +2168,8 @@ def repr_str(s, length, is_valid):
 
 
 def repr_unicode(s, length, is_valid):
+    index = [2, 1][is_py3k()]
+
     rs = ''
 
     for c in s:
@@ -2176,17 +2179,17 @@ def repr_unicode(s, length, is_valid):
             break
 
         if ord(c) < 128:
-            rs += repr(c)[2:-1]
+            rs += repr(c)[index: -1]
         else:
             rs += c
 
     if not "'" in rs:
-        return "u'%s'" % rs
+        return as_unicode("u'%s'" % rs)
 
     if not '"' in rs:
-        return 'u"%s"' % rs
+        return as_unicode('u"%s"' % rs)
    
-    return "u'%s'" % rs.replace("'", "\\'")
+    return as_unicode("u'%s'" % rs.replace("'", "\\'"))
 
 
 
@@ -2456,6 +2459,9 @@ def my_abspath(path):
 
 
 
+#
+# MOD
+#
 def my_abspath1(path):
     """
     Modification of ntpath.abspath() that avoids doing an import.
@@ -7460,11 +7466,11 @@ class CDebuggerEngine(CDebuggerCore):
                     rk = repr_ltd(i, REPR_ID_LENGTH, fraw = True)
 
                     e = {}
-                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
+                    e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
                     e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
                     e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
                     e[DICT_KEY_IS_VALID] = is_valid[0]
-                    e[DICT_KEY_TYPE] = self.__parse_type(type(i))
+                    e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(i)))
                     e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
                     snl.append(e)
@@ -7490,11 +7496,11 @@ class CDebuggerEngine(CDebuggerCore):
                 rk = repr_ltd(i, REPR_ID_LENGTH, fraw = True)
 
                 e = {}
-                e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
+                e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
                 e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
                 e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
-                e[DICT_KEY_TYPE] = self.__parse_type(type(i))
+                e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(i)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
                 snl.append(e)
@@ -7505,11 +7511,11 @@ class CDebuggerEngine(CDebuggerCore):
             for i, v in enumerate(r[0: MAX_NAMESPACE_ITEMS]):
                 is_valid = [True]
                 e = {}
-                e[DICT_KEY_EXPR] = '(%s)[%d]' % (expr, i)
-                e[DICT_KEY_NAME] = repr(i)
+                e[DICT_KEY_EXPR] = as_unicode('(%s)[%d]' % (expr, i))
+                e[DICT_KEY_NAME] = as_unicode(repr(i))
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
-                e[DICT_KEY_TYPE] = self.__parse_type(type(v))
+                e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
                 snl.append(e)
@@ -7546,16 +7552,16 @@ class CDebuggerEngine(CDebuggerCore):
                 if type(k) in [bool, int, float, bytes, str, unicode, type(None)]:
                     rk = repr(k)
                     if len(rk) < REPR_ID_LENGTH:
-                        e[DICT_KEY_EXPR] = '(%s)[%s]' % (expr, rk)
+                        e[DICT_KEY_EXPR] = as_unicode('(%s)[%s]' % (expr, rk))
 
                 if not DICT_KEY_EXPR in e:
                     rk = repr_ltd(k, REPR_ID_LENGTH, fraw = True)
-                    e[DICT_KEY_EXPR] = '_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot'))
+                    e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
 
-                e[DICT_KEY_NAME] = [repr_ltd(k, repr_limit), k][fForceNames]
+                e[DICT_KEY_NAME] = as_unicode([repr_ltd(k, repr_limit), k][fForceNames])
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
-                e[DICT_KEY_TYPE] = self.__parse_type(type(v))
+                e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
                 snl.append(e)
@@ -7580,11 +7586,11 @@ class CDebuggerEngine(CDebuggerCore):
 
             is_valid = [True]
             e = {}
-            e[DICT_KEY_EXPR] = '(%s).%s' % (expr, a)
-            e[DICT_KEY_NAME] = a
+            e[DICT_KEY_EXPR] = as_unicode('(%s).%s' % (expr, a))
+            e[DICT_KEY_NAME] = as_unicode(a)
             e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
             e[DICT_KEY_IS_VALID] = is_valid[0]
-            e[DICT_KEY_TYPE] = self.__parse_type(type(v))
+            e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
             snl.append(e)
@@ -7637,10 +7643,10 @@ class CDebuggerEngine(CDebuggerCore):
             is_valid = [True]
             r = eval(expr, __globals, __locals)
 
-            e[DICT_KEY_EXPR] = expr
+            e[DICT_KEY_EXPR] = as_unicode(expr)
             e[DICT_KEY_REPR] = repr_ltd(r, repr_limit, is_valid)
             e[DICT_KEY_IS_VALID] = is_valid[0]
-            e[DICT_KEY_TYPE] = self.__parse_type(type(r))
+            e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(r)))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(r)
             
             if fExpand and (e[DICT_KEY_N_SUBNODES] > 0):
@@ -7650,7 +7656,7 @@ class CDebuggerEngine(CDebuggerCore):
                 
         except:
             print_debug_exception()
-            e[DICT_KEY_ERROR] = repr(sys.exc_info())
+            e[DICT_KEY_ERROR] = as_unicode(repr(sys.exc_info()))
         
         lock.acquire()
         if len(rl) == index:    
@@ -8000,7 +8006,10 @@ class CWorkQueue:
             self.m_lock.release()
                 
         
-            
+
+#
+# MOD
+#
 class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     """
     Modification of SocketServer.ThreadingMixIn that uses a worker thread
@@ -8020,6 +8029,9 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
 
 
 
+#
+# MOD
+#
 def my_xmlrpclib_loads(data):
     """
     Modification of Python 2.3 xmlrpclib.loads() that does not do an 
@@ -8033,6 +8045,9 @@ def my_xmlrpclib_loads(data):
 
 
 
+#
+# MOD
+#
 class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServer):
     allow_reuse_address = False
     
@@ -8543,90 +8558,159 @@ class CDebuggeeServer(CIOServer):
 
 
 
-class CTimeoutHTTPConnection(httplib.HTTPConnection):
-    """
-    Modification of httplib.HTTPConnection with timeout for sockets.
-    """
+if not is_py3k():
+    #
+    # MOD
+    #
+    class CTimeoutHTTPConnection(httplib.HTTPConnection):
+        """
+        Modification of httplib.HTTPConnection with timeout for sockets.
+        """
 
-    _rpdb2_timeout = PING_TIMEOUT
-    
-    def connect(self):
-        """Connect to the host and port specified in __init__."""
-        msg = "getaddrinfo returns an empty list"
-        for res in socket.getaddrinfo(self.host, self.port, 0,
-                                      socket.SOCK_STREAM):
-            af, socktype, proto, canonname, sa = res
-            try:
-                self.sock = socket.socket(af, socktype, proto)
-                self.sock.settimeout(self._rpdb2_timeout)
-                if self.debuglevel > 0:
-                    print_debug("connect: (%s, %s)" % (self.host, self.port))
-                self.sock.connect(sa)
-            except socket.error:
-                msg = sys.exc_info()[1]
-                if self.debuglevel > 0:
-                    print_debug('connect fail: ' + repr((self.host, self.port)))
-                if self.sock:
-                    self.sock.close()
-                self.sock = None
-                continue
-            break
-        if not self.sock:
-            raise socket.error(msg)
-
-
-
-class CLocalTimeoutHTTPConnection(CTimeoutHTTPConnection):
-    """
-    Modification of httplib.HTTPConnection with timeout for sockets.
-    """
-
-    _rpdb2_timeout = LOCAL_TIMEOUT
+        _rpdb2_timeout = PING_TIMEOUT
+        
+        def connect(self):
+            """Connect to the host and port specified in __init__."""
+            msg = "getaddrinfo returns an empty list"
+            for res in socket.getaddrinfo(self.host, self.port, 0,
+                                          socket.SOCK_STREAM):
+                af, socktype, proto, canonname, sa = res
+                try:
+                    self.sock = socket.socket(af, socktype, proto)
+                    self.sock.settimeout(self._rpdb2_timeout)
+                    if self.debuglevel > 0:
+                        print_debug("connect: (%s, %s)" % (self.host, self.port))
+                    self.sock.connect(sa)
+                except socket.error:
+                    msg = sys.exc_info()[1]
+                    if self.debuglevel > 0:
+                        print_debug('connect fail: ' + repr((self.host, self.port)))
+                    if self.sock:
+                        self.sock.close()
+                    self.sock = None
+                    continue
+                break
+            if not self.sock:
+                raise socket.error(msg)
 
 
 
-class CTimeoutHTTP(httplib.HTTP):
-    """
-    Modification of httplib.HTTP with timeout for sockets.
-    """
-    
-    _connection_class = CTimeoutHTTPConnection
+    #
+    # MOD
+    #
+    class CLocalTimeoutHTTPConnection(CTimeoutHTTPConnection):
+        """
+        Modification of httplib.HTTPConnection with timeout for sockets.
+        """
+
+        _rpdb2_timeout = LOCAL_TIMEOUT
+
+
+
+    #
+    # MOD
+    #
+    class CTimeoutHTTP(httplib.HTTP):
+        """
+        Modification of httplib.HTTP with timeout for sockets.
+        """
+        
+        _connection_class = CTimeoutHTTPConnection
+
+        
+            
+    #
+    # MOD
+    #
+    class CLocalTimeoutHTTP(httplib.HTTP):
+        """
+        Modification of httplib.HTTP with timeout for sockets.
+        """
+        
+        _connection_class = CLocalTimeoutHTTPConnection
 
     
         
-class CLocalTimeoutHTTP(httplib.HTTP):
-    """
-    Modification of httplib.HTTP with timeout for sockets.
-    """
-    
-    _connection_class = CLocalTimeoutHTTPConnection
-
-    
+    #
+    # MOD
+    #
+    class CTimeoutTransport(xmlrpclib.Transport):
+        """
+        Modification of xmlrpclib.Transport with timeout for sockets.
+        """
         
-class CTimeoutTransport(xmlrpclib.Transport):
-    """
-    Modification of xmlrpclib.Transport with timeout for sockets.
-    """
-    
-    def make_connection(self, host):
-        # create a HTTP connection object from a host descriptor
-        host, extra_headers, x509 = self.get_host_info(host)
-        return CTimeoutHTTP(host)
+        def make_connection(self, host):
+            # create a HTTP connection object from a host descriptor
+            host, extra_headers, x509 = self.get_host_info(host)
+            return CTimeoutHTTP(host)
+
+        
+        
+    #
+    # MOD
+    #
+    class CLocalTimeoutTransport(xmlrpclib.Transport):
+        """
+        Modification of xmlrpclib.Transport with timeout for sockets.
+        """
+        
+        def make_connection(self, host):
+            # create a HTTP connection object from a host descriptor
+            host, extra_headers, x509 = self.get_host_info(host)
+            return CLocalTimeoutHTTP(host)
+
+else:
+    #
+    # MOD
+    #
+    class CTimeoutTransport(xmlrpclib.Transport):
+        """
+        Modification of xmlrpclib.Transport with timeout for sockets.
+        """
+        
+        def send_request(self, host, handler, request_body, debug):
+            host, extra_headers, x509 = self.get_host_info(host)
+            connection = httplib.HTTPConnection(host, timeout = PING_TIMEOUT)
+            if debug:
+                connection.set_debuglevel(1)
+            headers = {}
+            if extra_headers:
+                for key, val in extra_headers:
+                    header[key] = val
+            headers["Content-Type"] = "text/xml"
+            headers["User-Agent"] = self.user_agent
+            connection.request("POST", handler, request_body, headers)
+            return connection
+
+        
+        
+    #
+    # MOD
+    #
+    class CLocalTimeoutTransport(xmlrpclib.Transport):
+        """
+        Modification of xmlrpclib.Transport with timeout for sockets.
+        """
+        
+        def send_request(self, host, handler, request_body, debug):
+            host, extra_headers, x509 = self.get_host_info(host)
+            connection = httplib.HTTPConnection(host, timeout = LOCAL_TIMEOUT)
+            if debug:
+                connection.set_debuglevel(1)
+            headers = {}
+            if extra_headers:
+                for key, val in extra_headers:
+                    header[key] = val
+            headers["Content-Type"] = "text/xml"
+            headers["User-Agent"] = self.user_agent
+            connection.request("POST", handler, request_body, headers)
+            return connection
+
 
     
-    
-class CLocalTimeoutTransport(xmlrpclib.Transport):
-    """
-    Modification of xmlrpclib.Transport with timeout for sockets.
-    """
-    
-    def make_connection(self, host):
-        # create a HTTP connection object from a host descriptor
-        host, extra_headers, x509 = self.get_host_info(host)
-        return CLocalTimeoutHTTP(host)
-
-    
-    
+#
+# MOD
+#
 class CLocalTransport(xmlrpclib.Transport):
     """
     Modification of xmlrpclib.Transport to work around Zonealarm sockets
@@ -11738,6 +11822,9 @@ def myimport(*args, **kwargs):
 
 
 
+#
+# MOD
+#
 def workaround_import_deadlock():
     xmlrpclib.loads(XML_DATA)    
     pickle.loads('(S\'\\xb3\\x95\\xf9\\x1d\\x105c\\xc6\\xe2t\\x9a\\xa5_`\\xa59\'\np0\nS"(I0\\nI1\\nS\'5657827\'\\np0\\n(S\'server_info\'\\np1\\n(tI0\\ntp2\\ntp3\\n."\np1\ntp2\n.0000000')
