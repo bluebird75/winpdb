@@ -67,7 +67,7 @@ if os.name == 'nt':
     path2 = expandPath(os.path.abspath(os.path.dirname(__file__))).lower()
 
     if not path2.startswith(path1):
-        print >> sys.__stderr__, STR_VERSIONS_ERROR_MSG
+        sys.__stderr__.write(STR_VERSIONS_ERROR_MSG)
         
         try:
             import Tkinter

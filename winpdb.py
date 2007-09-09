@@ -299,7 +299,7 @@ if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
         import wxversion   
         wxversion.ensureMinimal(WXVER)
     except ImportError:
-        print >> sys.__stderr__, STR_WXPYTHON_ERROR_MSG
+        rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
         
         try:
             import Tkinter
@@ -2123,7 +2123,7 @@ class CSourceManager:
 
 
     def is_in_files(self, filename):
-        for k in self.m_files.keys():
+        for k in list(self.m_files.keys()):
             if filename in k:
                 return True
 
@@ -2131,7 +2131,7 @@ class CSourceManager:
         
     
     def get_source(self, filename):
-        for k, v in self.m_files.items():
+        for k, v in list(self.m_files.items()):
             if not filename in k:
                 continue
 
@@ -2530,6 +2530,11 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_exit_command = kwargs.pop('exit_command')
 
         wx.Panel.__init__(self, *args, **kwargs)
+
+        #
+        # CConsole acts as stdout so it exposes the encoding property.
+        #
+        self.encoding = wx.GetDefaultPyEncoding()
 
         self.m_history = ['']
         self.m_history_index = 0
@@ -4022,7 +4027,7 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
     except SystemError:
         if os.name == rpdb2.POSIX:
-            print >> sys.__stderr__, STR_X_ERROR_MSG
+            rpdb2._print(STR_X_ERROR_MSG, sys.__stderr__)
             sys.exit(1)
 
         raise
@@ -4038,7 +4043,7 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 def main():
     if rpdb2.get_version() != "RPDB_2_2_3":
-        print STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_3", rpdb2.get_version())
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_3", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient)
