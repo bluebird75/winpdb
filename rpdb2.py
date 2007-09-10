@@ -413,7 +413,7 @@ def start_embedded_debugger_interactive_password(
             stdout.write('Please type password:')
             
         _rpdb2_pwd = stdin.readline().rstrip('\n')
-        _rpdb2_pwd = as_unicode(_rpdb2_pwd, stdin.encoding)
+        _rpdb2_pwd = as_unicode(_rpdb2_pwd, stdin.encoding, fstrict = True)
 
         try:
             return __start_embedded_debugger(
@@ -506,7 +506,7 @@ class CSimpleSessionManager:
 
 
     def launch(self, fchdir, command_line, encoding = 'utf-8'):
-        command_line = as_unicode(command_line, encoding)
+        command_line = as_unicode(command_line, encoding, fstrict = True)
 
         self.m_fRunning = False
         self.m_termination_lineno = None
@@ -645,7 +645,7 @@ class CSessionManager:
     def __init__(self, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host):
         if _rpdb2_pwd != None:
             assert(is_valid_pwd(_rpdb2_pwd))
-            _rpdb2_pwd = as_unicode(_rpdb2_pwd)
+            _rpdb2_pwd = as_unicode(_rpdb2_pwd, fstrict = True)
 
         self.__smi = CSessionManagerInternal(
                             _rpdb2_pwd, 
@@ -710,7 +710,7 @@ class CSessionManager:
         with the given encoding
         """
         
-        command_line = as_unicode(command_line, encoding)
+        command_line = as_unicode(command_line, encoding, fstrict = True)
 
         return self.__smi.launch(fchdir, command_line)
 
@@ -743,9 +743,9 @@ class CSessionManager:
         with the given encoding
         """
        
-        key = as_unicode(key, encoding)
+        key = as_unicode(key, encoding, fstrict = True)
 
-        return self.__smi.attach(key, name, encoding = encoding)
+        return self.__smi.attach(key, name)
 
 
     def detach(self):
@@ -769,7 +769,7 @@ class CSessionManager:
         Go (run) until the specified location is reached.
         """
        
-        filename = as_unicode(filename)
+        filename = as_unicode(filename, fstrict = True)
 
         return self.__smi.request_go_breakpoint(filename, scope, lineno)
 
@@ -827,8 +827,8 @@ class CSessionManager:
                        occur only if the expression evaluates to true.
         """
 
-        filename = as_unicode(filename)
-        expr = as_unicode(expr)
+        filename = as_unicode(filename, fstrict = True)
+        expr = as_unicode(expr, fstrict = True)
 
         return self.__smi.set_breakpoint(
                                 filename, 
@@ -944,7 +944,7 @@ class CSessionManager:
 
 
     def get_source_file(self, filename, lineno, nlines):
-        filename = as_unicode(filename)
+        filename = as_unicode(filename, fstrict = True)
 
         return self.__smi.get_source_file(filename, lineno, nlines)
 
@@ -1095,6 +1095,8 @@ class CSessionManager:
         NOTE: This call might not return since debugged script logic can lead
         to tmporary locking or even deadlocking.
         """
+
+        expr = as_unicode(expr, fstrict = True)
         
         return self.__smi.evaluate(expr)
 
@@ -1111,6 +1113,8 @@ class CSessionManager:
         to tmporary locking or even deadlocking.
         """
         
+        suite = as_unicode(suite, fstrict = True)
+
         return self.__smi.execute(suite)
 
 
@@ -1145,7 +1149,9 @@ class CSessionManager:
         Set the password that will govern the authentication and encryption
         of client-server communication.
         """
-        
+       
+        _rpdb2_pwd = as_unicode(_rpdb2_pwd, fstrict = True)
+
         return self.__smi.set_password(_rpdb2_pwd)
 
 
@@ -1268,12 +1274,14 @@ class CConsole:
         return self.m_ci.join()
 
 
+    """
     def set_encoding(self, _encoding, funicode_output):
-        """
+        "" "
         Set the console encoding. if funicode_output is True, any output will
         be done directly with unicode.
-        """
+        "" "
         return self.m_ci.set_encoding(_encoding, funicode_output)
+    """
 
 
     def set_filename(self, filename):
@@ -1282,6 +1290,9 @@ class CConsole:
         from outside the console when the console is embeded in other 
         components, for example take a look at Winpdb. 
         """
+
+        filename = as_unicode(filename)
+
         return self.m_ci.set_filename(filename)
 
     
@@ -1700,8 +1711,6 @@ FORK_AUTO = 'auto'
 ENCRYPTION_ENABLED = 'encrypted'
 ENCRYPTION_DISABLED = 'plain-text'
 
-ENCRYPTION_PREFIX = 'encrypted'
-
 STATE_ENABLED = 'enabled'
 STATE_DISABLED = 'disabled'
 
@@ -1932,16 +1941,20 @@ def _raw_input(s):
         return input(s)
 
     i = raw_input(s)
-    i = as_unicode(i, sys.stdin.encoding)
+    i = as_unicode(i, sys.stdin.encoding, fstrict = True)
 
     return i
 
 
 
 def _print(s, f = sys.stdout, feol = True):
+    s = as_unicode(s)
+
+    encoding = None
     if hasattr(f, 'encoding'):
         encoding = f.encoding
-    else:
+
+    if encoding == None:
         encoding = detect_locale()
 
     s = as_string(s, encoding)
@@ -1964,32 +1977,52 @@ def is_unicode(s):
 
 
 
-def as_unicode(s, encoding = 'utf-8'):
+def as_unicode(s, encoding = 'utf-8', fstrict = False):
     if is_unicode(s):
         return s
 
-    u = s.decode(encoding, 'replace')
+    if fstrict:
+        u = s.decode(encoding)
+    else:
+        u = s.decode(encoding, 'replace')
+
     return u
 
 
 
-def as_string(s, encoding = 'utf-8'):
+def as_string(s, encoding = 'utf-8', fstrict = False):
     if is_py3k():
-        return s
+        if is_unicode(s):
+            return s
+
+        if fstrict:
+            e = s.decode(encoding)
+        else:
+            e = s.decode(encoding, 'replace')
+
+        return e
 
     if not is_unicode(s):
         return s
 
-    e = s.encode(encoding, 'replace')
+    if fstrict:
+        e = s.encode(encoding)
+    else:
+        e = s.encode(encoding, 'replace')
+
     return e
 
 
 
-def as_bytes(s):
+def as_bytes(s, encoding = 'utf-8', fstrict = True):
     if not is_unicode(s):
         return s
 
-    b = s.encode('utf-8')
+    if fstrict:
+        b = s.encode(encoding)
+    else:
+        b = s.encode(encoding, 'replace')
+
     return b
 
 
@@ -2278,7 +2311,7 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
 
 
 
-def print_debug(str):
+def print_debug(_str):
     if not g_fDebug:
         return
 
@@ -2286,7 +2319,7 @@ def print_debug(str):
     l = time.localtime(t)
     s = time.strftime('%H:%M:%S', l) + '.%03d' % ((t - int(t)) * 1000)
 
-    _print(s + ' RPDB2: ' + str, sys.__stderr__)
+    _print(s + ' RPDB2: ' + _str, sys.__stderr__)
 
 
 
@@ -2386,7 +2419,7 @@ def split_path(path):
 
 
 def my_os_path_join(dirname, basename):
-    if type(dirname) == str and type(basename) == str:
+    if is_py3k() or (type(dirname) == str and type(basename) == str):
         return os.path.join(dirname, basename)
 
     encoding = sys.getfilesystemencoding()
@@ -2760,9 +2793,9 @@ def IsFileInPath(filename):
 
 
 
-def IsPrefixInEnviron(str):
+def IsPrefixInEnviron(_str):
     for e in os.environ.keys():
-        if e.startswith(str):
+        if e.startswith(_str):
             return True
 
     return False
@@ -3073,16 +3106,16 @@ def generate_rid():
 
 
 
-def generate_random_char(str):
+def generate_random_char(_str):
     """
     Return a random character from string argument.
     """
     
-    if str == '':
+    if _str == '':
         return ''
         
-    i = random.randint(0, len(str) - 1)
-    return str[i]
+    i = random.randint(0, len(_str) - 1)
+    return _str[i]
 
 
 
@@ -3140,29 +3173,29 @@ def is_encryption_supported():
 
 
 
-def calc_suffix(str, n):
+def calc_suffix(_str, n):
     """
     Return an n charaters suffix of the argument string of the form
     '...suffix'.
     """
     
-    if len(str) <= n:
-        return str
+    if len(_str) <= n:
+        return _str
 
-    return '...' + str[-(n - 3):]
+    return '...' + _str[-(n - 3):]
 
 
     
-def calc_prefix(str, n):
+def calc_prefix(_str, n):
     """
     Return an n charaters prefix of the argument string of the form
     'prefix...'.
     """
     
-    if len(str) <= n:
-        return str
+    if len(_str) <= n:
+        return _str
 
-    return str[: (n - 3)] + '...'
+    return _str[: (n - 3)] + '...'
 
 
 
@@ -3297,7 +3330,7 @@ def read_pwd_file(rid):
     _rpdb2_pwd = p.read()
     p.close()
 
-    _rpdb2_pwd = as_unicode(_rpdb2_pwd)
+    _rpdb2_pwd = as_unicode(_rpdb2_pwd, fstrict = True)
 
     return _rpdb2_pwd
     
@@ -3841,94 +3874,92 @@ class CCrypto:
         return self.m_max_index
 
 
-    def is_encrypted(self, str):
-        return str.startswith(ENCRYPTION_PREFIX)
-
-        
-    def do_crypto(self, s, fEncryption):
+    def do_crypto(self, args, fencrypt):
         """
-        Sign string s and possibly encrypt it. 
+        Sign args and possibly encrypt. 
         Return signed/encrypted string.
         """
         
-        _s = self.__sign(s)
+        (digest, s) = self.__sign(args)
 
-        if not fEncryption:
-            if self.m_fAllowUnencrypted:
-                return _s
+        if not fencrypt:
+            if not self.m_fAllowUnencrypted:
+                raise EncryptionExpected
 
-            raise EncryptionExpected  
-            
-        if not is_encryption_supported():
-            raise EncryptionNotSupported
+        else:
+            if not is_encryption_supported():
+                raise EncryptionNotSupported
 
-        s_encrypted = self.__encrypt(_s)
-        return s_encrypted    
+            s = self.__encrypt(s)
+
+        u = as_unicode(s)
+        
+        return (digest, u)
 
 
-    def undo_crypto(self, s_encrypted, fVerifyIndex = True):
+    def undo_crypto(self, fencrypt, digest, msg, fVerifyIndex = True):
         """
         Take crypto string, verify its signature and decrypt it, if
         needed.
         """
 
-        (_s, fEncryption) = self.__decrypt(s_encrypted)            
-        s, id = self.__verify_signature(_s, fVerifyIndex)
+        s = as_bytes(msg)
 
-        return (s, id, fEncryption)
+        if not fencrypt:
+            if not self.m_fAllowUnencrypted:
+                raise EncryptionExpected
+
+        else:
+            if not is_encryption_supported():
+                raise EncryptionNotSupported
+        
+            s = self.__decrypt(s)
+
+        args, id = self.__verify_signature(digest, s, fVerifyIndex)
+
+        return (args, id)
 
     
     def __encrypt(self, s):
-        s_padded = s + '0' * (DES.block_size - (len(s) % DES.block_size))
+        s_padded = s + as_bytes('\x00') * (DES.block_size - (len(s) % DES.block_size))
 
-        key_padded = (self.m_key + '0' * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
+        key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
         iv = '0' * DES.block_size
         
         d = DES.new(key_padded, DES.MODE_CBC, iv)
         r = d.encrypt(s_padded)
+        b = base64.encodestring(r)
 
-        s_encoded = base64.encodestring(r)
-        return ENCRYPTION_PREFIX + s_encoded
+        return b
 
 
     def __decrypt(self, s):
-        if not s.startswith(ENCRYPTION_PREFIX):
-            if self.m_fAllowUnencrypted:
-                return (s, False)
-                
-            raise EncryptionExpected
-
-        if not is_encryption_supported():
-            raise EncryptionNotSupported
-        
-        s_encoded = s[len(ENCRYPTION_PREFIX):]
-        
         try:
-            _r = base64.decodestring(s_encoded)
-
-            key_padded = (self.m_key + '0' * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
+            key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
             iv = '0' * DES.block_size
             
             d = DES.new(key_padded, DES.MODE_CBC, iv)
-            _s = d.decrypt(_r)
+            b = base64.decodestring(s)
+            _s = d.decrypt(b).strip(as_bytes('\x00'))
 
-            return (_s, True)
+            return _s
             
         except:
             self.__wait_a_little()
             raise DecryptionFailure
 
 
-    def __sign(self, s):
+    def __sign(self, args):
         i = self.__get_next_index()
-        _s = pickle.dumps((self.m_index_anchor_ex, i, self.m_rid, s))
+        pack = (self.m_index_anchor_ex, i, self.m_rid, args)
         
-        h = hmac.new(self.m_key, _s)
-        _d = h.digest()
-        r = (_d, _s)
-        s_signed = pickle.dumps(r)
+        s = pickle.dumps(pack, 0)
+        h = hmac.new(self.m_key, s)
+        d = h.hexdigest()
 
-        return s_signed
+        #print_debug('%s, %s' % (len(s), d))
+
+        return (d, s)
 
 
     def __get_next_index(self):
@@ -3942,23 +3973,23 @@ class CCrypto:
             self.m_lock.release()
 
 
-    def __verify_signature(self, s, fVerifyIndex):
+    def __verify_signature(self, digest, s, fVerifyIndex):
         try:
-            r = pickle.loads(s)
-            
-            (_d, _s) = r
-            
-            h = hmac.new(self.m_key, _s)
-            d = h.digest()
+            h = hmac.new(self.m_key, s)
+            d = h.hexdigest()
 
-            if _d != d:
+            #print_debug('%s, %s, %s' % (len(s), digest, d))
+
+            if d != digest:
                 self.__wait_a_little()
                 raise AuthenticationFailure
 
-            (anchor, i, id, s_original) = pickle.loads(_s)
+            pack = pickle.loads(s)
+            (anchor, i, id, args) = pack
                 
         except AuthenticationFailure:
             raise
+
         except:
             print_debug_exception()
             self.__wait_a_little()
@@ -3967,7 +3998,7 @@ class CCrypto:
         if fVerifyIndex:
             self.__verify_index(anchor, i, id)
 
-        return s_original, id
+        return args, id
 
         
     def __verify_index(self, anchor, i, id):
@@ -4088,11 +4119,11 @@ class CEventState(CEvent):
     """
     
     def __init__(self, state):
-        self.m_state = state
+        self.m_state = as_unicode(state)
 
 
     def is_match(self, arg):
-        return self.m_state == arg
+        return self.m_state == as_unicode(arg)
 
 
 
@@ -4170,7 +4201,7 @@ class CEventThreadBroken(CEvent):
     
     def __init__(self, tid, name):
         self.m_tid = tid
-        self.m_name = name
+        self.m_name = as_unicode(name)
 
 
         
@@ -4220,7 +4251,7 @@ class CEventBreakpoint(CEvent):
         self.m_bp = copy.copy(bp)
         if self.m_bp is not None:
             self.m_bp.m_code = None
-            self.m_bp.m_filename = self.m_bp.m_filename.decode(sys.getfilesystemencoding())
+            self.m_bp.m_filename = as_unicode(self.m_bp.m_filename, sys.getfilesystemencoding())
         
         self.m_action = action
         self.m_id_list = id_list
@@ -6890,6 +6921,7 @@ class CDebuggerEngine(CDebuggerCore):
             self.set_all_tracers()
 
             event = CEventBreakpoint(bp)
+            #print_debug(repr(vars(bp)))
             self.m_event_dispatcher.fire_event(event)
 
         finally:
@@ -7706,9 +7738,6 @@ class CDebuggerEngine(CDebuggerCore):
         Evaluate expression in context of frame at depth 'frame-index'.
         """
         
-        if type(expr) == str:
-            expr = expr.decode('utf-8')
-
         (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException)
 
         v = ''
@@ -7734,7 +7763,7 @@ class CDebuggerEngine(CDebuggerCore):
 
         self.notify_namespace()
 
-        return (v, w, e)
+        return (as_unicode(v), as_unicode(w), as_unicode(e))
 
         
     def execute(self, suite, frame_index, fException):
@@ -7743,9 +7772,6 @@ class CDebuggerEngine(CDebuggerCore):
         depth 'frame-index'.
         """
        
-        if type(suite) == str:
-            suite = suite.decode('utf-8')
-
         print_debug('exec called with: ' + repr(suite))
 
         (_globals, _locals, _original_locals_copy) = self.__get_locals_globals(frame_index, fException)
@@ -7784,13 +7810,11 @@ class CDebuggerEngine(CDebuggerCore):
         
         self.notify_namespace()
         
-        return (w, e)
+        return (as_unicode(w), as_unicode(e))
 
 
     def __decode_thread_name(self, name):
-        if type(name) == str:
-            name = name.decode('utf-8', 'replace')
-
+        name = as_unicode(name)
         return name
 
 
@@ -7807,8 +7831,15 @@ class CDebuggerEngine(CDebuggerCore):
             current_thread_id = ctx.m_thread_id  
             
         ctx_list = list(self.get_threads().values())
-        
-        tl = [{DICT_KEY_TID: c.m_thread_id, DICT_KEY_NAME: self.__decode_thread_name(c.m_thread_name), DICT_KEY_BROKEN: c.m_fBroken, DICT_KEY_EVENT: c.m_event} for c in ctx_list]
+       
+        tl = []
+        for c in ctx_list:
+            d = {}
+            d[DICT_KEY_TID] = c.m_thread_id
+            d[DICT_KEY_NAME] = self.__decode_thread_name(c.m_thread_name)
+            d[DICT_KEY_BROKEN] = c.m_fBroken
+            d[DICT_KEY_EVENT] = as_unicode(c.m_event)
+            tl.append(d)
 
         return (current_thread_id, tl)
 
@@ -7849,17 +7880,11 @@ class CDebuggerEngine(CDebuggerCore):
         encoding = detect_locale() 
 
         for k, v in envmap:
-            if type(k) == unicode:
-                try:
-                    k = k.encode(encoding)
-                except:
-                    continue
-
-            if type(v) == unicode:
-                try:
-                    v = v.encode(encoding)
-                except:
-                    continue
+            try:
+                k = as_string(k, encoding, fstrict = True)
+                v = as_string(v, encoding, fstrict = True)
+            except:
+                continue
 
             command = 'echo %s' % v
             
@@ -8128,16 +8153,19 @@ class CPwdServerProxy:
                 #
                 # Encrypt method and params.
                 #
-                _params = self.m_crypto.do_crypto((name, params, self.m_target_rid), self.get_encryption())
+                fencrypt = self.get_encryption()
+                args = (name, params, self.m_target_rid)
+                (digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
 
-                rpdb_version = get_interface_compatibility_version()
+                rpdb_version = as_unicode(get_interface_compatibility_version())
 
-                r = self.m_method(rpdb_version + _params)
+                r = self.m_method(rpdb_version, fencrypt, digest, msg)
+                (fencrypt, digest, msg) = r
                 
                 #
                 # Decrypt response.
                 #
-                ((max_index, _r, _e), id, fe)= self.m_crypto.undo_crypto(r, fVerifyIndex = False)
+                ((max_index, _r, _e), id) = self.m_crypto.undo_crypto(fencrypt, digest, msg, fVerifyIndex = False)
                 
                 if _e is not None:
                     raise _e
@@ -8265,23 +8293,22 @@ class CIOServer:
             self.m_server.handle_request()
             
         
-    def dispatcher_method(self, params):
+    def dispatcher_method(self, rpdb_version, fencrypt, digest, msg):
         """
         Process RPC call.
         """
         
-        rpdb_version = get_interface_compatibility_version()
+        #print_debug('dispatcher_method() called with: %s, %s, %s, %s' % (rpdb_version, fencrypt, digest, msg[:100]))
 
-        if params[: len(rpdb_version)] != rpdb_version:
-            raise BadVersion(get_version())
-
-        _params = params[len(rpdb_version):]
+        if rpdb_version != as_unicode(get_interface_compatibility_version()):
+            raise BadVersion(as_unicode(get_version()))
 
         try:
             #
             # Decrypt parameters.
             #
-            ((name, _params, target_rid), client_id, fEncryption) = self.m_crypto.undo_crypto(_params)
+            ((name, __params, target_rid), client_id) = self.m_crypto.undo_crypto(fencrypt, digest, msg)
+            
         except AuthenticationBadIndex:
             e = sys.exc_info()[1]
             #print_debug_exception()
@@ -8289,10 +8316,10 @@ class CIOServer:
             #
             # Notify the caller on the expected index.
             #
-            fEncryption = self.m_crypto.is_encrypted(_params)                           
             max_index = self.m_crypto.get_max_index()
-            _r = self.m_crypto.do_crypto((max_index, None, e), fEncryption)
-            return _r
+            args = (max_index, None, e)
+            (digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
+            return (fencrypt, digest, msg)
             
         r = None
         e = None
@@ -8314,9 +8341,9 @@ class CIOServer:
             #
             # Record that client id is still attached. 
             #
-            self.record_client_heartbeat(client_id, name, _params)
+            self.record_client_heartbeat(client_id, name, __params)
 
-            r = func(*_params)
+            r = func(*__params)
 
         except Exception:
             _e = sys.exc_info()[1]
@@ -8327,8 +8354,9 @@ class CIOServer:
         # Send the encrypted result.
         #
         max_index = self.m_crypto.get_max_index()
-        _r = self.m_crypto.do_crypto((max_index, r, e), fEncryption)
-        return _r
+        args = (max_index, r, e)
+        (digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
+        return (fencrypt, digest, msg)
 
 
     def __StartXMLRPCServer(self):
@@ -8370,7 +8398,7 @@ class CServerInfo:
         self.m_port = port
         self.m_pid = pid
         self.m_filename = as_unicode(filename, sys.getfilesystemencoding())
-        self.m_module_name = CalcModuleName(self.m_filename)
+        self.m_module_name = as_unicode(CalcModuleName(filename), sys.getfilesystemencoding())
         self.m_rid = rid
         self.m_state = as_unicode(state)
         self.m_fembedded = fembedded
@@ -8897,11 +8925,8 @@ class CServerList:
             n = int(key)
             _s = [s for s in self.m_list if (s.m_pid == n) or (s.m_rid == key)]
 
-        except ValueError: 
-            if type(key) == unicode:
-                fse = sys.getfilesystemencoding()
-                key = key.encode(fse)
-
+        except ValueError:
+            key = as_string(key, sys.getfilesystemencoding())
             _s = [s for s in self.m_list if key in s.m_filename]
 
         if _s == []:
@@ -8982,7 +9007,7 @@ class CSessionManagerInternal:
         self.m_state_manager.shutdown()
 
         
-    def __nul_printer(self, str):
+    def __nul_printer(self, _str):
         pass
 
         
@@ -9138,8 +9163,10 @@ class CSessionManagerInternal:
         b = ''
         if ExpandedFilename in g_found_unicode_files:
             u = g_found_unicode_files[ExpandedFilename]
-            _u = u.encode('utf-8')
-            _b = base64.encodestring(_u).strip('\n').translate(g_safe_base64_to)
+            _u = as_bytes(u)
+            _b = base64.encodestring(_u)
+            _b = _b.strip('\n').translate(g_safe_base64_to)
+            _b = as_string(_b, fstrict = True)
             b = ' --base64=%s' % _b
 
         fse = sys.getfilesystemencoding()
@@ -9690,6 +9717,8 @@ class CSessionManagerInternal:
 
 
     def evaluate(self, expr):
+        assert(is_unicode(expr))
+
         self.__verify_attached()
         self.__verify_broken()
 
@@ -9701,6 +9730,8 @@ class CSessionManagerInternal:
 
         
     def execute(self, suite):
+        assert(is_unicode(suite))
+
         self.__verify_attached()
         self.__verify_broken()
 
@@ -9870,10 +9901,12 @@ class CSessionManagerInternal:
 
 
     def get_state(self):
-        return self.m_state_manager.get_state()
+        return as_unicode(self.m_state_manager.get_state())
 
 
-    def set_password(self, _rpdb2_pwd): 
+    def set_password(self, _rpdb2_pwd):
+        assert(is_unicode(_rpdb2_pwd))
+
         if not is_valid_pwd(_rpdb2_pwd):
             raise BadArgument
 
@@ -9922,20 +9955,15 @@ class CSessionManagerInternal:
     def set_environ(self, envmap):
         self.m_environment = []
 
-        for k, v in envmap: 
-            if type(k) == str:
-                k = k.decode('utf-8')
+        try:
+            for k, v in envmap: 
+                k = as_unicode(k, fstrict = True)
+                v = as_unicode(v, fstrict = True)
 
-            if type(k) != unicode:
-                raise BadArgument
-
-            if type(v) == str:
-                v = v.decode('utf-8')
-
-            if type(v) != unicode:
-                raise BadArgument
-
-            self.m_environment.append((k, v))
+                self.m_environment.append((k, v))
+        
+        except:
+            raise BadArgument
 
 
     def get_environ(self):
@@ -9968,6 +9996,7 @@ class CSessionManagerInternal:
 
 
 
+"""
 class CStdoutWrapper:
     def __init__(self, stdout, encoding):
         self.m_stdout = stdout
@@ -9989,6 +10018,7 @@ class CStdoutWrapper:
 
     def flush(self):
         self.m_stdout.flush()
+"""
 
 
 
@@ -10002,7 +10032,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.fAnalyzeMode = False
         self.fPrintBroken = True
 
-        self.m_filename = None
+        self.m_filename = ''
         
         self.use_rawinput = [1, 0][fSplit]
         self.m_fSplit = fSplit
@@ -10029,7 +10059,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_eInLoop = threading.Event()
         self.cmdqueue.insert(0, '')
 
-        self.m_stdout = CStdoutWrapper(self.stdout, self.__detect_encoding(self.stdout))
+        self.m_stdout = self.stdout #CStdoutWrapper(self.stdout, self.__detect_encoding(self.stdout))
         self.m_encoding = self.__detect_encoding(self.stdin)
 
         g_fDefaultStd = (stdin == None)
@@ -10044,6 +10074,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         return detect_locale()
 
 
+    """
     def set_encoding(self, _encoding, funicode_output):
         try:
             codecs.lookup(_encoding)
@@ -10052,18 +10083,17 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         self.m_encoding = _encoding
         self.m_stdout.set_encoding(_encoding, funicode_output)
+    """
 
 
     def set_filename(self, filename):
-        if type(filename) == str:
-            filename = filename.decode('utf-8')
+        assert(is_unicode(filename))
 
         self.m_filename = filename
 
 
     def precmd(self, line):
-        if type(line) == str:
-            line = line.decode(self.m_encoding, 'replace')
+        line = as_unicode(line, self.m_encoding)
 
         self.m_fAddPromptBeforeMsg = True
         if not self.m_eInLoop.isSet():
@@ -10142,7 +10172,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         s = _str
         while s != '':
             s, _s = self.__get_str_wrap(s, CONSOLE_WRAP_INDEX - len(prefix + suffix))
-            self.m_stdout.write(prefix + s + suffix)
+            _print(prefix + s + suffix, self.m_stdout, feol = False)
             s = _s 
 
         self.m_stdout.flush()
@@ -11883,6 +11913,8 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
 
     
 def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid): 
+    assert(is_unicode(_rpdb2_pwd))
+
     global g_server
     global g_debugger
     global g_module_main
@@ -11894,7 +11926,7 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
         if fchdir:   
             os.chdir(os.path.dirname(_path))
 
-        if type(_path) == unicode:
+        if ExpandedFilename in g_found_unicode_files:
             prefix = os.path.join(os.getcwdu(), '')
             _path = _path.replace(winlower(prefix), '')
         
@@ -11947,6 +11979,9 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
 
 def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host):
+    assert(is_unicode(command_line))
+    assert(_rpdb2_pwd == None or is_unicode(_rpdb2_pwd))
+
     if (not fAllowUnencrypted) and not is_encryption_supported():
         _print(STR_ENCRYPTION_SUPPORT_ERROR)
         return 2
@@ -11959,9 +11994,9 @@ def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fA
 
     try:
         if fAttach:
-            sm.attach(command_line, encoding = detect_locale())
+            sm.attach(command_line)
         elif command_line != '':
-            sm.launch(fchdir, command_line, encoding = detect_locale())
+            sm.launch(fchdir, command_line)
             
     except (socket.error, CConnectionException):
         sm.report_exception(*sys.exc_info())
@@ -12146,8 +12181,9 @@ def main(StartClient_func = StartClient):
     if fWrap or fSpawn:
         try:
             if encoded_path != None:
-                _u = base64.decodestring(encoded_path.translate(g_safe_base64_from))
-                _path = _u.decode('utf-8')
+                _b = as_bytes(encoded_path).translate(g_safe_base64_from)
+                _u = base64.decodestring(_b)
+                _path = as_unicode(_u)
                 _rpdb2_args[0] = _path
 
             FindFile(_rpdb2_args[0])
@@ -12166,7 +12202,7 @@ def main(StartClient_func = StartClient):
         StartClient_func(_rpdb2_args[0], fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
         
     elif fStart:
-        StartClient_func('', fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(as_unicode(''), fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
         
     else:
         if len(_rpdb2_args) == 0:

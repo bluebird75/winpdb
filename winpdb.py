@@ -651,6 +651,8 @@ g_ignored_warnings = {'': True}
 
 g_fUnicode = 'unicode' in wx.PlatformInfo
 
+assert(g_fUnicode or not rpdb2.is_py3k())
+
 
 
 def open_new(url):
@@ -666,7 +668,8 @@ def open_new(url):
 
 
 def image_from_base64(str_b64):
-    s = base64.decodestring(str_b64)
+    b = rpdb2.as_bytes(str_b64)
+    s = base64.decodestring(b)
     stream = cStringIO.StringIO(s)
     image = wx.ImageFromStream(stream)
 
@@ -2159,11 +2162,7 @@ class CSourceManager:
         if t == None:
             _filename = r[rpdb2.DICT_KEY_FILENAME]
             source_lines = r[rpdb2.DICT_KEY_LINES]
-            _source = string.join(source_lines, '')
-
-            source = _source.decode('utf-8')
-            if not g_fUnicode:
-                source = source.encode(wx.GetDefaultPyEncoding(), 'replace')
+            source = string.join(source_lines, '')
 
             _time = 0
         
@@ -2532,7 +2531,7 @@ class CConsole(wx.Panel, CCaptionManager):
         wx.Panel.__init__(self, *args, **kwargs)
 
         #
-        # CConsole acts as stdout so it exposes the encoding property.
+        # CConsole acts as stdin and stdout so it exposes the encoding property.
         #
         self.encoding = wx.GetDefaultPyEncoding()
 
@@ -2540,7 +2539,7 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_history_index = 0
         
         self.m_console = rpdb2.CConsole(self.m_session_manager, stdin = self, stdout = self, fSplit = True)
-        self.m_console.set_encoding(wx.GetDefaultPyEncoding(), g_fUnicode)
+        #self.m_console.set_encoding(wx.GetDefaultPyEncoding(), g_fUnicode)
 
         self.m_queue = Queue.Queue()
         
@@ -2623,16 +2622,8 @@ class CConsole(wx.Panel, CCaptionManager):
 
 
     def write(self, _str):
-        try:
-            if type(_str) == str:
-                _str = _str.decode('utf-8')
+        assert(rpdb2.is_py3k() or not rpdb2.is_unicode(_str))
 
-            if not g_fUnicode:
-                encoding = wx.GetDefaultPyEncoding()
-                _str = _str.encode(encoding, 'replace')
-        except:
-            pass
-            
         sl = _str.split('\n')
         
         _str = ''
@@ -2652,8 +2643,8 @@ class CConsole(wx.Panel, CCaptionManager):
 
 
     def readline(self):
-        str = self.m_queue.get()
-        return str
+        _str = self.m_queue.get()
+        return _str
 
 
     def OnChar(self, event):
@@ -2672,7 +2663,7 @@ class CConsole(wx.Panel, CCaptionManager):
     def OnSendText(self, event):
         value = self.m_console_in.GetValue()
         self.set_history(value)
-        
+
         self.m_console_out.write(CONSOLE_PROMPT + value + '\n') 
         self.m_console_in.Clear()
 
@@ -2680,6 +2671,8 @@ class CConsole(wx.Panel, CCaptionManager):
             self.m_exit_command()
             return
 
+        value = rpdb2.as_unicode(value, wx.GetDefaultPyEncoding())
+        
         self.m_queue.put(value + '\n')
 
             
@@ -2754,16 +2747,11 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
 
 
     def update_thread(self, thread_id, thread_name, fBroken):
+        assert(rpdb2.is_unicode(thread_name))
+
         index = self.m_threads.FindItemData(-1, thread_id)
         if index < 0:
             return -1
-
-        if type(thread_name) == str:
-            thread_name = thread_name.decode('utf-8')
-        
-        if not g_fUnicode:
-            encoding = wx.GetDefaultPyEncoding()
-            thread_name = thread_name.encode(encoding, 'replace')
 
         self.m_threads.SetStringItem(index, 1, thread_name)
         self.m_threads.SetStringItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
@@ -2892,16 +2880,10 @@ class CNamespacePanel(wx.Panel, CJobs):
             return
 
         _expr = expr_dialog.get_expression()
+
         expr_dialog.Destroy()
 
         _suite = "%s = %s" % (expr, _expr)
-
-        if not g_fUnicode and type(_suite) == str:
-            try:
-                encoding = wx.GetDefaultPyEncoding()
-                _suite = _suite.decode(encoding, 'replace')
-            except:
-                pass
         
         self.m_async_sm.with_callback(self.callback_execute).execute(_suite)
 
@@ -2992,16 +2974,8 @@ class CNamespacePanel(wx.Panel, CJobs):
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
        
         for r in snl:
-            #
-            # The following string are encoded as utf-8 by repr_ltd()
-            #
-            _name = r[rpdb2.DICT_KEY_NAME].decode('utf-8')
-            _repr = r[rpdb2.DICT_KEY_REPR].decode('utf-8')
-            
-            if not g_fUnicode:
-                encoding = wx.GetDefaultPyEncoding()
-                _name = _name.encode(encoding, 'replace')
-                _repr = _repr.encode(encoding, 'replace')
+            _name = r[rpdb2.DICT_KEY_NAME]
+            _repr = r[rpdb2.DICT_KEY_REPR]
 
             identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
             child = self.m_tree.AppendItem(item, identation + _name)
@@ -3360,13 +3334,6 @@ class CStackViewer(wx.Panel, CCaptionManager):
             
             filename = e[0]
 
-            if type(filename) == str:
-                filename = filename.decode('utf-8')
-            
-            if not g_fUnicode:
-                encoding = wx.GetDefaultPyEncoding()
-                filename = filename.encode(encoding, 'replace')
-            
             index = self.m_stack.InsertStringItem(sys.maxint, repr(i))
             self.m_stack.SetStringItem(index, 1, os.path.basename(filename))
             self.m_stack.SetStringItem(index, 2, repr(e[1]))
@@ -3582,6 +3549,8 @@ class CAttachDialog(wx.Dialog, CJobs):
         if host == '':
             host = 'localhost'
 
+        host = rpdb2.as_unicode(host, wx.GetDefaultPyEncoding())
+
         f = lambda r, exc_info: self.callback_sethost(r, exc_info, host)
         self.m_async_sm.with_callback(f).set_host(host)
 
@@ -3647,12 +3616,6 @@ class CAttachDialog(wx.Dialog, CJobs):
             index = self.m_listbox_scripts.InsertStringItem(sys.maxint, repr(s.m_pid))
             
             filename = s.m_filename
-            if type(filename) == str:
-                filename.decode('utf-8')
-
-            if not g_fUnicode:
-                encoding = wx.GetDefaultPyEncoding()
-                filename = filename.encode(encoding, 'replace')
 
             self.m_listbox_scripts.SetStringItem(index, 1, filename)
             self.m_listbox_scripts.SetItemData(index, i)
@@ -3732,7 +3695,10 @@ class CExpressionDialog(wx.Dialog):
 
                    
     def get_expression(self):
-        return self.m_entry_expr.GetValue()
+        expr = self.m_entry_expr.GetValue()
+        expr = rpdb2.as_unicode(expr, wx.GetDefaultPyEncoding())
+
+        return expr
 
 
     
@@ -3789,7 +3755,10 @@ class CPwdDialog(wx.Dialog):
 
                    
     def get_password(self):
-        return self.m_entry_pwd.GetValue()
+        pwd = self.m_entry_pwd.GetValue()
+        pwd = rpdb2.as_unicode(pwd, wx.GetDefaultPyEncoding())
+
+        return pwd
 
 
     def do_validate(self):
@@ -3883,9 +3852,7 @@ class COpenDialog(wx.Dialog):
 
     def get_file_name(self):
         filename = self.m_entry.GetValue()
-        if type(filename) == str:
-            encoding = wx.GetDefaultPyEncoding()
-            filename = filename.decode(encoding)
+        filename = rpdb2.as_unicode(filename, wx.GetDefaultPyEncoding())
 
         return filename
 
@@ -3979,6 +3946,8 @@ class CLaunchDialog(wx.Dialog):
         
     def do_validate(self):
         command_line = self.m_entry_commandline.GetValue()
+        command_line = rpdb2.as_unicode(command_line, wx.GetDefaultPyEncoding())
+        
         (_path, filename, args)  = rpdb2.split_command_line_path_filename_args(command_line)
         
         try:
@@ -4011,9 +3980,7 @@ class CLaunchDialog(wx.Dialog):
         
     def get_command_line(self):
         command_line = self.m_entry_commandline.GetValue()
-        if type(command_line) == str:
-            encoding = wx.GetDefaultPyEncoding()
-            command_line = command_line.decode(encoding)
+        command_line = rpdb2.as_unicode(command_line, wx.GetDefaultPyEncoding())
 
         return (command_line, self.m_cb.GetValue())
 
