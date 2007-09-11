@@ -294,6 +294,10 @@ Start the X server or try to use rpdb2 instead of winpdb."""
 
 
 
+import rpdb2
+
+
+
 if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
     try:
         import wxversion   
@@ -341,7 +345,6 @@ import base64
 import socket
 import string
 import Queue
-import rpdb2
 import time
 import os
 
