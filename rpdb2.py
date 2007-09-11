@@ -2764,6 +2764,7 @@ def FindFile(
             if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
                 return scriptname
             
+            scriptname = None
             raise IOError
 
         finally:
@@ -2806,6 +2807,7 @@ def FindFile(
             if lowered.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(lowered):
                 return lowered
 
+        lowered = None
         raise IOError
 
     finally:
@@ -3918,26 +3920,24 @@ class CCrypto:
         Return signed/encrypted string.
         """
         
+        if not fencrypt and not self.m_fAllowUnencrypted:
+            raise EncryptionExpected
+
+        if fencrypt and not is_encryption_supported():
+            raise EncryptionNotSupported
+
         (digest, s) = self.__sign(args)
 
-        fcompress = len(s) > 50000
+        fcompress = False
 
-        if fcompress:
+        if len(s) > 50000:
             _s = zlib.compress(s)
 
             if len(_s) < len(s) * 0.4:
                 s = _s
-            else:
-                fcompress = False
+                fcompress = True
             
-        if not fencrypt:
-            if not self.m_fAllowUnencrypted:
-                raise EncryptionExpected
-
-        else:
-            if not is_encryption_supported():
-                raise EncryptionNotSupported
-
+        if fencrypt:
             s = self.__encrypt(s)
 
         s = base64.encodestring(s)
@@ -3952,17 +3952,16 @@ class CCrypto:
         needed.
         """
 
+        if not fencrypt and not self.m_fAllowUnencrypted:
+            raise EncryptionExpected
+
+        if fencrypt and not is_encryption_supported():
+            raise EncryptionNotSupported
+
         s = as_bytes(msg)
         s = base64.decodestring(s)
 
-        if not fencrypt:
-            if not self.m_fAllowUnencrypted:
-                raise EncryptionExpected
-
-        else:
-            if not is_encryption_supported():
-                raise EncryptionNotSupported
-        
+        if fencrypt:
             s = self.__decrypt(s)
 
         if fcompress:
