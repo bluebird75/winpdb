@@ -290,6 +290,7 @@ import time
 import copy
 import hmac
 import stat
+import zlib
 import sys
 import cmd
 import imp
@@ -1794,7 +1795,7 @@ INDEX_TABLE_SIZE = 100
 
 DISPACHER_METHOD = 'dispatcher_method'
 
-BASIC_TYPES_LIST = ['bytes', 'str', 'unicode', 'int', 'long', 'float', 'bool', 'NoneType']
+BASIC_TYPES_LIST = ['bytes', 'str', 'str8', 'unicode', 'int', 'long', 'float', 'bool', 'NoneType']
 
 XML_DATA = """<?xml version='1.0'?>
 <methodCall>
@@ -1919,12 +1920,13 @@ if is_py3k():
         pass
 
     class sets:
-        Set = type(_sets)
-        BaseSet = type(_sets)
-        ImmutableSet = type(_sets)
+        Set = _sets
+        BaseSet = _sets
+        ImmutableSet = _sets
 
 else:
     bytes = 'bytes'
+    str8 = 'str8'
 
     def foo(s, e):
         return s.encode(e)
@@ -1957,6 +1959,7 @@ def _print(s, f = sys.stdout, feol = True):
     if encoding == None:
         encoding = detect_locale()
 
+    s = as_bytes(s, encoding, fstrict = False)
     s = as_string(s, encoding)
 
     if feol:
@@ -2179,7 +2182,23 @@ def repr_bytes(s, length, is_valid):
         # If a string is not encoded as utf-8 its repr() will be done with
         # the regular repr() function.
         #
-        return 'b' + repr_str_raw(s, length, is_valid)
+        return repr_str_raw(s, length, is_valid)
+
+
+
+def repr_str8(s, length, is_valid):
+    try:
+        s = s.decode('utf-8')
+
+        r = repr_unicode(s, length, is_valid)
+        return 's' + r[1:]
+
+    except:
+        #
+        # If a string is not encoded as utf-8 its repr() will be done with
+        # the regular repr() function.
+        #
+        return repr_str_raw(s, length, is_valid)
 
 
 
@@ -2229,7 +2248,7 @@ def repr_unicode(s, length, is_valid):
 def repr_str_raw(s, length, is_valid):
     if len(s) > length:
         is_valid[0] = False
-        s = s[: length] + '...'
+        s = s[: length] + as_bytes('...')
 
     return as_unicode(repr(s))
 
@@ -2260,6 +2279,7 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
         pass
 
     if isinstance(x, sets.Set):
+        print_debug(repr(x))
         return repr_list('sets.Set([%s])', x, length, is_valid, fraw = fraw)
 
     if isinstance(x, sets.ImmutableSet):
@@ -2282,6 +2302,9 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
 
     if type(x) == bytes:
         return repr_bytes(x, length, is_valid)
+
+    if type(x) == str8:
+        return repr_str8(x, length, is_valid)
 
     if type(x) == str:
         return repr_str(x, length, is_valid)
@@ -2506,7 +2529,14 @@ def my_abspath1(path):
         except WindowsError:
             pass
     else:
-        path = os.getcwd()
+        try:
+            path = os.getcwd()
+
+        except UnicodeDecodeError:
+            #
+            # This exception can be raised in py3k (alpha) on nt.
+            #
+            path = os.getcwdu()
         
     np = os.path.normpath(path)
 
@@ -2746,7 +2776,15 @@ def FindFile(
 
     scriptname = CalcScriptName(filename, fAllowAnyExt)
     
-    cwd = [os.getcwd(), os.getcwdu()]
+    try:
+        cwd = [os.getcwd(), os.getcwdu()]
+    
+    except UnicodeDecodeError:
+        #
+        # This exception can be raised in py3k (alpha) on nt.
+        #
+        cwd = [os.getcwdu()]
+
     env_path = os.environ['PATH']
     paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep)
     
@@ -2985,7 +3023,7 @@ def get_source_line(filename, lineno, fBlender, fdetect_encoding = False):
             return line
             
         except IndexError:
-            return '' 
+            return as_unicode('')
 
     filename = g_found_unicode_files.get(filename, filename)
     line = linecache.getline(filename, lineno) 
@@ -3882,6 +3920,16 @@ class CCrypto:
         
         (digest, s) = self.__sign(args)
 
+        fcompress = len(s) > 50000
+
+        if fcompress:
+            _s = zlib.compress(s)
+
+            if len(_s) < len(s) * 0.4:
+                s = _s
+            else:
+                fcompress = False
+            
         if not fencrypt:
             if not self.m_fAllowUnencrypted:
                 raise EncryptionExpected
@@ -3892,18 +3940,20 @@ class CCrypto:
 
             s = self.__encrypt(s)
 
+        s = base64.encodestring(s)
         u = as_unicode(s)
         
-        return (digest, u)
+        return (fcompress, digest, u)
 
 
-    def undo_crypto(self, fencrypt, digest, msg, fVerifyIndex = True):
+    def undo_crypto(self, fencrypt, fcompress, digest, msg, fVerifyIndex = True):
         """
         Take crypto string, verify its signature and decrypt it, if
         needed.
         """
 
         s = as_bytes(msg)
+        s = base64.decodestring(s)
 
         if not fencrypt:
             if not self.m_fAllowUnencrypted:
@@ -3914,6 +3964,9 @@ class CCrypto:
                 raise EncryptionNotSupported
         
             s = self.__decrypt(s)
+
+        if fcompress:
+            s = zlib.decompress(s)
 
         args, id = self.__verify_signature(digest, s, fVerifyIndex)
 
@@ -3928,9 +3981,8 @@ class CCrypto:
         
         d = DES.new(key_padded, DES.MODE_CBC, iv)
         r = d.encrypt(s_padded)
-        b = base64.encodestring(r)
 
-        return b
+        return r
 
 
     def __decrypt(self, s):
@@ -3939,8 +3991,7 @@ class CCrypto:
             iv = '0' * DES.block_size
             
             d = DES.new(key_padded, DES.MODE_CBC, iv)
-            b = base64.decodestring(s)
-            _s = d.decrypt(b).strip(as_bytes('\x00'))
+            _s = d.decrypt(s).strip(as_bytes('\x00'))
 
             return _s
             
@@ -3953,11 +4004,12 @@ class CCrypto:
         i = self.__get_next_index()
         pack = (self.m_index_anchor_ex, i, self.m_rid, args)
         
-        s = pickle.dumps(pack, 0)
+        s = pickle.dumps(pack, 2)
         h = hmac.new(self.m_key, s)
         d = h.hexdigest()
 
-        #print_debug('%s, %s' % (len(s), d))
+        #if 'coding:' in s:
+        #    print_debug('%s, %s, %s\n\n==========\n\n%s' % (len(s), d, repr(args), repr(s)))
 
         return (d, s)
 
@@ -3978,7 +4030,8 @@ class CCrypto:
             h = hmac.new(self.m_key, s)
             d = h.hexdigest()
 
-            #print_debug('%s, %s, %s' % (len(s), digest, d))
+            #if 'coding:' in s:
+            #    print_debug('%s, %s, %s, %s' % (len(s), digest, d, repr(s)))
 
             if d != digest:
                 self.__wait_a_little()
@@ -4056,7 +4109,7 @@ class CCrypto:
 
 
 
-class CEvent:
+class CEvent(object):
     """
     Base class for events.
     """
@@ -7274,7 +7327,7 @@ class CDebuggerEngine(CDebuggerCore):
 
             if fhide_pwd_mode:
                 if not ')' in line:
-                    line = '...\n'
+                    line = as_unicode('...\n')
                 else:
                     line = '...""")' + line.split(')', 1)[1]
                     fhide_pwd_mode = False
@@ -7362,7 +7415,7 @@ class CDebuggerEngine(CDebuggerCore):
 
             if fhide_pwd_mode:
                 if not ')' in line:
-                    line = '...\n'
+                    line = as_unicode('...\n')
                 else:
                     line = '...""")' + line.split(')', 1)[1]
                     fhide_pwd_mode = False
@@ -7581,7 +7634,7 @@ class CDebuggerEngine(CDebuggerCore):
                 is_valid = [True]
                 e = {}
 
-                if type(k) in [bool, int, float, bytes, str, unicode, type(None)]:
+                if type(k) in [bool, int, float, bytes, str, str8, unicode, type(None)]:
                     rk = repr(k)
                     if len(rk) < REPR_ID_LENGTH:
                         e[DICT_KEY_EXPR] = as_unicode('(%s)[%s]' % (expr, rk))
@@ -8155,17 +8208,17 @@ class CPwdServerProxy:
                 #
                 fencrypt = self.get_encryption()
                 args = (name, params, self.m_target_rid)
-                (digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
+                (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
 
                 rpdb_version = as_unicode(get_interface_compatibility_version())
 
-                r = self.m_method(rpdb_version, fencrypt, digest, msg)
-                (fencrypt, digest, msg) = r
+                r = self.m_method(rpdb_version, fencrypt, fcompress, digest, msg)
+                (fencrypt, fcompress, digest, msg) = r
                 
                 #
                 # Decrypt response.
                 #
-                ((max_index, _r, _e), id) = self.m_crypto.undo_crypto(fencrypt, digest, msg, fVerifyIndex = False)
+                ((max_index, _r, _e), id) = self.m_crypto.undo_crypto(fencrypt, fcompress, digest, msg, fVerifyIndex = False)
                 
                 if _e is not None:
                     raise _e
@@ -8293,7 +8346,7 @@ class CIOServer:
             self.m_server.handle_request()
             
         
-    def dispatcher_method(self, rpdb_version, fencrypt, digest, msg):
+    def dispatcher_method(self, rpdb_version, fencrypt, fcompress, digest, msg):
         """
         Process RPC call.
         """
@@ -8307,7 +8360,7 @@ class CIOServer:
             #
             # Decrypt parameters.
             #
-            ((name, __params, target_rid), client_id) = self.m_crypto.undo_crypto(fencrypt, digest, msg)
+            ((name, __params, target_rid), client_id) = self.m_crypto.undo_crypto(fencrypt, fcompress, digest, msg)
             
         except AuthenticationBadIndex:
             e = sys.exc_info()[1]
@@ -8318,8 +8371,8 @@ class CIOServer:
             #
             max_index = self.m_crypto.get_max_index()
             args = (max_index, None, e)
-            (digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
-            return (fencrypt, digest, msg)
+            (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
+            return (fencrypt, fcompress, digest, msg)
             
         r = None
         e = None
@@ -8355,8 +8408,8 @@ class CIOServer:
         #
         max_index = self.m_crypto.get_max_index()
         args = (max_index, r, e)
-        (digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
-        return (fencrypt, digest, msg)
+        (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
+        return (fencrypt, fcompress, digest, msg)
 
 
     def __StartXMLRPCServer(self):
@@ -8390,7 +8443,7 @@ class CIOServer:
 
 
 
-class CServerInfo:
+class CServerInfo(object):
     def __init__(self, age, port, pid, filename, rid, state, fembedded):
         assert(is_unicode(rid))
 
@@ -8754,7 +8807,7 @@ class CLocalTransport(xmlrpclib.Transport):
             if sock:
                 response = sock.recv(1024)
             else:
-                time.sleep(0.001)
+                time.sleep(0.002)
                 response = file.read(1024)
             if not response:
                 break
@@ -11896,7 +11949,15 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         # relative paths in __file__ members of modules in the following case.
         #
         if sys.path[0] == '':
-            g_initial_cwd = [os.getcwd(), os.getcwdu()]
+            try:
+                g_initial_cwd = [os.getcwd(), os.getcwdu()]
+    
+            except UnicodeDecodeError:
+                #
+                # This exception can be raised in py3k (alpha) on nt.
+                #
+                g_initial_cwd = [os.getcwdu()]
+
             
         atexit.register(_atexit)
         
