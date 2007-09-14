@@ -1119,6 +1119,25 @@ class CSessionManager:
         return self.__smi.execute(suite)
 
 
+    def set_encoding(self, encoding):
+        """
+        Set the encoding that will be used as source encoding for execute()
+        evaluate() commands and in strings returned by get_namespace().
+
+        The value can be 'auto' or any encoding accepted by string.encode().
+        If 'auto' is set, the encoding used will be that of the current 
+        code scope.
+
+        The default encoding is 'auto'.
+        """
+
+        return self.__smi.set_encoding(encoding)
+
+
+    def get_encoding(self):
+        return self.__smi.get_encoding()
+
+
     def get_state(self):
         """
         Get the session manager state. Return one of the STATE_* constants
@@ -1690,6 +1709,8 @@ STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_PASSWORD_BAD = 'The password should begin with a letter and continue with any combination of digits, letters or underscores (\'_\'). Only English characters are accepted for letters.'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
+STR_ENCODING_MODE = 'Encoding is set to: %s'
+STR_ENCODING_MODE_SET = 'Encoding was set to: %s'
 STR_ENVIRONMENT = 'The current environment mapping is:'
 STR_ENVIRONMENT_EMPTY = 'The current environment mapping is not set.'
 STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
@@ -1771,6 +1792,10 @@ RPDB_EXEC_INFO = 'rpdb_exception_info'
 
 MODE_ON = 'ON'
 MODE_OFF = 'OFF'
+
+ENCODING_SOURCE = '# -*- coding: %s -*-\n'
+ENCODING_AUTO = 'auto'
+ENCODING_RAW = '__raw'
 
 MAX_EVALUATE_LENGTH = 256 * 1024
 MAX_NAMESPACE_ITEMS = 1024
@@ -2088,7 +2113,7 @@ def safe_repr(x):
 
 
 
-def repr_list(pattern, l, length, is_valid, fraw = False):
+def repr_list(pattern, l, length, encoding, is_valid):
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -2104,7 +2129,7 @@ def repr_list(pattern, l, length, is_valid, fraw = False):
             if i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
                 continue
             
-            s += repr_ltd(i, length - len(s), is_valid, fraw = fraw)
+            s += repr_ltd(i, length - len(s), encoding, is_valid)
 
             index += 1
             
@@ -2124,7 +2149,7 @@ def repr_list(pattern, l, length, is_valid, fraw = False):
 
 
 
-def repr_dict(pattern, d, length, is_valid, fraw = False):
+def repr_dict(pattern, d, length, encoding, is_valid):
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -2142,7 +2167,7 @@ def repr_dict(pattern, d, length, is_valid, fraw = False):
             
             v = d[k]
 
-            s += repr_ltd(k, length - len(s), is_valid, fraw = fraw)
+            s += repr_ltd(k, length - len(s), encoding, is_valid)
 
             if len(s) > length:
                 is_valid[0] = False
@@ -2150,7 +2175,7 @@ def repr_dict(pattern, d, length, is_valid, fraw = False):
                     s += '...'
                 break
 
-            s +=  ': ' + repr_ltd(v, length - len(s), is_valid, fraw = fraw)
+            s +=  ': ' + repr_ltd(v, length - len(s), encoding, is_valid)
 
             index += 1
 
@@ -2170,9 +2195,9 @@ def repr_dict(pattern, d, length, is_valid, fraw = False):
 
 
 
-def repr_bytes(s, length, is_valid):
+def repr_bytes(s, length, encoding, is_valid):
     try:
-        s = s.decode('utf-8')
+        s = s.decode(encoding)
 
         r = repr_unicode(s, length, is_valid)
         return 'b' + r[1:]
@@ -2186,9 +2211,9 @@ def repr_bytes(s, length, is_valid):
 
 
 
-def repr_str8(s, length, is_valid):
+def repr_str8(s, length, encoding, is_valid):
     try:
-        s = s.decode('utf-8')
+        s = s.decode(encoding)
 
         r = repr_unicode(s, length, is_valid)
         return 's' + r[1:]
@@ -2202,10 +2227,10 @@ def repr_str8(s, length, is_valid):
 
 
 
-def repr_str(s, length, is_valid):
+def repr_str(s, length, encoding, is_valid):
     try:
         if not is_unicode(s):
-            s = s.decode('utf-8')
+            s = s.decode(encoding)
 
         r = repr_unicode(s, length, is_valid)
         return r[1:]
@@ -2265,49 +2290,49 @@ def repr_base(v, length, is_valid):
 
 
 
-def repr_ltd(x, length, is_valid = [True], fraw = False):
+def repr_ltd(x, length, encoding, is_valid = [True]):
     length = max(0, length)
 
     try:
         if isinstance(x, frozenset):
-            return repr_list('frozenset([%s])', x, length, is_valid, fraw = fraw)
+            return repr_list('frozenset([%s])', x, length, encoding, is_valid)
 
         if isinstance(x, set):
-            return repr_list('set([%s])', x, length, is_valid, fraw = fraw)
+            return repr_list('set([%s])', x, length, encoding, is_valid)
 
     except NameError:
         pass
 
     if isinstance(x, sets.Set):
         print_debug(repr(x))
-        return repr_list('sets.Set([%s])', x, length, is_valid, fraw = fraw)
+        return repr_list('sets.Set([%s])', x, length, encoding, is_valid)
 
     if isinstance(x, sets.ImmutableSet):
-        return repr_list('sets.ImmutableSet([%s])', x, length, is_valid, fraw = fraw)
+        return repr_list('sets.ImmutableSet([%s])', x, length, encoding, is_valid)
 
     if isinstance(x, list):
-        return repr_list('[%s]', x, length, is_valid, fraw = fraw)
+        return repr_list('[%s]', x, length, encoding, is_valid)
 
     if isinstance(x, tuple):
-        return repr_list('(%s)', x, length, is_valid, fraw = fraw)
+        return repr_list('(%s)', x, length, encoding, is_valid)
 
     if isinstance(x, dict):
-        return repr_dict('{%s}', x, length, is_valid, fraw = fraw)
+        return repr_dict('{%s}', x, length, encoding, is_valid)
 
-    if fraw and type(x) in [str, unicode]:
+    if encoding == ENCODING_RAW and type(x) in [str, unicode]:
         return repr_str_raw(x, length, is_valid)
 
     if type(x) == unicode:
         return repr_unicode(x, length, is_valid)
 
     if type(x) == bytes:
-        return repr_bytes(x, length, is_valid)
+        return repr_bytes(x, length, encoding, is_valid)
 
     if type(x) == str8:
-        return repr_str8(x, length, is_valid)
+        return repr_str8(x, length, encoding, is_valid)
 
     if type(x) == str:
-        return repr_str(x, length, is_valid)
+        return repr_str(x, length, encoding, is_valid)
 
     if type(x) in [bool, int, float, long, type(None)]:
         return repr_base(x, length, is_valid)
@@ -2320,7 +2345,7 @@ def repr_ltd(x, length, is_valid = [True], fraw = False):
 
     try:
         if not is_unicode(y):
-            y = y.decode('utf-8')
+            y = y.decode(encoding)
         
         return y
         
@@ -3037,21 +3062,27 @@ def get_source_line(filename, lineno, fBlender, fdetect_encoding = False):
 
 
 
-def get_file_encoding(filename, fBlender):
+def get_file_encoding(filename, fBlender = None):
     if filename in g_file_encoding:
-        return g_file_encoding
+        return g_file_encoding[filename]
+
+    if fBlender == None:
+        fBlender = is_blender_file(filename)
 
     for i in range(10):
         line = get_source_line(filename, i, fBlender, fdetect_encoding = False)
 
         if i == 0 and line.startswith('\xef\xbb\xbf'):
+            g_file_encoding[filename] = 'utf-8'
             return 'utf-8'
 
         encoding = ParseLineEncoding(line)
         if encoding != None:
+            g_file_encoding[filename] = encoding
             return encoding
 
-    return 'ascii'
+    g_file_encoding[filename] = 'utf-8'
+    return 'utf-8'
 
 
 
@@ -3497,7 +3528,7 @@ class _RPDB2_FindRepr:
     def __getitem__(self, key):
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit, fraw = True).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW).replace('"', '&quot') == key:
                 if isinstance(self.m_object, dict):
                     return self.m_object[i]
 
@@ -3514,7 +3545,7 @@ class _RPDB2_FindRepr:
 
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit, fraw = True).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW).replace('"', '&quot') == key:
                 self.m_object[i] = value
                 return
 
@@ -3531,7 +3562,7 @@ def SafeCmp(x, y):
     except:
         pass
 
-    return cmp(repr_ltd(x, 256, fraw = True), repr_ltd(y, 256, fraw = True))
+    return cmp(repr_ltd(x, 256, encoding = ENCODING_RAW), repr_ltd(y, 256, encoding = ENCODING_RAW))
 
 
 
@@ -7530,7 +7561,7 @@ class CDebuggerEngine(CDebuggerCore):
         return st
 
 
-    def __calc_subnodes(self, expr, r, fForceNames, fFilter, repr_limit):
+    def __calc_subnodes(self, expr, r, fForceNames, fFilter, repr_limit, encoding):
         snl = []
         
         try:
@@ -7547,12 +7578,12 @@ class CDebuggerEngine(CDebuggerCore):
                         break
                     
                     is_valid = [True]
-                    rk = repr_ltd(i, REPR_ID_LENGTH, fraw = True)
+                    rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW)
 
                     e = {}
                     e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
-                    e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
-                    e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
+                    e[DICT_KEY_NAME] = repr_ltd(i, repr_limit, encoding)
+                    e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, encoding, is_valid)
                     e[DICT_KEY_IS_VALID] = is_valid[0]
                     e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(i)))
                     e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
@@ -7577,12 +7608,12 @@ class CDebuggerEngine(CDebuggerCore):
                     break
 
                 is_valid = [True]
-                rk = repr_ltd(i, REPR_ID_LENGTH, fraw = True)
+                rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW)
 
                 e = {}
                 e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
-                e[DICT_KEY_NAME] = repr_ltd(i, repr_limit)
-                e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, is_valid)
+                e[DICT_KEY_NAME] = repr_ltd(i, repr_limit, encoding)
+                e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, encoding, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
                 e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(i)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
@@ -7597,7 +7628,7 @@ class CDebuggerEngine(CDebuggerCore):
                 e = {}
                 e[DICT_KEY_EXPR] = as_unicode('(%s)[%d]' % (expr, i))
                 e[DICT_KEY_NAME] = as_unicode(repr(i))
-                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
+                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, encoding, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
                 e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
@@ -7639,11 +7670,11 @@ class CDebuggerEngine(CDebuggerCore):
                         e[DICT_KEY_EXPR] = as_unicode('(%s)[%s]' % (expr, rk))
 
                 if not DICT_KEY_EXPR in e:
-                    rk = repr_ltd(k, REPR_ID_LENGTH, fraw = True)
+                    rk = repr_ltd(k, REPR_ID_LENGTH, encoding = ENCODING_RAW)
                     e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
 
-                e[DICT_KEY_NAME] = as_unicode([repr_ltd(k, repr_limit), k][fForceNames])
-                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
+                e[DICT_KEY_NAME] = as_unicode([repr_ltd(k, repr_limit, encoding), k][fForceNames])
+                e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, encoding, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
                 e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
@@ -7672,7 +7703,7 @@ class CDebuggerEngine(CDebuggerCore):
             e = {}
             e[DICT_KEY_EXPR] = as_unicode('(%s).%s' % (expr, a))
             e[DICT_KEY_NAME] = as_unicode(a)
-            e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, is_valid)
+            e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, encoding, is_valid)
             e[DICT_KEY_IS_VALID] = is_valid[0]
             e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
@@ -7710,7 +7741,7 @@ class CDebuggerEngine(CDebuggerCore):
         return False        
 
 
-    def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit):
+    def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit, encoding):
         e = {}
 
         try:
@@ -7728,14 +7759,14 @@ class CDebuggerEngine(CDebuggerCore):
             r = eval(expr, __globals, __locals)
 
             e[DICT_KEY_EXPR] = as_unicode(expr)
-            e[DICT_KEY_REPR] = repr_ltd(r, repr_limit, is_valid)
+            e[DICT_KEY_REPR] = repr_ltd(r, repr_limit, encoding, is_valid)
             e[DICT_KEY_IS_VALID] = is_valid[0]
             e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(r)))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(r)
             
             if fExpand and (e[DICT_KEY_N_SUBNODES] > 0):
                 fForceNames = (expr in ['globals()', 'locals()']) or (RPDB_EXEC_INFO in expr)
-                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, fFilter, repr_limit)
+                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, fFilter, repr_limit, encoding)
                 e[DICT_KEY_N_SUBNODES] = len(e[DICT_KEY_SUBNODES])
                 
         except:
@@ -7747,8 +7778,29 @@ class CDebuggerEngine(CDebuggerCore):
             rl.append(e)
         lock.release()    
 
-        
-    def get_namespace(self, nl, fFilter, frame_index, fException, repr_limit):
+    
+    def __calc_encoding(self, encoding, fvalidate = False):
+        if encoding != ENCODING_AUTO and not fvalidate:
+            return encoding
+
+        if encoding != ENCODING_AUTO:
+            try:
+                codecs.lookup(encoding)
+                return encoding
+            
+            except:
+                pass
+
+        ctx = self.get_current_ctx()
+        filename = ctx.m_code_context.m_filename
+        encoding = get_file_encoding(filename)
+
+        return encoding
+
+
+    def get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding):
+        encoding = self.__calc_encoding(encoding, fvalidate = True)
+
         try:
             (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException, fReadOnly = True)
         except:    
@@ -7764,7 +7816,7 @@ class CDebuggerEngine(CDebuggerCore):
             if self.is_child_of_failure(failed_expr_list, expr):
                 continue
 
-            args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit)
+            args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit, encoding)
             t = CThread(name = 'calc_expr %s' % expr, target = self.calc_expr, args = args)
             t.start()
             t.join(2)
@@ -7785,11 +7837,13 @@ class CDebuggerEngine(CDebuggerCore):
         return _rl 
 
             
-    def evaluate(self, expr, frame_index, fException):
+    def evaluate(self, expr, frame_index, fException, encoding):
         """
         Evaluate expression in context of frame at depth 'frame-index'.
         """
         
+        encoding = self.__calc_encoding(encoding)
+
         (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException)
 
         v = ''
@@ -7801,9 +7855,10 @@ class CDebuggerEngine(CDebuggerCore):
                 r = '...Removed-password-from-output...'
             
             else:
-                r = eval(expr, _globals, _locals)
+                _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding, fstrict = False)
+                r = eval(_expr, _globals, _locals)
 
-            v = repr_ltd(r, MAX_EVALUATE_LENGTH)
+            v = repr_ltd(r, MAX_EVALUATE_LENGTH, encoding)
             
             if len(v) > MAX_EVALUATE_LENGTH:
                 v += '... *** %s ***' % STR_MAX_EVALUATE_LENGTH_WARNING 
@@ -7818,13 +7873,15 @@ class CDebuggerEngine(CDebuggerCore):
         return (as_unicode(v), as_unicode(w), as_unicode(e))
 
         
-    def execute(self, suite, frame_index, fException):
+    def execute(self, suite, frame_index, fException, encoding):
         """
         Execute suite (Python statement) in context of frame at 
         depth 'frame-index'.
         """
        
         print_debug('exec called with: ' + repr(suite))
+
+        encoding = self.__calc_encoding(encoding)
 
         (_globals, _locals, _original_locals_copy) = self.__get_locals_globals(frame_index, fException)
 
@@ -7839,7 +7896,8 @@ class CDebuggerEngine(CDebuggerCore):
                 _locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
 
             try:
-                exec(suite, _globals, _locals)
+                _suite = as_bytes(ENCODING_SOURCE % encoding + suite, encoding, fstrict = False)
+                exec(_suite, _globals, _locals)
 
             finally:
                 if '_RPDB2_FindRepr' in suite and not '_RPDB2_FindRepr' in _original_locals_copy:
@@ -8596,18 +8654,18 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
-    def export_get_namespace(self, nl, fFilter, frame_index, fException, repr_limit):
-        r = self.m_debugger.get_namespace(nl, fFilter, frame_index, fException, repr_limit)
+    def export_get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding):
+        r = self.m_debugger.get_namespace(nl, fFilter, frame_index, fException, repr_limit, encoding)
         return r
 
         
-    def export_evaluate(self, expr, frame_index, fException):
-        (v, w, e) = self.m_debugger.evaluate(expr, frame_index, fException)
+    def export_evaluate(self, expr, frame_index, fException, encoding):
+        (v, w, e) = self.m_debugger.evaluate(expr, frame_index, fException, encoding)
         return (v, w, e)
 
         
-    def export_execute(self, suite, frame_index, fException):
-        (w, e) = self.m_debugger.execute(suite, frame_index, fException)
+    def export_execute(self, suite, frame_index, fException, encoding):
+        (w, e) = self.m_debugger.execute(suite, frame_index, fException, encoding)
         return (w, e)
 
         
@@ -9051,6 +9109,8 @@ class CSessionManagerInternal:
         self.m_ffork_auto = False
 
         self.m_environment = []
+
+        self.m_encoding = ENCODING_AUTO
         
     
     def __del__(self):
@@ -9764,7 +9824,7 @@ class CSessionManagerInternal:
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        r = self.getSession().getProxy().get_namespace(nl, fFilter, frame_index, fAnalyzeMode, repr_limit)
+        r = self.getSession().getProxy().get_namespace(nl, fFilter, frame_index, fAnalyzeMode, repr_limit, self.m_encoding)
         return r
 
 
@@ -9777,7 +9837,7 @@ class CSessionManagerInternal:
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        (value, warning, error) = self.getSession().getProxy().evaluate(expr, frame_index, fAnalyzeMode)
+        (value, warning, error) = self.getSession().getProxy().evaluate(expr, frame_index, fAnalyzeMode, self.m_encoding)
         return (value, warning, error)
 
         
@@ -9790,8 +9850,16 @@ class CSessionManagerInternal:
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE)
 
-        (warning, error) = self.getSession().getProxy().execute(suite, frame_index, fAnalyzeMode)
+        (warning, error) = self.getSession().getProxy().execute(suite, frame_index, fAnalyzeMode, self.m_encoding)
         return (warning, error)
+
+
+    def set_encoding(self, encoding):
+        self.m_encoding = encoding
+
+
+    def get_encoding(self):
+        return self.m_encoding
 
 
     def set_host(self, host):
@@ -10946,6 +11014,18 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         
     do_x = do_exec
 
+            
+    def do_encoding(self, arg):
+        if arg == '':
+            encoding = self.m_session_manager.get_encoding()
+            _print(STR_ENCODING_MODE % encoding, self.m_stdout)
+            return
+
+        arg = arg.split()[0].strip()
+
+        self.m_session_manager.set_encoding(arg)
+        _print(STR_ENCODING_MODE_SET % arg, self.m_stdout)
+
     
     def do_thread(self, arg):
         if self.fAnalyzeMode and (arg != ''):
@@ -11196,6 +11276,7 @@ list        - List source code.
 stack       - Display stack trace.
 up          - Go up one frame in stack.
 down        - Go down one frame in stack.
+encoding    - Set the source encoding used by exec or eval commands.
 eval        - Evaluate expression in the context of the current frame.
 exec        - Execute suite in the context of the current frame.
 analyze     - Toggle analyze last exception mode.
@@ -11674,6 +11755,20 @@ focused stack frame is the top most frame.
 Type 'help up' or 'help down' for more information on focused frames.""", self.m_stdout)  
 
     help_x = help_exec
+
+
+    def help_encoding(self):
+        _print("""encoding [<encoding>]
+
+Set the encoding that will be used as source encoding for exec and eval
+commands.
+
+Without an argument returns the current encoding.
+
+The value can be 'auto' or any encoding accepted by string.encode().
+If 'auto' is set the encoding used will be that of the current code scope.
+
+The default encoding is 'auto'.""", self.m_stdout)
 
 
     def help_env(self):
