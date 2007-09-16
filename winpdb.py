@@ -344,6 +344,7 @@ import weakref
 import base64
 import socket
 import string
+import codecs
 import Queue
 import time
 import os
@@ -404,12 +405,21 @@ STR_WXPYTHON_ANSI_WARNING_TITLE = 'wxPython ANSI Warning'
 STR_WXPYTHON_ANSI_WARNING_MSG = """The version of wxPython that was found does not support Unicode. wxPython is the graphical user interface toolkit used by Winpdb. You may experience some functionality limitations when debugging Unicode programs with this version of wxPython. If you need to debug Unicode programs it is recommended that you install the Unicode version of wxPython. You can find more information on wxPython at http://www.wxpython.org/"""
 
 DLG_EXPR_TITLE = "Enter Expression"
+DLG_ENCODING_TITLE = "encoding"
 DLG_PWD_TITLE = "Password"
 DLG_OPEN_TITLE = "Open Source"
 DLG_LAUNCH_TITLE = "Launch"
 DLG_ATTACH_TITLE = "Attach"
 STATIC_EXPR = """The new expression will be evaluated at the debuggee
 and its value will be set to the item."""
+STATIC_ENCODING = """The encoding is used as source encoding for the name-space viewer and for the exec and eval console commands. Valid values are either 'auto' or an encoding known by the codecs module. If 'auto' is specified, the encoding used will be the source encoding of the active scope, which is utf-8 by default."""
+STATIC_ENCODING_SPLIT = """The encoding is used as source encoding for 
+the name-space viewer and for the exec and eval 
+console commands. Valid values are either 'auto' 
+or an encoding known by the codecs module. 
+If 'auto' is specified, the encoding used will 
+be the source encoding of the active scope, 
+which is utf-8 by default."""
 STATIC_PWD = """The password is used to secure communication between the debugger console and the debuggee. Debuggees with un-matching passwords will not appear in the attach query list."""
 STATIC_PWD_SPLIT = """The password is used to secure communication 
 between the debugger console and the debuggee. 
@@ -420,6 +430,7 @@ STATIC_LAUNCH_ENV_SPLIT = """To set environment variables for the new script use
 console command."""
 STATIC_OPEN = """The source file entered will be fetched from the debugee."""
 LABEL_EXPR = "New Expression:"
+LABEL_ENCODING = "Set encoding:"
 LABEL_PWD = "Set password:"
 LABEL_OPEN = "File name:"
 LABEL_LAUNCH_COMMAND_LINE = "Command line:"
@@ -530,10 +541,14 @@ TB_RETURN = "Return"
 TB_GOTO = "Run to line"
 TB_FILTER = "Filter out __methods__ from objects and classes in the namespace viewer"
 TB_EXCEPTION = "Toggle 'analyze exception' mode"
+TB_ENCODING = "Set the source encoding for the name-space viewer and the exec/eval console commands."
 TB_TRAP = "Toggle 'trap unhandled exceptions' mode"
+
+TB_ENCODING_TEXT = "Encoding: %s "
 
 COMMAND = "command"
 TOOLTIP = "tooltip"
+TEXT = "text"
 DATA = "data"
 DATA2 = "data2"
 ID = "id"
@@ -823,6 +838,7 @@ class CToolBar:
         self.m_toolbar = None
         self.m_items = {}
 
+
     def init_toolbar(self, resource):
         self.m_toolbar = self.CreateToolBar(wx.TB_HORIZONTAL | wx.NO_BORDER | wx.TB_FLAT | wx.TB_TEXT)
         self.m_toolbar.SetToolBitmapSize(TOOLBAR_BITMAP_SIZE)
@@ -836,8 +852,17 @@ class CToolBar:
 
             command = e[COMMAND]
             id = wx.NewId()
-            image = image_from_base64(e[DATA])
-            bitmap = wx.BitmapFromImage(image)
+
+            if TEXT in e:
+                button = wx.Button(self.m_toolbar, id, e[TEXT] % 'auto', style = wx.NO_BORDER)
+                self.m_toolbar.AddControl(button)
+                self.m_items[item_label] = {ID: id}
+                wx.EVT_BUTTON(self.m_toolbar, id, command)
+                continue
+
+            if DATA in e:
+                image = image_from_base64(e[DATA])
+                bitmap = wx.BitmapFromImage(image)
 
             if DATA2 in e:
                 image2 = image_from_base64(e[DATA2])
@@ -854,6 +879,16 @@ class CToolBar:
             
         self.m_toolbar.Realize()
 
+
+    def set_toolbar_item_text(self, label, text):
+        item = self.m_items[label]
+        id = item[ID]
+        tool = self.m_toolbar.FindControl(id)
+        tool.SetLabel(text)
+        size = tool.GetBestSize()
+        tool.SetSize(size)
+
+
     def set_toolbar_items_state(self, state_label_dict):
         for state, label_list in state_label_dict.items():
             for label in label_list:
@@ -863,6 +898,7 @@ class CToolBar:
                     self.__gtk_enable_tool(id)
                 else:    
                     self.m_toolbar.EnableTool(id, [True, False][state == DISABLED])
+
 
     def __gtk_enable_tool(self, id):
         p = self.m_toolbar.ScreenToClient(wx.GetMousePosition())
@@ -876,6 +912,7 @@ class CToolBar:
 
         if r.Inside(p):
             self.m_toolbar.WarpPointer(p.x, p.y) 
+
 
     def set_toggle(self, label, fToggle):
         item = self.m_items[label]
@@ -893,6 +930,7 @@ class CToolBar:
             self.m_toolbar.ToggleTool(id, not fToggle);   
             self.m_toolbar.ToggleTool(id, fToggle);
 
+
     def OnToggleTool(self, event):
         tool = self.m_toolbar.FindById(event.GetId())
         if tool is None:
@@ -904,7 +942,7 @@ class CToolBar:
         
         self.set_toggle(label, f)
 
-        event.Skip()   
+        event.Skip()  
 
 
 
@@ -1269,7 +1307,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             {LABEL: ML_SEPARATOR},
             {LABEL: TB_FILTER,  DATA: BASE64_FILTER, DATA2: BASE64_FILTER, COMMAND: self.do_filter},
             {LABEL: TB_EXCEPTION, DATA: BASE64_EXCEPTION, DATA2: BASE64_EXCEPTION, COMMAND: self.do_analyze},
-            {LABEL: TB_TRAP, DATA: BASE64_TRAP, DATA2: BASE64_TRAP, COMMAND: self.do_trap}
+            {LABEL: TB_TRAP, DATA: BASE64_TRAP, DATA2: BASE64_TRAP, COMMAND: self.do_trap},
+            {LABEL: ML_SEPARATOR},
+            {LABEL: TB_ENCODING, TEXT: TB_ENCODING_TEXT, COMMAND: self.do_encoding}
         ]
 
         self.init_toolbar(toolbar_resource)
@@ -1357,6 +1397,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         event_type_dict = {rpdb2.CEventTrap: {}}
         self.m_session_manager.register_callback(self.update_trap, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {rpdb2.CEventEncoding: {}}
+        self.m_session_manager.register_callback(self.update_encoding, event_type_dict, fSingleUse = False)
 
         wx.CallAfter(self.__init2)
 
@@ -1504,6 +1547,17 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #----------------------------------------------------
     #
 
+    def do_encoding(self, event):
+        encoding = self.m_session_manager.get_encoding()
+        dlg = CEncodingDialog(self, encoding)
+        r = dlg.ShowModal()
+        if r == wx.ID_OK:
+            encoding = dlg.get_encoding()
+            self.m_session_manager.set_encoding(encoding)
+
+        dlg.Destroy()
+
+
     def do_analyze_menu(self, event):
         state = self.m_session_manager.get_state()
         f = (state != rpdb2.STATE_ANALYZE)
@@ -1637,6 +1691,22 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def do_none(self, event):
         pass
+
+
+    def update_encoding(self, event):
+        wx.CallAfter(self.callback_encoding, event)
+
+
+    def callback_encoding(self, event):
+        encoding = self.m_session_manager.get_encoding()
+
+        if encoding != rpdb2.ENCODING_AUTO:
+            try:
+                codecs.lookup(encoding)
+            except:
+                encoding += ' (?)'
+
+        self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % encoding)
 
 
     def update_state(self, event):
@@ -2625,7 +2695,7 @@ class CConsole(wx.Panel, CCaptionManager):
 
 
     def write(self, _str):
-        assert(rpdb2.is_py3k() or not rpdb2.is_unicode(_str))
+        _str = rpdb2.as_string(_str, wx.GetDefaultPyEncoding())
 
         sl = _str.split('\n')
         
@@ -3705,6 +3775,93 @@ class CExpressionDialog(wx.Dialog):
 
 
     
+class CEncodingDialog(wx.Dialog):
+    def __init__(self, parent, current_encoding):
+        wx.Dialog.__init__(self, parent, -1, DLG_ENCODING_TITLE)
+        
+        sizerv = wx.BoxSizer(wx.VERTICAL)
+
+        label = wx.StaticText(self, -1, STATIC_ENCODING, size = (300, -1))
+        try:
+            label.Wrap(300)
+        except:
+            label.SetLabel(STATIC_ENCODING_SPLIT)
+
+        sizerv.Add(label, 1, wx.ALIGN_LEFT | wx.ALL, 5)
+
+        sizerh = wx.BoxSizer(wx.HORIZONTAL)
+        sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
+
+        label = wx.StaticText(self, -1, LABEL_ENCODING)
+        sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
+        encoding = [current_encoding, ''][current_encoding is None]
+        self.m_entry_encoding = wx.TextCtrl(self, value = encoding, size = (200, -1))
+        self.m_entry_encoding.SetFocus()
+        self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_encoding)
+        sizerh.Add(self.m_entry_encoding, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
+        
+        btnsizer = wx.StdDialogButtonSizer()
+        sizerv.Add(btnsizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+        
+        self.m_ok = wx.Button(self, wx.ID_OK)
+        self.m_ok.SetDefault()
+        self.Bind(wx.EVT_BUTTON, self.do_ok, self.m_ok)
+        if encoding == '':
+            self.m_ok.Disable()
+        btnsizer.AddButton(self.m_ok)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        self.SetSizer(sizerv)
+        sizerv.Fit(self)        
+
+
+    def OnText(self, event):
+        if event.GetString() == '':
+            self.m_ok.Disable()
+        else:
+            self.m_ok.Enable()
+
+        event.Skip()        
+
+                   
+    def get_encoding(self):
+        encoding = self.m_entry_encoding.GetValue()
+        encoding = rpdb2.as_unicode(encoding, wx.GetDefaultPyEncoding())
+
+        return encoding
+
+
+    def do_validate(self):
+        encoding = self.get_encoding()
+        if encoding == rpdb2.ENCODING_AUTO:
+            return True
+
+        try:
+            codecs.lookup(encoding)
+            return True
+
+        except:
+            pass
+
+        dlg = wx.MessageDialog(self, rpdb2.STR_ENCODING_BAD, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg.ShowModal()
+        dlg.Destroy()
+        
+        return True
+        
+
+    def do_ok(self, event):
+        f = self.do_validate()
+        if not f:
+            return
+
+        event.Skip()
+
+
+    
 class CPwdDialog(wx.Dialog):
     def __init__(self, parent, current_password):
         wx.Dialog.__init__(self, parent, -1, DLG_PWD_TITLE)
@@ -3781,6 +3938,7 @@ class CPwdDialog(wx.Dialog):
             return
 
         event.Skip()
+
 
     
 class COpenDialog(wx.Dialog):

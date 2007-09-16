@@ -1124,11 +1124,11 @@ class CSessionManager:
         Set the encoding that will be used as source encoding for execute()
         evaluate() commands and in strings returned by get_namespace().
 
-        The value can be 'auto' or any encoding accepted by string.encode().
-        If 'auto' is set, the encoding used will be that of the current 
-        code scope.
+        The value can be either 'auto' or any encoding accepted by the 
+        codecs module. If 'auto' is specified, the encoding used will be the 
+        source encoding of the active scope, which is utf-8 by default.
 
-        The default encoding is 'auto'.
+        The default value is 'auto'.
         """
 
         return self.__smi.set_encoding(encoding)
@@ -1711,6 +1711,7 @@ STR_ENCRYPT_MODE = 'Force encryption mode: %s'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
 STR_ENCODING_MODE = 'Encoding is set to: %s'
 STR_ENCODING_MODE_SET = 'Encoding was set to: %s'
+STR_ENCODING_BAD = 'The specified encoding was not recognized by the debugger.'
 STR_ENVIRONMENT = 'The current environment mapping is:'
 STR_ENVIRONMENT_EMPTY = 'The current environment mapping is not set.'
 STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
@@ -4146,6 +4147,16 @@ class CEvent(object):
     
     def is_match(self, arg):
         pass
+
+
+
+class CEventEncoding(CEvent):
+    """
+    The encoding has been set.
+    """
+
+    def __init__(self, event):
+        self.m_event = event
 
 
 
@@ -7855,7 +7866,7 @@ class CDebuggerEngine(CDebuggerCore):
                 r = '...Removed-password-from-output...'
             
             else:
-                _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding, fstrict = False)
+                _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
                 r = eval(_expr, _globals, _locals)
 
             v = repr_ltd(r, MAX_EVALUATE_LENGTH, encoding)
@@ -7896,7 +7907,7 @@ class CDebuggerEngine(CDebuggerCore):
                 _locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
 
             try:
-                _suite = as_bytes(ENCODING_SOURCE % encoding + suite, encoding, fstrict = False)
+                _suite = as_bytes(ENCODING_SOURCE % encoding + suite, encoding)
                 exec(_suite, _globals, _locals)
 
             finally:
@@ -9855,7 +9866,16 @@ class CSessionManagerInternal:
 
 
     def set_encoding(self, encoding):
+        if self.m_encoding == encoding:
+            return
+
         self.m_encoding = encoding
+        
+        event = CEventEncoding(encoding)
+        self.m_event_dispatcher.fire_event(event)
+
+        if self.__is_attached():
+            self.refresh()
 
 
     def get_encoding(self):
@@ -11018,13 +11038,27 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
     def do_encoding(self, arg):
         if arg == '':
             encoding = self.m_session_manager.get_encoding()
+            if encoding != ENCODING_AUTO:
+                try:
+                    codecs.lookup(encoding)
+                except:
+                    encoding += ' (?)'
+
             _print(STR_ENCODING_MODE % encoding, self.m_stdout)
             return
 
-        arg = arg.split()[0].strip()
+        encoding = arg.split()[0].strip()
 
-        self.m_session_manager.set_encoding(arg)
-        _print(STR_ENCODING_MODE_SET % arg, self.m_stdout)
+        self.m_session_manager.set_encoding(encoding)
+        
+        if encoding != ENCODING_AUTO:
+            try:
+                codecs.lookup(encoding)
+            except:
+                encoding += ' (?)'
+                _print(STR_ENCODING_BAD, self.m_stdout)
+
+        _print(STR_ENCODING_MODE_SET % encoding, self.m_stdout)
 
     
     def do_thread(self, arg):
@@ -11765,10 +11799,11 @@ commands.
 
 Without an argument returns the current encoding.
 
-The value can be 'auto' or any encoding accepted by string.encode().
-If 'auto' is set the encoding used will be that of the current code scope.
+The value can be either 'auto' or any encoding accepted by the codecs module.
+If 'auto' is specified, the encoding used will be the source encoding 
+of the active scope, which is utf-8 by default.
 
-The default encoding is 'auto'.""", self.m_stdout)
+The default value is 'auto'.""", self.m_stdout)
 
 
     def help_env(self):
