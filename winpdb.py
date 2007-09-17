@@ -412,6 +412,7 @@ DLG_LAUNCH_TITLE = "Launch"
 DLG_ATTACH_TITLE = "Attach"
 STATIC_EXPR = """The new expression will be evaluated at the debuggee
 and its value will be set to the item."""
+CHECKBOX_ENCODING = "Output non ASCII characters as an escape sequence."
 STATIC_ENCODING = """The encoding is used as source encoding for the name-space viewer and for the exec and eval console commands. Valid values are either 'auto' or an encoding known by the codecs module. If 'auto' is specified, the encoding used will be the source encoding of the active scope, which is utf-8 by default."""
 STATIC_ENCODING_SPLIT = """The encoding is used as source encoding for 
 the name-space viewer and for the exec and eval 
@@ -1548,12 +1549,12 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #
 
     def do_encoding(self, event):
-        encoding = self.m_session_manager.get_encoding()
-        dlg = CEncodingDialog(self, encoding)
+        encoding, fraw = self.m_session_manager.get_encoding()
+        dlg = CEncodingDialog(self, encoding, fraw)
         r = dlg.ShowModal()
         if r == wx.ID_OK:
-            encoding = dlg.get_encoding()
-            self.m_session_manager.set_encoding(encoding)
+            encoding, fraw = dlg.get_encoding()
+            self.m_session_manager.set_encoding(encoding, fraw)
 
         dlg.Destroy()
 
@@ -1698,13 +1699,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def callback_encoding(self, event):
-        encoding = self.m_session_manager.get_encoding()
+        encoding, fraw = self.m_session_manager.get_encoding()
 
         if encoding != rpdb2.ENCODING_AUTO:
             try:
                 codecs.lookup(encoding)
             except:
                 encoding += ' (?)'
+              
+        if fraw:
+            encoding += ', ' + rpdb2.ENCODING_RAW
 
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % encoding)
 
@@ -2612,7 +2616,6 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_history_index = 0
         
         self.m_console = rpdb2.CConsole(self.m_session_manager, stdin = self, stdout = self, fSplit = True)
-        #self.m_console.set_encoding(wx.GetDefaultPyEncoding(), g_fUnicode)
 
         self.m_queue = Queue.Queue()
         
@@ -3776,7 +3779,7 @@ class CExpressionDialog(wx.Dialog):
 
     
 class CEncodingDialog(wx.Dialog):
-    def __init__(self, parent, current_encoding):
+    def __init__(self, parent, current_encoding, current_fraw):
         wx.Dialog.__init__(self, parent, -1, DLG_ENCODING_TITLE)
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
@@ -3799,6 +3802,10 @@ class CEncodingDialog(wx.Dialog):
         self.m_entry_encoding.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_encoding)
         sizerh.Add(self.m_entry_encoding, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
+        
+        self.m_cb = wx.CheckBox(self, -1, CHECKBOX_ENCODING)
+        self.m_cb.SetValue(current_fraw)
+        sizerv.Add(self.m_cb, 0, wx.ALIGN_LEFT | wx.ALL, 5)
         
         btnsizer = wx.StdDialogButtonSizer()
         sizerv.Add(btnsizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
@@ -3831,11 +3838,11 @@ class CEncodingDialog(wx.Dialog):
         encoding = self.m_entry_encoding.GetValue()
         encoding = rpdb2.as_unicode(encoding, wx.GetDefaultPyEncoding())
 
-        return encoding
+        return encoding, self.m_cb.GetValue()
 
 
     def do_validate(self):
-        encoding = self.get_encoding()
+        encoding, fraw = self.get_encoding()
         if encoding == rpdb2.ENCODING_AUTO:
             return True
 

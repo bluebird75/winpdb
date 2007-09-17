@@ -1119,22 +1119,28 @@ class CSessionManager:
         return self.__smi.execute(suite)
 
 
-    def set_encoding(self, encoding):
+    def set_encoding(self, encoding, fraw = False):
         """
         Set the encoding that will be used as source encoding for execute()
         evaluate() commands and in strings returned by get_namespace().
 
-        The value can be either 'auto' or any encoding accepted by the 
-        codecs module. If 'auto' is specified, the encoding used will be the 
-        source encoding of the active scope, which is utf-8 by default.
+        The encoding value can be either 'auto' or any encoding accepted by 
+        the codecs module. If 'auto' is specified, the encoding used will be 
+        the source encoding of the active scope, which is utf-8 by default.
 
-        The default value is 'auto'.
+        The default encoding value is 'auto'.
+
+        If fraw is True, strings returned by evaluate() and get_namespace() 
+        will represent non ASCII characters as an escape sequence.
         """
 
-        return self.__smi.set_encoding(encoding)
+        return self.__smi.set_encoding(encoding, fraw)
 
 
     def get_encoding(self):
+        """
+        return the (encoding, fraw) tuple.
+        """
         return self.__smi.get_encoding()
 
 
@@ -1292,16 +1298,6 @@ class CConsole:
         """
         
         return self.m_ci.join()
-
-
-    """
-    def set_encoding(self, _encoding, funicode_output):
-        "" "
-        Set the console encoding. if funicode_output is True, any output will
-        be done directly with unicode.
-        "" "
-        return self.m_ci.set_encoding(_encoding, funicode_output)
-    """
 
 
     def set_filename(self, filename):
@@ -1796,7 +1792,8 @@ MODE_OFF = 'OFF'
 
 ENCODING_SOURCE = '# -*- coding: %s -*-\n'
 ENCODING_AUTO = 'auto'
-ENCODING_RAW = '__raw'
+ENCODING_RAW = 'raw'
+ENCODING_RAW_I = '__raw'
 
 MAX_EVALUATE_LENGTH = 256 * 1024
 MAX_NAMESPACE_ITEMS = 1024
@@ -2320,7 +2317,7 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
     if isinstance(x, dict):
         return repr_dict('{%s}', x, length, encoding, is_valid)
 
-    if encoding == ENCODING_RAW and type(x) in [str, unicode]:
+    if encoding == ENCODING_RAW_I and type(x) in [str, unicode]:
         return repr_str_raw(x, length, is_valid)
 
     if type(x) == unicode:
@@ -3529,7 +3526,7 @@ class _RPDB2_FindRepr:
     def __getitem__(self, key):
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW_I).replace('"', '&quot') == key:
                 if isinstance(self.m_object, dict):
                     return self.m_object[i]
 
@@ -3546,7 +3543,7 @@ class _RPDB2_FindRepr:
 
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW_I).replace('"', '&quot') == key:
                 self.m_object[i] = value
                 return
 
@@ -3563,7 +3560,7 @@ def SafeCmp(x, y):
     except:
         pass
 
-    return cmp(repr_ltd(x, 256, encoding = ENCODING_RAW), repr_ltd(y, 256, encoding = ENCODING_RAW))
+    return cmp(repr_ltd(x, 256, encoding = ENCODING_RAW_I), repr_ltd(y, 256, encoding = ENCODING_RAW_I))
 
 
 
@@ -4155,8 +4152,9 @@ class CEventEncoding(CEvent):
     The encoding has been set.
     """
 
-    def __init__(self, event):
-        self.m_event = event
+    def __init__(self, encoding, fraw):
+        self.m_encoding = encoding
+        self.m_fraw = fraw
 
 
 
@@ -7589,7 +7587,7 @@ class CDebuggerEngine(CDebuggerCore):
                         break
                     
                     is_valid = [True]
-                    rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW)
+                    rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW_I)
 
                     e = {}
                     e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
@@ -7619,7 +7617,7 @@ class CDebuggerEngine(CDebuggerCore):
                     break
 
                 is_valid = [True]
-                rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW)
+                rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW_I)
 
                 e = {}
                 e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
@@ -7681,7 +7679,7 @@ class CDebuggerEngine(CDebuggerCore):
                         e[DICT_KEY_EXPR] = as_unicode('(%s)[%s]' % (expr, rk))
 
                 if not DICT_KEY_EXPR in e:
-                    rk = repr_ltd(k, REPR_ID_LENGTH, encoding = ENCODING_RAW)
+                    rk = repr_ltd(k, REPR_ID_LENGTH, encoding = ENCODING_RAW_I)
                     e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
 
                 e[DICT_KEY_NAME] = as_unicode([repr_ltd(k, repr_limit, encoding), k][fForceNames])
@@ -7809,8 +7807,11 @@ class CDebuggerEngine(CDebuggerCore):
         return encoding
 
 
-    def get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding):
-        encoding = self.__calc_encoding(encoding, fvalidate = True)
+    def get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding, fraw):
+        if fraw:
+            encoding = ENCODING_RAW_I
+        else:
+            encoding = self.__calc_encoding(encoding, fvalidate = True)
 
         try:
             (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException, fReadOnly = True)
@@ -7848,7 +7849,7 @@ class CDebuggerEngine(CDebuggerCore):
         return _rl 
 
             
-    def evaluate(self, expr, frame_index, fException, encoding):
+    def evaluate(self, expr, frame_index, fException, encoding, fraw):
         """
         Evaluate expression in context of frame at depth 'frame-index'.
         """
@@ -7868,6 +7869,9 @@ class CDebuggerEngine(CDebuggerCore):
             else:
                 _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
                 r = eval(_expr, _globals, _locals)
+        
+            if fraw:
+                encoding = ENCODING_RAW_I
 
             v = repr_ltd(r, MAX_EVALUATE_LENGTH, encoding)
             
@@ -8665,13 +8669,13 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
-    def export_get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding):
-        r = self.m_debugger.get_namespace(nl, fFilter, frame_index, fException, repr_limit, encoding)
+    def export_get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding, fraw):
+        r = self.m_debugger.get_namespace(nl, fFilter, frame_index, fException, repr_limit, encoding, fraw)
         return r
 
         
-    def export_evaluate(self, expr, frame_index, fException, encoding):
-        (v, w, e) = self.m_debugger.evaluate(expr, frame_index, fException, encoding)
+    def export_evaluate(self, expr, frame_index, fException, encoding, fraw):
+        (v, w, e) = self.m_debugger.evaluate(expr, frame_index, fException, encoding, fraw)
         return (v, w, e)
 
         
@@ -9122,6 +9126,7 @@ class CSessionManagerInternal:
         self.m_environment = []
 
         self.m_encoding = ENCODING_AUTO
+        self.m_fraw = False
         
     
     def __del__(self):
@@ -9835,7 +9840,7 @@ class CSessionManagerInternal:
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        r = self.getSession().getProxy().get_namespace(nl, fFilter, frame_index, fAnalyzeMode, repr_limit, self.m_encoding)
+        r = self.getSession().getProxy().get_namespace(nl, fFilter, frame_index, fAnalyzeMode, repr_limit, self.m_encoding, self.m_fraw)
         return r
 
 
@@ -9848,7 +9853,7 @@ class CSessionManagerInternal:
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        (value, warning, error) = self.getSession().getProxy().evaluate(expr, frame_index, fAnalyzeMode, self.m_encoding)
+        (value, warning, error) = self.getSession().getProxy().evaluate(expr, frame_index, fAnalyzeMode, self.m_encoding, self.m_fraw)
         return (value, warning, error)
 
         
@@ -9865,13 +9870,14 @@ class CSessionManagerInternal:
         return (warning, error)
 
 
-    def set_encoding(self, encoding):
-        if self.m_encoding == encoding:
+    def set_encoding(self, encoding, fraw):
+        if (self.m_encoding, self.m_fraw) == (encoding, fraw):
             return
 
         self.m_encoding = encoding
+        self.m_fraw = fraw
         
-        event = CEventEncoding(encoding)
+        event = CEventEncoding(encoding, fraw)
         self.m_event_dispatcher.fire_event(event)
 
         if self.__is_attached():
@@ -9879,7 +9885,7 @@ class CSessionManagerInternal:
 
 
     def get_encoding(self):
-        return self.m_encoding
+        return (self.m_encoding, self.m_fraw)
 
 
     def set_host(self, host):
@@ -10136,32 +10142,6 @@ class CSessionManagerInternal:
 
 
 
-"""
-class CStdoutWrapper:
-    def __init__(self, stdout, encoding):
-        self.m_stdout = stdout
-        self.m_encoding = encoding
-        self.m_funicode_output = False
-
-
-    def set_encoding(self, encoding, funicode_output):
-        self.m_encoding = encoding
-        self.m_funicode_output = funicode_output
-
-
-    def write(self, t):
-        if type(t) == unicode and not self.m_funicode_output:
-            t = t.encode(self.m_encoding, 'replace')
-
-        self.m_stdout.write(t)
-
-
-    def flush(self):
-        self.m_stdout.flush()
-"""
-
-
-
 class CConsoleInternal(cmd.Cmd, threading.Thread):
     def __init__(self, session_manager, stdin = None, stdout = None, fSplit = False):
         global g_fDefaultStd
@@ -10199,7 +10179,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_eInLoop = threading.Event()
         self.cmdqueue.insert(0, '')
 
-        self.m_stdout = self.stdout #CStdoutWrapper(self.stdout, self.__detect_encoding(self.stdout))
+        self.m_stdout = self.stdout
         self.m_encoding = self.__detect_encoding(self.stdin)
 
         g_fDefaultStd = (stdin == None)
@@ -10212,18 +10192,6 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             pass
 
         return detect_locale()
-
-
-    """
-    def set_encoding(self, _encoding, funicode_output):
-        try:
-            codecs.lookup(_encoding)
-        except LookupError:
-            raise BadArgument
-
-        self.m_encoding = _encoding
-        self.m_stdout.set_encoding(_encoding, funicode_output)
-    """
 
 
     def set_filename(self, filename):
@@ -11037,19 +11005,31 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             
     def do_encoding(self, arg):
         if arg == '':
-            encoding = self.m_session_manager.get_encoding()
+            encoding, fraw = self.m_session_manager.get_encoding()
             if encoding != ENCODING_AUTO:
                 try:
                     codecs.lookup(encoding)
                 except:
                     encoding += ' (?)'
 
+            if fraw:
+                encoding += ', ' + ENCODING_RAW
+
             _print(STR_ENCODING_MODE % encoding, self.m_stdout)
             return
 
-        encoding = arg.split()[0].strip()
+        if ',' in arg:
+            encoding, raw = arg.split(',')
+        else:
+            encoding, raw = arg, ''
 
-        self.m_session_manager.set_encoding(encoding)
+        encoding = encoding.strip()
+        if encoding == '':
+            encoding, fraw = self.m_session_manager.get_encoding()
+
+        fraw = 'raw' in raw
+
+        self.m_session_manager.set_encoding(encoding, fraw)
         
         if encoding != ENCODING_AUTO:
             try:
@@ -11057,6 +11037,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             except:
                 encoding += ' (?)'
                 _print(STR_ENCODING_BAD, self.m_stdout)
+
+        if fraw:
+            encoding += ', ' + ENCODING_RAW
 
         _print(STR_ENCODING_MODE_SET % encoding, self.m_stdout)
 
@@ -11792,18 +11775,22 @@ Type 'help up' or 'help down' for more information on focused frames.""", self.m
 
 
     def help_encoding(self):
-        _print("""encoding [<encoding>]
+        _print("""encoding [<encoding> [, raw]]
 
-Set the encoding that will be used as source encoding for exec and eval
-commands.
+Set the encoding that will be used as source encoding for 
+exec and eval commands.
 
 Without an argument returns the current encoding.
 
-The value can be either 'auto' or any encoding accepted by the codecs module.
-If 'auto' is specified, the encoding used will be the source encoding 
-of the active scope, which is utf-8 by default.
+The encoding value can be either 'auto' or any encoding accepted 
+by the codecs module. If 'auto' is specified, the encoding used 
+will be the source encoding of the active scope, 
+which is utf-8 by default.
 
-The default value is 'auto'.""", self.m_stdout)
+The default encoding value is 'auto'.
+
+If 'raw' is specified, strings returned by the eval command
+will represent non ASCII characters as an escape sequence.""", self.m_stdout)
 
 
     def help_env(self):
