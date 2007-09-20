@@ -3109,7 +3109,7 @@ def get_file_encoding(filename):
     if filename in g_file_encoding:
         return g_file_encoding[filename]
 
-    for i in range(10):
+    for i in range(1, 10):
         line = get_source_line(filename, i, fdetect_encoding = False)
 
         encoding = ParseLineEncoding(line)
@@ -3146,20 +3146,19 @@ def ParseEncoding(txt):
     http://docs.python.org/ref/encodings.html
     """
     
-    if txt.startswith(ENCODING_UTF8_PREFIX_1):
-        return 'utf-8'
+    l = txt.split('\n', 20)
 
-    l = txt.split('\n', 2)
+    for line in l:
+        encoding = ParseLineEncoding(line)
+        if encoding is not None:
+            try:
+                codecs.lookup(encoding)
+                return encoding
 
-    e = ParseLineEncoding(l[0])
-    if e is not None:
-        return e
-        
-    if len(l) == 1:
-        return None 
-        
-    e = ParseLineEncoding(l[1])
-    return e
+            except:
+                return 'utf-8'
+
+    return 'utf-8'
 
 
 
@@ -4883,12 +4882,16 @@ class CFileBreakInfo:
         else:    
             fn = g_found_unicode_files.get(self.m_filename, self.m_filename)
             source = get_source(fn)
-        
+
         self.__CalcBreakInfoFromSource(source)
 
 
     def __CalcBreakInfoFromSource(self, source):
         _source = source.replace('\r\n', '\n') + '\n'
+
+        encoding = ParseEncoding(_source)
+        _source = as_string(_source, encoding)
+        
         code = compile(_source, self.m_filename, "exec")
         
         self.m_scope_break_info = []
