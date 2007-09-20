@@ -267,7 +267,6 @@ import SimpleXMLRPCServer
 import SocketServer
 import xmlrpclib
 import threading
-import linecache
 import traceback
 import commands
 import tempfile
@@ -1792,6 +1791,7 @@ RPDB_EXEC_INFO = 'rpdb_exception_info'
 MODE_ON = 'ON'
 MODE_OFF = 'OFF'
 
+ENCODING_UTF8_PREFIX_1 = '\xef\xbb\xbf'
 ENCODING_SOURCE = '# -*- coding: %s -*-\n'
 ENCODING_AUTO = 'auto'
 ENCODING_RAW = 'raw'
@@ -1860,6 +1860,7 @@ g_traceback_lock = threading.RLock()
 # Filename to Source-lines dictionary of blender Python scripts.
 #
 g_blender_text = {}
+g_line_cache = {}
 
 g_initial_cwd = []
 
@@ -2384,6 +2385,20 @@ def print_debug_exception(fForce = False):
 
        
 
+class CFileWrapper:
+    def __init__(self, f):
+        self.m_f = f
+
+
+    def write(self, s):
+        _print(s, self.m_f, feol = False) 
+
+
+    def __getattr__(self, name):
+        return self.m_f.__getattr__(name)
+
+
+
 def print_exception(t, v, tb, fForce = False):
     """
     Print exceptions to stderr when in debug mode.
@@ -2394,7 +2409,7 @@ def print_exception(t, v, tb, fForce = False):
         
     try:
         g_traceback_lock.acquire()
-        traceback.print_exception(t, v, tb, file = sys.stderr)
+        traceback.print_exception(t, v, tb, file = CFileWrapper(sys.stderr))
         
     finally:    
         g_traceback_lock.release()
@@ -2409,7 +2424,7 @@ def print_stack():
     if g_fDebug == True:
         try:
             g_traceback_lock.acquire()
-            traceback.print_stack(file = sys.stderr)
+            traceback.print_stack(file = CFileWrapper(sys.stderr))
             
         finally:    
             g_traceback_lock.release()
@@ -2581,20 +2596,16 @@ def IsPythonSourceFile(path):
 
     path = g_found_unicode_files.get(path, path)
 
+    for lineno in range(1, 10):
+        line = get_source_line(path, lineno)
+
+        if line.startswith('#!') and 'python' in line:
+            return True
+
+    if is_py3k():
+        return False
+
     try:
-        f = open(path, 'r')
-        c = f.read(10000)
-        f.close()
-  
-        ll = c.split('\n')
-
-        for l in ll:
-            if l.startswith('#!') and 'python' in l:
-                return True
-
-        if is_py3k():
-            return False
-
         compiler.parseFile(path) 
         return True
 
@@ -3029,23 +3040,57 @@ def get_blender_source(filename):
         return lines
 
     
-            
-def get_source_line(filename, lineno, fBlender, fdetect_encoding = False):
+
+def get_source_line_bytes(filename, lineno):
+    if not filename in g_line_cache:
+        f = open(filename, 'rb')
+        l = f.read()
+        f.close()
+
+        if l[:3] == as_bytes(ENCODING_UTF8_PREFIX_1):
+            l = l[3:]
+        
+        eol = as_bytes('\n')
+        ll = l.split(eol)
+        lll = [line + eol for line in ll]
+
+        g_line_cache[filename] = lll
+
+    if lineno > len(g_line_cache[filename]):
+        return as_bytes('')
+
+    line = g_line_cache[filename][lineno - 1]
+
+    return line 
+
+
+
+def get_source(filename):
+    encoding = get_file_encoding(filename)
+
+    lines = as_bytes('').join(g_line_cache[filename])
+    source = as_unicode(lines, encoding)
+
+    return source
+
+
+
+def get_source_line(filename, lineno, fdetect_encoding = True):
     """
     Return source line from file.
     """
     
     if fdetect_encoding:
-        encoding = get_file_encoding(filename, fBlender)
+        encoding = get_file_encoding(filename)
+    else:
+        encoding = 'utf-8'
 
-    if fBlender:
-        lines = get_blender_source(filename, fBlender)
+    if is_blender_file(filename):
+        lines = get_blender_source(filename)
 
         try:
             line = lines[lineno - 1] + '\n'
-
-            if fdetect_encoding:
-                line = as_unicode(line, encoding)
+            line = as_unicode(line, encoding)
 
             return line
             
@@ -3053,31 +3098,27 @@ def get_source_line(filename, lineno, fBlender, fdetect_encoding = False):
             return as_unicode('')
 
     filename = g_found_unicode_files.get(filename, filename)
-    line = linecache.getline(filename, lineno) 
-
-    if fdetect_encoding:
-        line = as_unicode(line, encoding)
+    line = get_source_line_bytes(filename, lineno) 
+    line = as_unicode(line, encoding)
 
     return line
 
 
 
-def get_file_encoding(filename, fBlender = None):
+def get_file_encoding(filename):
     if filename in g_file_encoding:
         return g_file_encoding[filename]
 
-    if fBlender == None:
-        fBlender = is_blender_file(filename)
-
     for i in range(10):
-        line = get_source_line(filename, i, fBlender, fdetect_encoding = False)
-
-        if i == 0 and line.startswith('\xef\xbb\xbf'):
-            g_file_encoding[filename] = 'utf-8'
-            return 'utf-8'
+        line = get_source_line(filename, i, fdetect_encoding = False)
 
         encoding = ParseLineEncoding(line)
         if encoding != None:
+            try:
+                codecs.lookup(encoding)
+            except:
+                encoding = 'utf-8'
+
             g_file_encoding[filename] = encoding
             return encoding
 
@@ -3105,7 +3146,7 @@ def ParseEncoding(txt):
     http://docs.python.org/ref/encodings.html
     """
     
-    if txt.startswith('\xef\xbb\xbf'):
+    if txt.startswith(ENCODING_UTF8_PREFIX_1):
         return 'utf-8'
 
     l = txt.split('\n', 2)
@@ -4841,9 +4882,7 @@ class CFileBreakInfo:
             source = '\n'.join(lines) + '\n'
         else:    
             fn = g_found_unicode_files.get(self.m_filename, self.m_filename)
-            f = open(fn, "r")
-            source = f.read()
-            f.close()
+            source = get_source(fn)
         
         self.__CalcBreakInfoFromSource(source)
 
@@ -4958,7 +4997,7 @@ class CBreakInfoManager:
 
 
 
-class CBreakPoint:    
+class CBreakPoint(object):    
     def __init__(self, filename, scope_fqn, scope_first_line, lineno, fEnabled, expr, fTemporary = False):
         """
         Breakpoint constructor.
@@ -4982,6 +5021,11 @@ class CBreakPoint:
             self.m_code = compile(expr, '', 'eval')
 
         
+    def __reduce__(self):
+        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
+        return rv
+
+
     def calc_enclosing_scope_name(self):
         if self.m_scope_offset != 0:
             return None
@@ -7339,13 +7383,10 @@ class CDebuggerEngine(CDebuggerCore):
             if filename in [None, '']:
                 raise
 
-        fBlender = False
-        
         if filename in [None, '']:
             __filename = frame_filename
             r[DICT_KEY_TID] = ctx.m_thread_id
         elif is_blender_file(filename):
-            fBlender = True
             __filename = as_string(filename, sys.getfilesystemencoding())
         else:    
             __filename = FindFile(filename, fModules = True)
@@ -7361,7 +7402,7 @@ class CDebuggerEngine(CDebuggerCore):
         while nlines != 0:
             try:
                 g_traceback_lock.acquire()
-                line = get_source_line(_filename, _lineno, fBlender, fdetect_encoding = True)
+                line = get_source_line(_filename, _lineno)
                 
             finally:    
                 g_traceback_lock.release()
@@ -7441,7 +7482,6 @@ class CDebuggerEngine(CDebuggerCore):
         first_line = max(1, frame_lineno - nlines // 2)     
         _lineno = first_line
 
-        fBlender = is_blender_file(frame_filename)
         lines = []
         breakpoints = {}
         fhide_pwd_mode = False
@@ -7449,7 +7489,7 @@ class CDebuggerEngine(CDebuggerCore):
         while nlines != 0:
             try:
                 g_traceback_lock.acquire()
-                line = get_source_line(frame_filename, _lineno, fBlender, fdetect_encoding = True)
+                line = get_source_line(frame_filename, _lineno)
                 
             finally:    
                 g_traceback_lock.release()
@@ -12041,8 +12081,9 @@ def myimport(*args, **kwargs):
 # MOD
 #
 def workaround_import_deadlock():
-    xmlrpclib.loads(XML_DATA)    
-    pickle.loads('(S\'\\xb3\\x95\\xf9\\x1d\\x105c\\xc6\\xe2t\\x9a\\xa5_`\\xa59\'\np0\nS"(I0\\nI1\\nS\'5657827\'\\np0\\n(S\'server_info\'\\np1\\n(tI0\\ntp2\\ntp3\\n."\np1\ntp2\n.0000000')
+    xmlrpclib.loads(XML_DATA)
+    s = as_bytes('(S\'\\xb3\\x95\\xf9\\x1d\\x105c\\xc6\\xe2t\\x9a\\xa5_`\\xa59\'\np0\nS"(I0\\nI1\\nS\'5657827\'\\np0\\n(S\'server_info\'\\np1\\n(tI0\\ntp2\\ntp3\\n."\np1\ntp2\n.0000000')
+    pickle.loads(s)
     pickle.__import__ = myimport
 
 
