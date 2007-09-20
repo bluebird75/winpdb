@@ -272,9 +272,11 @@ import traceback
 import commands
 import tempfile
 import __main__
+import copy_reg
 import weakref
 import httplib
 import os.path
+import hashlib
 import pickle
 import socket
 import getopt
@@ -2137,7 +2139,7 @@ def repr_list(pattern, l, length, encoding, is_valid):
                     s += '...'
                 break
 
-            if index < len(l):
+            if index < len(l) or (index == 1 and pattern[0] == '('):
                 s += ', '
 
     except AttributeError:
@@ -3911,7 +3913,7 @@ class CCrypto:
             return CCrypto.m_keys[_rpdb2_pwd]
 
         key = as_bytes(_rpdb2_pwd)
-        d = hmac.new(key)
+        d = hmac.new(key, digestmod = hashlib.md5)
 
         #
         # The following loop takes around a second to complete
@@ -4032,8 +4034,11 @@ class CCrypto:
         i = self.__get_next_index()
         pack = (self.m_index_anchor_ex, i, self.m_rid, args)
         
+        #print_debug('***** 1' + repr(args)[:50]) 
         s = pickle.dumps(pack, 2)
-        h = hmac.new(self.m_key, s)
+        #print_debug('***** 2' + repr(args)[:50]) 
+        
+        h = hmac.new(self.m_key, s, digestmod = hashlib.md5)
         d = h.hexdigest()
 
         #if 'coding:' in s:
@@ -4055,7 +4060,7 @@ class CCrypto:
 
     def __verify_signature(self, digest, s, fVerifyIndex):
         try:
-            h = hmac.new(self.m_key, s)
+            h = hmac.new(self.m_key, s, digestmod = hashlib.md5)
             d = h.hexdigest()
 
             #if 'coding:' in s:
@@ -4141,7 +4146,12 @@ class CEvent(object):
     """
     Base class for events.
     """
-    
+   
+    def __reduce__(self):
+        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
+        return rv
+
+
     def is_match(self, arg):
         pass
 
@@ -8528,6 +8538,12 @@ class CServerInfo(object):
         self.m_state = as_unicode(state)
         self.m_fembedded = fembedded
 
+
+    def __reduce__(self):
+        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
+        return rv
+
+
     def __str__(self):
         return 'age: %d, port: %d, pid: %d, filename: %s, rid: %s' % (self.m_age, self.m_port, self.m_pid, self.m_filename, self.m_rid)
 
@@ -12112,6 +12128,8 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
         return
 
     print_debug('Starting server with: %s' % ExpandedFilename)
+
+    workaround_import_deadlock()
 
     #
     # Replace the rpdb2.py directory with the script directory in 
