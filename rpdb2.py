@@ -772,6 +772,7 @@ class CSessionManager:
         """
        
         filename = as_unicode(filename, fstrict = True)
+        scope = as_unicode(scope, fstrict = True)
 
         return self.__smi.request_go_breakpoint(filename, scope, lineno)
 
@@ -830,6 +831,7 @@ class CSessionManager:
         """
 
         filename = as_unicode(filename, fstrict = True)
+        scope = as_unicode(scope, fstrict = True)
         expr = as_unicode(expr, fstrict = True)
 
         return self.__smi.set_breakpoint(
@@ -1693,10 +1695,11 @@ STR_ACTIVE_THREADS = """List of active threads known to the debugger:
 -----------------------------------------------""" 
 STR_BREAKPOINTS_LIST = """List of breakpoints:
 
- Id  State      Line  Filename-Scope-Condition
+ Id  State      Line  Filename-Scope-Condition-Encoding
 ------------------------------------------------------------------------------""" 
 
 STR_BREAKPOINTS_TEMPLATE = """ %2d  %-8s  %5d  %s
+                      %s
                       %s
                       %s"""
 
@@ -3066,6 +3069,8 @@ def get_source_line_bytes(filename, lineno):
 
 
 def get_source(filename):
+    filename = g_found_unicode_files.get(filename, filename)
+
     encoding = get_file_encoding(filename)
 
     lines = as_bytes('').join(g_line_cache[filename])
@@ -3080,6 +3085,8 @@ def get_source_line(filename, lineno, fdetect_encoding = True):
     Return source line from file.
     """
     
+    filename = g_found_unicode_files.get(filename, filename)
+
     if fdetect_encoding:
         encoding = get_file_encoding(filename)
     else:
@@ -3097,7 +3104,6 @@ def get_source_line(filename, lineno, fdetect_encoding = True):
         except IndexError:
             return as_unicode('')
 
-    filename = g_found_unicode_files.get(filename, filename)
     line = get_source_line_bytes(filename, lineno) 
     line = as_unicode(line, encoding)
 
@@ -3106,6 +3112,8 @@ def get_source_line(filename, lineno, fdetect_encoding = True):
 
 
 def get_file_encoding(filename):
+    filename = g_found_unicode_files.get(filename, filename)
+
     if filename in g_file_encoding:
         return g_file_encoding[filename]
 
@@ -4390,11 +4398,7 @@ class CEventBreakpoint(CEvent):
     SET = 'set'
     
     def __init__(self, bp, action = SET, id_list = [], fAll = False):
-        self.m_bp = copy.copy(bp)
-        if self.m_bp is not None:
-            self.m_bp.m_code = None
-            self.m_bp.m_filename = as_unicode(self.m_bp.m_filename, sys.getfilesystemencoding())
-        
+        self.m_bp = breakpoint_copy(bp)
         self.m_action = action
         self.m_id_list = id_list
         self.m_fAll = fAll
@@ -4880,8 +4884,7 @@ class CFileBreakInfo:
             lines = get_blender_source(self.m_filename)
             source = '\n'.join(lines) + '\n'
         else:    
-            fn = g_found_unicode_files.get(self.m_filename, self.m_filename)
-            source = get_source(fn)
+            source = get_source(self.m_filename)
 
         self.__CalcBreakInfoFromSource(source)
 
@@ -4912,7 +4915,7 @@ class CFileBreakInfo:
             fqn = fqn + [c.co_name]  
             valid_lines = CalcValidLines(c)
             self.m_last_line = max(self.m_last_line, valid_lines[-1])
-            _fqn = '.'.join(fqn)
+            _fqn = as_unicode('.'.join(fqn), encoding)
             si = (_fqn, valid_lines)  
             subcodeslist = self.__CalcSubCodesList(c)
             t = subcodeslist + [si] + t
@@ -4967,6 +4970,7 @@ class CFileBreakInfo:
                 l = sbi.CalcScopeLine(sbi.m_first_line + offset)
                 return (sbi, l)
 
+        print_debug(repr(name))
         raise InvalidScopeName
     
 
@@ -5000,8 +5004,23 @@ class CBreakInfoManager:
 
 
 
+def breakpoint_copy(bp):
+    if bp is None:
+        return None
+
+    _bp = copy.copy(bp)
+        
+    #filename = g_found_unicode_files.get(bp.m_filename, bp.m_filename)
+
+    _bp.m_filename = as_unicode(bp.m_filename, sys.getfilesystemencoding())   
+    _bp.m_code = None
+
+    return _bp
+
+
+
 class CBreakPoint(object):    
-    def __init__(self, filename, scope_fqn, scope_first_line, lineno, fEnabled, expr, fTemporary = False):
+    def __init__(self, filename, scope_fqn, scope_first_line, lineno, fEnabled, expr, encoding, fTemporary = False):
         """
         Breakpoint constructor.
 
@@ -5017,11 +5036,14 @@ class CBreakPoint(object):
         self.m_scope_offset = lineno - scope_first_line
         self.m_lineno = lineno
         self.m_expr = expr
+        self.m_encoding = encoding
         self.m_code = None
         self.m_fTemporary = fTemporary
 
         if (expr is not None) and (expr != ''):
-            self.m_code = compile(expr, '', 'eval')
+            _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
+            print_debug('Breakpoint expression: %s' % repr(_expr))
+            self.m_code = compile(_expr, '', 'eval')
 
         
     def __reduce__(self):
@@ -5332,7 +5354,7 @@ class CBreakPointsManager:
         else:
             (s, l) = mbi.FindScopeByLineno(lineno)
 
-        bp = CBreakPoint(_filename, s.m_fqn, s.m_first_line, l, fEnabled = True, expr = '', fTemporary = True)
+        bp = CBreakPoint(_filename, s.m_fqn, s.m_first_line, l, fEnabled = True, expr = as_unicode(''), encoding = as_unicode('utf-8'), fTemporary = True)
 
         try:    
             self.m_lock.acquire()
@@ -5349,7 +5371,7 @@ class CBreakPointsManager:
             self.m_lock.release()
 
 
-    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr):
+    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr, encoding):
         """
         Set breakpoint.
 
@@ -5371,7 +5393,7 @@ class CBreakPointsManager:
         else:
             (s, l) = mbi.FindScopeByLineno(lineno)
 
-        bp = CBreakPoint(_filename, s.m_fqn, s.m_first_line, l, fEnabled, expr)
+        bp = CBreakPoint(_filename, s.m_fqn, s.m_first_line, l, fEnabled, expr, encoding)
 
         try:    
             self.m_lock.acquire()
@@ -6800,6 +6822,7 @@ class CDebuggerCore:
         """
 
         assert(is_unicode(filename))
+        assert(is_unicode(scope))
         
         try:
             self.m_state_manager.acquire()
@@ -6920,7 +6943,7 @@ class CDebuggerCore:
             code = frame.f_code
 
             valid_lines = CalcValidLines(code)
-            sbi = CScopeBreakInfo('', valid_lines)
+            sbi = CScopeBreakInfo(as_unicode(''), valid_lines)
             l = sbi.CalcScopeLine(lineno)
 
             frame.f_lineno = l
@@ -7040,17 +7063,12 @@ class CDebuggerEngine(CDebuggerCore):
         return (new_event_index, sel)
 
 
-    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr, frame_index, fException):
+    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr, frame_index, fException, encoding):
         print_debug('Setting breakpoint to: %s, %s, %d' % (repr(filename), scope, lineno))
 
         assert(is_unicode(filename))
+        assert(is_unicode(scope))
         assert(is_unicode(expr))
-
-        if expr != '':
-            try:
-                compile(expr, '', 'eval')
-            except:
-                raise SyntaxError
 
         fLock = False
         
@@ -7065,8 +7083,18 @@ class CDebuggerEngine(CDebuggerCore):
                 _filename = as_string(filename, sys.getfilesystemencoding())
             else:
                 _filename = FindFile(filename, fModules = True)
-                
-            bp = self.m_bp_manager.set_breakpoint(_filename, scope, lineno, fEnabled, expr)
+            
+            if expr != '':
+                try:
+                    encoding = self.__calc_encoding(encoding, filename = _filename)
+                    _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
+                    compile(_expr, '', 'eval')
+                except:
+                    raise SyntaxError
+
+            encoding = as_unicode(encoding)
+
+            bp = self.m_bp_manager.set_breakpoint(_filename, scope, lineno, fEnabled, expr, encoding)
             self.set_all_tracers()
 
             event = CEventBreakpoint(bp)
@@ -7108,7 +7136,7 @@ class CDebuggerEngine(CDebuggerCore):
         """
         
         bpl = self.m_bp_manager.get_breakpoints()
-        _items = [(id, copy.copy(bp)) for (id, bp) in bpl.items()]
+        _items = [(id, breakpoint_copy(bp)) for (id, bp) in bpl.items()]
         for (id, bp) in _items:
             bp.m_code = None
             
@@ -7841,7 +7869,7 @@ class CDebuggerEngine(CDebuggerCore):
         lock.release()    
 
     
-    def __calc_encoding(self, encoding, fvalidate = False):
+    def __calc_encoding(self, encoding, fvalidate = False, filename = None):
         if encoding != ENCODING_AUTO and not fvalidate:
             return encoding
 
@@ -7853,8 +7881,10 @@ class CDebuggerEngine(CDebuggerCore):
             except:
                 pass
 
-        ctx = self.get_current_ctx()
-        filename = ctx.m_code_context.m_filename
+        if filename == None:
+            ctx = self.get_current_ctx()
+            filename = ctx.m_code_context.m_filename
+
         encoding = get_file_encoding(filename)
 
         return encoding
@@ -8643,8 +8673,8 @@ class CDebuggeeServer(CIOServer):
         return (new_event_index, s)
 
                 
-    def export_set_breakpoint(self, filename, scope, lineno, fEnabled, expr, frame_index, fException):
-        self.m_debugger.set_breakpoint(filename, scope, lineno, fEnabled, expr, frame_index, fException)
+    def export_set_breakpoint(self, filename, scope, lineno, fEnabled, expr, frame_index, fException, encoding):
+        self.m_debugger.set_breakpoint(filename, scope, lineno, fEnabled, expr, frame_index, fException, encoding)
         return 0
 
         
@@ -9710,11 +9740,14 @@ class CSessionManagerInternal:
         self.getSession().getProxy().request_jump(lineno)
 
     
-    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr):
+    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr, encoding = None):
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        self.getSession().getProxy().set_breakpoint(filename, scope, lineno, fEnabled, expr, frame_index, fAnalyzeMode)
+        if encoding == None:
+            encoding = self.m_encoding
+
+        self.getSession().getProxy().set_breakpoint(filename, scope, lineno, fEnabled, expr, frame_index, fAnalyzeMode, encoding)
 
         
     def disable_breakpoint(self, id_list, fAll):
@@ -9789,7 +9822,7 @@ class CSessionManagerInternal:
                 
             for bp in bpl.values():
                 try:
-                    self.set_breakpoint(bp.m_filename, bp.m_scope_fqn, bp.m_scope_offset, bp.m_fEnabled, bp.m_expr)
+                    self.set_breakpoint(bp.m_filename, bp.m_scope_fqn, bp.m_scope_offset, bp.m_fEnabled, bp.m_expr, bp.m_encoding)
                 except:
                     print_debug_exception()
                     ferror = True
@@ -10741,9 +10774,15 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             bp = bpl[id]
 
             if bp.m_expr:
-                expr = bp.m_expr + '\n'
+                expr = bp.m_expr
             else:
                 expr = ''
+            
+            try:
+                expr.encode('ascii', 'strict')
+                encoding = ''
+            except:
+                encoding = bp.m_encoding
 
             scope = bp.m_scope_fqn
 
@@ -10754,7 +10793,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 scope = scope[len(MODULE_SCOPE2) + 1:]   
                 
             state = [STATE_DISABLED, STATE_ENABLED][bp.isEnabled()]
-            _print(STR_BREAKPOINTS_TEMPLATE % (id, state, bp.m_lineno, clip_filename(bp.m_filename, 45), calc_suffix(scope, 45), calc_prefix(expr, 50)), self.m_stdout)
+            s = STR_BREAKPOINTS_TEMPLATE % (id, state, bp.m_lineno, clip_filename(bp.m_filename, 45), calc_suffix(scope, 45), calc_prefix(expr, 50), encoding)
+            _print(s.rstrip() + '\n', self.m_stdout)
             
 
     def do_save(self, arg):
