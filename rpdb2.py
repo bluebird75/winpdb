@@ -286,6 +286,7 @@ import base64
 import atexit
 import locale
 import codecs
+import signal
 import errno
 import time
 import copy
@@ -1637,6 +1638,8 @@ STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'hel
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
 STR_PSYCO_WARNING = "The psyco module was detected. The debugger is incompatible with the psyco module and will not function correctly as long as the psyco module is imported and used."
+STR_SIGNAL_INTERCEPT = "The signal %s(%d) was intercepted. It will be held pending until the debugger continues. Any exceptions raised by the handler will be ignored!"
+STR_SIGNAL_EXCEPTION = "Exception %s raised by handler of signal %s(%d) was ignored!"
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
 STR_DEBUGGEE_NOT_BROKEN = "Debuggee has to be waiting at break point to complete this command."
 STR_DEBUGGER_HAS_BROKEN = "Debuggee is waiting at break point for further commands."
@@ -1927,6 +1930,11 @@ g_found_unicode_files = {}
 g_file_encoding = {}
 
 g_frames_path = {}
+
+g_signal_handlers = {}
+g_signals_pending = []
+
+#g_profile = None
 
 
 
@@ -3628,6 +3636,18 @@ def recalc_sys_path(old_pythonpath):
 
 
 
+def calc_signame(signum):
+    for k, v in list(vars(signal).items()):
+        if not k.startswith('SIG'):
+            continue
+
+        if v == signum:
+            return k
+
+    return '?'
+
+
+
 class CFirewallTest:
     m_port = None
     m_thread_server = None
@@ -4202,6 +4222,32 @@ class CEvent(object):
 
     def is_match(self, arg):
         pass
+
+
+
+class CEventSignalIntercepted(CEvent):
+    """
+    This event is sent when a signal is intercepted inside tracing code.
+    Such signals are held pending until tracing code is returned from.
+    """
+    
+    def __init__(self, signum):
+        self.m_signum = signum
+        self.m_signame = calc_signame(signum)
+
+
+
+class CEventSignalException(CEvent):
+    """
+    This event is sent when the handler of a previously intercepted signal
+    raises an exception. Such exceptions are ignored because of technical 
+    limitations.
+    """
+
+    def __init__(self, signum, description):
+        self.m_signum = signum
+        self.m_signame = calc_signame(signum)
+        self.m_description = description
 
 
 
@@ -5612,8 +5658,10 @@ class CDebuggerCoreThread:
         mainly to handle synchronization issues related to the 
         life time of the frame structure.
         """
-        
+        #print_debug('profile: %s, %s, %s, %s, %s' % (repr(frame), event, frame.f_code.co_name, frame.f_code.co_filename, repr(arg)[:40])) 
         if event == 'return':            
+            signal_handler = []
+            
             self.m_frame = frame.f_back
 
             try:
@@ -5841,7 +5889,7 @@ class CDebuggerCoreThread:
             return False
 
 
-    def set_local_trace(self, frame):
+    def set_local_trace(self, frame, fsignal_exception = False):
         """
         Set trace callback of frame. 
         Specialized trace methods are selected here to save switching time 
@@ -5850,6 +5898,10 @@ class CDebuggerCoreThread:
         
         if not self.m_core.m_ftrace:
             frame.f_trace = self.trace_dispatch_stop
+            return
+
+        if fsignal_exception:
+            frame.f_trace = self.trace_dispatch_signal
             return
 
         code_context = self.m_core.get_code_context(frame)
@@ -5873,7 +5925,7 @@ class CDebuggerCoreThread:
             del frame.f_trace
 
 
-    def set_tracers(self): 
+    def set_tracers(self, fsignal_exception = False): 
         """
         Set trace callbacks for all frames in stack.
         """
@@ -5882,7 +5934,7 @@ class CDebuggerCoreThread:
             try:
                 f = self.frame_acquire()
                 while f is not None:
-                    self.set_local_trace(f)
+                    self.set_local_trace(f, fsignal_exception)
                     f = f.f_back
                     
             except ThreadDone:
@@ -5898,6 +5950,8 @@ class CDebuggerCoreThread:
         Disable tracing for this thread.
         """
         
+        signal_handler = []
+        
         if frame in self.m_locals_copy:
             self.update_locals()
 
@@ -5910,6 +5964,8 @@ class CDebuggerCoreThread:
         """
         Trace method for breaking a thread.
         """
+        
+        signal_handler = []
         
         if event not in ['line', 'return', 'exception']:
             return frame.f_trace
@@ -5936,9 +5992,11 @@ class CDebuggerCoreThread:
         Initial trace method for thread.
         """
         
+        signal_handler = []
+        
         if not self.m_core.m_ftrace:
             return self.trace_dispatch_stop(frame, event, arg)
-            
+        
         self.m_frame = frame
 
         try:
@@ -5973,6 +6031,8 @@ class CDebuggerCoreThread:
         """
         General trace method for thread.
         """
+        
+        signal_handler = []
         
         if (event == 'line'):
             if frame in self.m_locals_copy:
@@ -6015,12 +6075,14 @@ class CDebuggerCoreThread:
 
         return frame.f_trace     
 
-        
+
     def trace_dispatch_trap(self, frame, event, arg):
         """
         Trace method used for frames in which unhandled exceptions
         should be caught.
         """
+        
+        signal_handler = []
         
         if (event == 'line'):
             self.m_event = event
@@ -6082,6 +6144,15 @@ class CDebuggerCoreThread:
             return frame.f_trace     
 
         return frame.f_trace     
+
+
+    def trace_dispatch_signal(self, frame, event, arg):
+        #print_debug('*** trace_dispatch_signal %s, %s, %s' % (repr(frame), event, repr(arg)))
+        self.set_exc_info(arg)
+        self.set_tracers()
+        sys.setprofile(self.profile)
+
+        return self.trace_dispatch_trap(frame, event, arg)
 
         
     def set_exc_info(self, arg):
@@ -6322,6 +6393,14 @@ class CDebuggerCore:
         return self.m_current_ctx 
 
         
+    def get_ctx(self, tid):
+        ctx = self.m_threads.get(tid, None)
+        if ctx == None:
+            raise ThreadNotFound 
+
+        return ctx 
+
+
     def wait_for_first_thread(self):
         """
         Wait until at least one debuggee thread is alive.
@@ -6372,6 +6451,8 @@ class CDebuggerCore:
         """
         Initial tracing method.
         """
+        
+        signal_handler = []
         
         if event not in ['call', 'line', 'return']:
             return None
@@ -7008,7 +7089,9 @@ class CDebuggerEngine(CDebuggerCore):
             CEventExecSwitch: {},
             CEventTrap: {},
             CEventForkMode: {},
-            CEventPsycoWarning: {}
+            CEventPsycoWarning: {},
+            CEventSignalIntercepted: {},
+            CEventSignalException: {}
             }
 
         self.m_event_queue = CEventQueue(self.m_event_dispatcher)
@@ -9194,6 +9277,12 @@ class CSessionManagerInternal:
         event_type_dict = {CEventPsycoWarning: {}}
         self.register_callback(self.on_event_psyco, event_type_dict, fSingleUse = False)
         
+        event_type_dict = {CEventSignalIntercepted: {}}
+        self.register_callback(self.on_event_signal_intercept, event_type_dict, fSingleUse = False)
+        
+        event_type_dict = {CEventSignalException: {}}
+        self.register_callback(self.on_event_signal_exception, event_type_dict, fSingleUse = False)
+        
         event_type_dict = {CEventTrap: {}}
         self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
         self.m_event_dispatcher.register_chain_override(event_type_dict)
@@ -9635,6 +9724,15 @@ class CSessionManagerInternal:
 
     def on_event_psyco(self, event):
         self.m_printer(STR_PSYCO_WARNING)
+
+
+    def on_event_signal_intercept(self, event):
+        if self.m_state_manager.get_state() in [STATE_ANALYZE, STATE_BROKEN]:
+            self.m_printer(STR_SIGNAL_INTERCEPT % (event.m_signame, event.m_signum))
+
+
+    def on_event_signal_exception(self, event):
+        self.m_printer(STR_SIGNAL_EXCEPTION % (event.m_description, event.m_signame, event.m_signum))
 
 
     def on_event_exit(self, event):
@@ -11920,6 +12018,139 @@ last set, last evaluated.""", self.m_stdout)
 #
 # ---------------------------------------- Replacement Functions ------------------------------------
 #
+
+
+
+def __find_debugger_frame():
+    frame = None
+
+    f = sys._getframe(0)
+    while f:
+        filename = f.f_code.co_filename
+        name = f.f_code.co_name
+        
+        if DEBUGGER_FILENAME in filename and name == '__del__':
+            try:
+                if f.f_locals['self'].__class__ == CSignalHandler:
+                    return None
+            except:
+                pass
+
+        if DEBUGGER_FILENAME in filename and (name.startswith('trace_dispatch') or name == 'profile'):
+            frame = f 
+
+        f = f.f_back
+
+    return frame
+
+
+
+class CSignalHandler:
+    def __del__(self):
+        while len(g_signals_pending) != 0:
+            (signum, frameobj) = g_signals_pending.pop(0)
+            print_debug('Handling pending signal: %s, %s' % (repr(signum), repr(frameobj)))
+
+            try:
+                handler = signal.getsignal(signum)
+                handler(signum, frameobj)
+            except:
+                (t, v, tb) = sys.exc_info()
+
+                _t = repr(t)
+                if _t.startswith("<type '"):
+                    _t = _t.split("'")[1]
+
+                event = CEventSignalException(signum, '%s: %s' % (_t, repr(v)))
+                g_debugger.m_event_dispatcher.fire_event(event)
+
+
+
+def signal_handler(signum, frameobj):
+    frame = __find_debugger_frame()
+    if frame == None or not 'signal_handler' in frame.f_locals:
+        handler = signal.getsignal(signum)
+        try:
+            handler(signum, frameobj)
+        except:
+            ctx = g_debugger.get_ctx(thread.get_ident())
+            ctx.set_tracers(fsignal_exception = True)
+            raise
+
+    print_debug('Intercepted signal: %s, %s' % (repr(signum), repr(frameobj)))
+
+    f = frameobj
+    while f:
+        if f == frame:
+            frameobj = frame.f_back
+            break
+
+        f = f.f_back
+
+    g_signals_pending.append((signum, frameobj))
+
+    if len(frame.f_locals['signal_handler']) == 0:
+        frame.f_locals['signal_handler'].append(CSignalHandler())
+
+    event = CEventSignalIntercepted(signum)
+    g_debugger.m_event_dispatcher.fire_event(event)
+
+
+
+def __getsignal(signum):
+    handler = g_signal_handlers.get(signum, g_signal_getsignal(signum))
+    return handler
+
+
+
+g_signal_getsignal = None
+
+if __name__ == 'rpdb2' and 'getsignal' in dir(signal) and signal.getsignal != __getsignal:
+    g_signal_getsignal = signal.getsignal
+    signal.getsignal = __getsignal
+
+
+
+def __signal(signum, handler):
+    old_handler = __getsignal(signum)
+    g_signal_handlers[signum] = handler
+    g_signal_signal(signum, signal_handler)
+
+    return old_handler
+
+
+
+g_signal_signal = None
+
+if __name__ == 'rpdb2' and 'signal' in dir(signal) and signal.signal != __signal:
+    g_signal_signal = signal.signal
+    signal.signal = __signal
+
+    if threading.currentThread().getName() == 'MainThread':
+        signal.signal(signal.SIGINT, signal.getsignal(signal.SIGINT))
+
+
+
+"""
+def __setprofile(foo):
+    global g_profile
+
+    print_debug('*** setprofile to %s' % repr(foo))
+    traceback.print_stack(file = sys.__stderr__)
+
+    if threading.currentThread().getName() == 'MainThread':
+        g_profile = foo
+
+    g_sys_setprofile(foo)
+
+
+
+g_sys_setprofile = None
+
+if __name__ == 'rpdb2' and sys.setprofile != __setprofile:
+    g_sys_setprofile = sys.setprofile
+    sys.setprofile = __setprofile
+"""
 
 
 
