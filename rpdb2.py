@@ -275,7 +275,6 @@ import copy_reg
 import weakref
 import httplib
 import os.path
-import hashlib
 import pickle
 import socket
 import getopt
@@ -297,6 +296,13 @@ import sys
 import cmd
 import imp
 import os
+
+try:
+    import hashlib
+    _md5 = hashlib.md5
+except:
+    import md5
+    _md5 = md5
 
 try:
     import compiler
@@ -1944,6 +1950,28 @@ g_signals_pending = []
             
 
 
+def safe_wait(lock, timeout = None):
+    #
+    # workaround windows bug where signal handlers might raise exceptions
+    # even if they return normally.
+    #
+
+    if timeout == None:
+        return lock.wait()
+    
+    while True:
+        try:
+            t0 = time.time()
+            lock.wait(timeout)
+            return
+
+        except:
+            timeout -= (time.time() - t0)
+            if timeout <= 0:
+                return
+
+
+
 def is_py3k():
     return sys.version_info[0] >= 3
 
@@ -2138,7 +2166,7 @@ def repr_list(pattern, l, length, encoding, is_valid):
             # Remove any trace of session password from data structures that 
             # go over the network.
             #
-            if i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
+            if type(i) == str and i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
                 continue
             
             s += repr_ltd(i, length - len(s), encoding, is_valid)
@@ -2174,7 +2202,7 @@ def repr_dict(pattern, d, length, encoding, is_valid):
             # Remove any trace of session password from data structures that 
             # go over the network.
             #
-            if k in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
+            if type(k) == str and k in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
                 continue
             
             v = d[k]
@@ -3981,7 +4009,7 @@ class CCrypto:
             return CCrypto.m_keys[_rpdb2_pwd]
 
         key = as_bytes(_rpdb2_pwd)
-        d = hmac.new(key, digestmod = hashlib.md5)
+        d = hmac.new(key, digestmod = _md5)
 
         #
         # The following loop takes around a second to complete
@@ -4106,7 +4134,7 @@ class CCrypto:
         s = pickle.dumps(pack, 2)
         #print_debug('***** 2' + repr(args)[:50]) 
         
-        h = hmac.new(self.m_key, s, digestmod = hashlib.md5)
+        h = hmac.new(self.m_key, s, digestmod = _md5)
         d = h.hexdigest()
 
         #if 'coding:' in s:
@@ -4128,7 +4156,7 @@ class CCrypto:
 
     def __verify_signature(self, digest, s, fVerifyIndex):
         try:
-            h = hmac.new(self.m_key, s, digestmod = hashlib.md5)
+            h = hmac.new(self.m_key, s, digestmod = _md5)
             d = h.hexdigest()
 
             #if 'coding:' in s:
@@ -4678,7 +4706,7 @@ class CEventQueue:
 
             self.m_event_lock.acquire()
             if event_index >= self.m_event_index:
-                self.m_event_lock.wait(timeout)
+                safe_wait(self.m_event_lock, timeout)
 
             if event_index >= self.m_event_index:
                 return (self.m_event_index, [])
@@ -4835,7 +4863,7 @@ class CStateManager:
             while True:
                 index = self.__add_waiter()
             
-                self.m_state_lock.wait(PING_TIMEOUT)
+                safe_wait(self.m_state_lock, PING_TIMEOUT)
 
                 states = self.__get_states(index)
                 self.__remove_waiter(index)
@@ -5660,8 +5688,6 @@ class CDebuggerCoreThread:
         """
         #print_debug('profile: %s, %s, %s, %s, %s' % (repr(frame), event, frame.f_code.co_name, frame.f_code.co_filename, repr(arg)[:40])) 
         if event == 'return':            
-            signal_handler = []
-            
             self.m_frame = frame.f_back
 
             try:
@@ -5703,7 +5729,7 @@ class CDebuggerCoreThread:
                 self.m_frame_lock.acquire() 
 
                 while self.m_frame_external_references != 0:
-                    self.m_frame_lock.wait(1.0)
+                    safe_wait(self.m_frame_lock, 1.0)
 
             finally:
                 self.m_frame_lock.release()
@@ -5950,8 +5976,6 @@ class CDebuggerCoreThread:
         Disable tracing for this thread.
         """
         
-        signal_handler = []
-        
         if frame in self.m_locals_copy:
             self.update_locals()
 
@@ -5964,8 +5988,6 @@ class CDebuggerCoreThread:
         """
         Trace method for breaking a thread.
         """
-        
-        signal_handler = []
         
         if event not in ['line', 'return', 'exception']:
             return frame.f_trace
@@ -5991,8 +6013,6 @@ class CDebuggerCoreThread:
         """
         Initial trace method for thread.
         """
-        
-        signal_handler = []
         
         if not self.m_core.m_ftrace:
             return self.trace_dispatch_stop(frame, event, arg)
@@ -6031,8 +6051,6 @@ class CDebuggerCoreThread:
         """
         General trace method for thread.
         """
-        
-        signal_handler = []
         
         if (event == 'line'):
             if frame in self.m_locals_copy:
@@ -6081,8 +6099,6 @@ class CDebuggerCoreThread:
         Trace method used for frames in which unhandled exceptions
         should be caught.
         """
-        
-        signal_handler = []
         
         if (event == 'line'):
             self.m_event = event
@@ -6146,8 +6162,26 @@ class CDebuggerCoreThread:
         return frame.f_trace     
 
 
+    def trace_dispatch_signal_break(self, frame, event, arg):
+        self.m_frame = frame
+
+        try:
+            self.m_code_context = self.m_core.m_code_contexts[frame.f_code]
+        except KeyError:
+            self.m_code_context = self.m_core.get_code_context(frame)
+
+        self.m_core.m_step_tid = thread.get_ident()
+
+        self.m_event = event
+        self.m_core._break(self, frame, event, arg)
+        if frame in self.m_locals_copy:
+            self.update_locals()
+            self.set_local_trace(frame)
+        return frame.f_trace
+
+
     def trace_dispatch_signal(self, frame, event, arg):
-        #print_debug('*** trace_dispatch_signal %s, %s, %s' % (repr(frame), event, repr(arg)))
+        #print_debug('*** trace_dispatch_signal %s, %s, %s' % (frame.f_lineno, event, repr(arg)))
         self.set_exc_info(arg)
         self.set_tracers()
         sys.setprofile(self.profile)
@@ -6415,7 +6449,7 @@ class CDebuggerCore:
             self.m_threads_lock.acquire() 
 
             while self.m_current_ctx is None:
-                self.m_threads_lock.wait(1.0)
+                safe_wait(self.m_threads_lock, 1.0)
 
         finally:
             self.m_threads_lock.release()
@@ -6447,12 +6481,25 @@ class CDebuggerCore:
             frame = frame.f_back
 
 
+    def __set_signal_handler(self):
+        """
+        Set rpdb2 to wrap all signal handlers.
+        """
+        for key, value in list(vars(signal).items()):
+            if not key.startswith('SIG') or key in ['SIG_IGN', 'SIG_DFL']:
+                continue
+
+            handler = signal.getsignal(value)
+            if handler in [signal.SIG_IGN, signal.SIG_DFL]:
+                continue
+
+            signal.signal(value, handler)
+
+
     def trace_dispatch_init(self, frame, event, arg):   
         """
         Initial tracing method.
         """
-        
-        signal_handler = []
         
         if event not in ['call', 'line', 'return']:
             return None
@@ -6468,7 +6515,10 @@ class CDebuggerCore:
             name = t.getName()
         except:
             name = ''
-        
+       
+        if name == 'MainThread':
+            self.__set_signal_handler()
+
         ctx = CDebuggerCoreThread(name, self, frame, event)
         ctx.set_tracers()
         self.m_threads[ctx.m_thread_id] = ctx
@@ -12050,11 +12100,16 @@ class CSignalHandler:
         while len(g_signals_pending) != 0:
             (signum, frameobj) = g_signals_pending.pop(0)
             print_debug('Handling pending signal: %s, %s' % (repr(signum), repr(frameobj)))
-
+            
             try:
                 handler = signal.getsignal(signum)
                 handler(signum, frameobj)
+
             except:
+                #
+                # Can not raise from inside a destructor. Report that handler
+                # exception will be ignored.
+                #
                 (t, v, tb) = sys.exc_info()
 
                 _t = repr(t)
@@ -12068,14 +12123,34 @@ class CSignalHandler:
 
 def signal_handler(signum, frameobj):
     frame = __find_debugger_frame()
-    if frame == None or not 'signal_handler' in frame.f_locals:
+    if frame == None:
+        #
+        # A debugger tracing frame was not found in the stack.
+        # This means that the handler can be run without risk
+        # for state corruption.
+        #
         handler = signal.getsignal(signum)
+        return handler(signum, frameobj)
+
+    if frame.f_code.co_name == 'profile' and frame.f_locals['event'] != 'return':
+        #
+        # signal was caught inside the profile hook but not while
+        # doing some debugger stuff. Call the handler but in case
+        # of exception schedule the debugger to re-enable the 
+        # profile hook.
+        #
         try:
-            handler(signum, frameobj)
+            handler = signal.getsignal(signum)
+            return handler(signum, frameobj)
         except:
             ctx = g_debugger.get_ctx(thread.get_ident())
             ctx.set_tracers(fsignal_exception = True)
             raise
+
+    #
+    # Set the handler to be run when the debugger is about 
+    # to return from the tracing code.
+    #
 
     print_debug('Intercepted signal: %s, %s' % (repr(signum), repr(frameobj)))
 
@@ -12089,8 +12164,8 @@ def signal_handler(signum, frameobj):
 
     g_signals_pending.append((signum, frameobj))
 
-    if len(frame.f_locals['signal_handler']) == 0:
-        frame.f_locals['signal_handler'].append(CSignalHandler())
+    if not 'signal_handler' in frame.f_locals:
+        frame.f_locals.update({'signal_handler': CSignalHandler()})
 
     event = CEventSignalIntercepted(signum)
     g_debugger.m_event_dispatcher.fire_event(event)
@@ -12113,8 +12188,13 @@ if __name__ == 'rpdb2' and 'getsignal' in dir(signal) and signal.getsignal != __
 
 def __signal(signum, handler):
     old_handler = __getsignal(signum)
-    g_signal_handlers[signum] = handler
+    
+    if handler in [signal.SIG_IGN, signal.SIG_DFL]:
+        g_signal_signal(signum, handler)
+        return old_handler
+
     g_signal_signal(signum, signal_handler)
+    g_signal_handlers[signum] = handler
 
     return old_handler
 
@@ -12125,9 +12205,6 @@ g_signal_signal = None
 if __name__ == 'rpdb2' and 'signal' in dir(signal) and signal.signal != __signal:
     g_signal_signal = signal.signal
     signal.signal = __signal
-
-    if threading.currentThread().getName() == 'MainThread':
-        signal.signal(signal.SIGINT, signal.getsignal(signal.SIGINT))
 
 
 
