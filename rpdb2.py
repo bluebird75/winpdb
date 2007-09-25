@@ -1359,7 +1359,7 @@ class NotPythonSource(CException):
 class InvalidScopeName(CException):
     """
     Invalid scope name.
-    This exception may be thrown when a request was made to set a breakpoint
+    This exception might be thrown when a request was made to set a breakpoint
     to an unknown scope.
     """
 
@@ -1644,8 +1644,8 @@ STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'hel
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
 STR_PSYCO_WARNING = "The psyco module was detected. The debugger is incompatible with the psyco module and will not function correctly as long as the psyco module is imported and used."
-STR_SIGNAL_INTERCEPT = "The signal %s(%d) was intercepted. It will be held pending until the debugger continues. Any exceptions raised by the handler will be ignored!"
-STR_SIGNAL_EXCEPTION = "Exception %s raised by handler of signal %s(%d) was ignored!"
+STR_SIGNAL_INTERCEPT = "The signal %s(%d) was intercepted inside debugger tracing logic. It will be held pending until the debugger continues. Any exceptions raised by the handler will be ignored!"
+STR_SIGNAL_EXCEPTION = "Exception %s raised by handler of signal %s(%d) inside debugger tracing logic was ignored!"
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
 STR_DEBUGGEE_NOT_BROKEN = "Debuggee has to be waiting at break point to complete this command."
 STR_DEBUGGER_HAS_BROKEN = "Debuggee is waiting at break point for further commands."
@@ -1677,7 +1677,7 @@ STR_ATTACH_FAILED_NAME = "Failed to attach to '%s'."
 STR_ATTACH_CRYPTO_MODE = "Debug Channel is%s encrypted."
 STR_ATTACH_CRYPTO_MODE_NOT = "NOT"
 STR_ATTACH_SUCCEEDED = "Successfully attached to '%s'."
-STR_ATTEMPTING_TO_STOP = "Requesting script to stop (with os.abort())."
+STR_ATTEMPTING_TO_STOP = "Requesting script to stop with os.abort(). This operation might produce a core dump."
 STR_ATTEMPTING_TO_DETACH = "Detaching from script..."
 STR_DETACH_SUCCEEDED = "Detached from script."
 STR_DEBUGGEE_UNKNOWN = "Failed to find script."
@@ -8190,6 +8190,7 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
+        print_debug('Will try to abort process using os.abort(). This operation might result in a core dump.')
         CThread(name = '_atexit', target = _atexit, args = (True, )).start()
 
 
@@ -11615,7 +11616,7 @@ debuggee alone) governs both security methods. The password is never
 communicated between the two components on the communication channel.
 
 A password is always required since unsecured communication between the 
-console and the debuggee may expose your machine to attacks.""", self.m_stdout)
+console and the debuggee might expose your machine to attacks.""", self.m_stdout)
 
 
     def help_remote(self):

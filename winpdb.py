@@ -821,6 +821,9 @@ class CMenuBar:
                 parent.Enable(id, [True, False][state == DISABLED])
 
     def add_menu_item(self, menu_label, item_label, command):
+        if not g_fUnicode:
+            item_label = rpdb2.as_string(item_label, wx.GetDefaultPyEncoding())
+
         parent = self.m_cascades[menu_label]
         item = parent.Append(-1, item_label)
         self.Bind(wx.EVT_MENU, command, item)
@@ -2237,11 +2240,12 @@ class CSourceManager:
         (t, v, tb) = exc_info
 
         if t == None:
+            _time = 0
             _filename = r[rpdb2.DICT_KEY_FILENAME]
             source_lines = r[rpdb2.DICT_KEY_LINES]
             source = string.join(source_lines, '')
-
-            _time = 0
+            if not g_fUnicode:
+                source = rpdb2.as_string(source, wx.GetDefaultPyEncoding())
         
         elif t == rpdb2.NotPythonSource and fComplain:
             dlg = wx.MessageDialog(None, MSG_ERROR_FILE_NOT_PYTHON % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
@@ -2261,16 +2265,20 @@ class CSourceManager:
                 dlg.ShowModal()
                 dlg.Destroy()
             
+            _time = time.time()
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
-            _time = time.time()
+            if not g_fUnicode:
+                source = rpdb2.as_string(source, wx.GetDefaultPyEncoding())
         
         else:
             rpdb2.print_debug('get_source_file() returned the following error: %s' % repr(t))
 
+            _time = time.time()
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
-            _time = time.time()
+            if not g_fUnicode:
+                source = rpdb2.as_string(source, wx.GetDefaultPyEncoding())
                     
         try:    
             self.m_lock.acquire()
@@ -2494,8 +2502,12 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
     
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
-       
-        label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(_filename)
+      
+        displayed_filename = _filename
+        if not g_fUnicode:
+            displayed_filename = rpdb2.as_string(displayed_filename, wx.GetDefaultPyEncoding())
+
+        label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(displayed_filename)
         self.m_caption.m_static_text.SetLabel(label)
         self.m_sizerv.Layout()
 
@@ -2534,7 +2546,11 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
         
-        label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(filename)
+        displayed_filename = filename
+        if not g_fUnicode:
+            displayed_filename = rpdb2.as_string(displayed_filename, wx.GetDefaultPyEncoding())
+
+        label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(displayed_filename)
         self.m_caption.m_static_text.SetLabel(label)
         self.m_sizerv.Layout()
 
@@ -2829,6 +2845,9 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         if index < 0:
             return -1
 
+        if not g_fUnicode:
+            thread_name = rpdb2.as_string(thread_name, wx.GetDefaultPyEncoding())
+
         self.m_threads.SetStringItem(index, 1, thread_name)
         self.m_threads.SetStringItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
 
@@ -2846,6 +2865,9 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         for i, s in enumerate(threads_list):
             tid = s[rpdb2.DICT_KEY_TID]
             name = s[rpdb2.DICT_KEY_NAME]
+            if not g_fUnicode:
+                name = rpdb2.as_string(name, wx.GetDefaultPyEncoding())
+
             fBroken = s[rpdb2.DICT_KEY_BROKEN]
             index = self.m_threads.InsertStringItem(sys.maxint, repr(tid))
             self.m_threads.SetStringItem(index, 1, name)
@@ -3050,13 +3072,19 @@ class CNamespacePanel(wx.Panel, CJobs):
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
        
         for r in snl:
-            _name = r[rpdb2.DICT_KEY_NAME]
-            _repr = r[rpdb2.DICT_KEY_REPR]
+            if g_fUnicode:
+                _name = r[rpdb2.DICT_KEY_NAME]
+                _type = r[rpdb2.DICT_KEY_TYPE]
+                _repr = r[rpdb2.DICT_KEY_REPR]
+            else:
+                _name = rpdb2.as_string(r[rpdb2.DICT_KEY_NAME], wx.GetDefaultPyEncoding())
+                _type = rpdb2.as_string(r[rpdb2.DICT_KEY_TYPE], wx.GetDefaultPyEncoding())
+                _repr = rpdb2.as_string(r[rpdb2.DICT_KEY_REPR], wx.GetDefaultPyEncoding())
 
             identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
             child = self.m_tree.AppendItem(item, identation + _name)
             self.m_tree.SetItemText(child, ' ' + _repr, 2)
-            self.m_tree.SetItemText(child, ' ' + r[rpdb2.DICT_KEY_TYPE], 1)
+            self.m_tree.SetItemText(child, ' ' + _type, 1)
             self.m_tree.SetItemPyData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
             self.m_tree.SetItemHasChildren(child, (r[rpdb2.DICT_KEY_N_SUBNODES] > 0))
 
@@ -3409,11 +3437,16 @@ class CStackViewer(wx.Panel, CCaptionManager):
             e = s[-(1 + i)]
             
             filename = e[0]
+            function = e[2]
+
+            if not g_fUnicode:
+                filename = rpdb2.as_string(filename, wx.GetDefaultPyEncoding())
+                function = rpdb2.as_string(function, wx.GetDefaultPyEncoding())
 
             index = self.m_stack.InsertStringItem(sys.maxint, repr(i))
             self.m_stack.SetStringItem(index, 1, os.path.basename(filename))
             self.m_stack.SetStringItem(index, 2, repr(e[1]))
-            self.m_stack.SetStringItem(index, 3, e[2])
+            self.m_stack.SetStringItem(index, 3, function)
             self.m_stack.SetStringItem(index, 4, os.path.dirname(filename))
             self.m_stack.SetItemData(index, i)
 
@@ -3692,6 +3725,8 @@ class CAttachDialog(wx.Dialog, CJobs):
             index = self.m_listbox_scripts.InsertStringItem(sys.maxint, repr(s.m_pid))
             
             filename = s.m_filename
+            if not g_fUnicode:
+                filename = rpdb2.as_string(filename, wx.GetDefaultPyEncoding())
 
             self.m_listbox_scripts.SetStringItem(index, 1, filename)
             self.m_listbox_scripts.SetItemData(index, i)
@@ -3740,6 +3775,10 @@ class CExpressionDialog(wx.Dialog):
 
         label = wx.StaticText(self, -1, LABEL_EXPR)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
+
+        if not g_fUnicode:
+            default_value = rpdb2.as_string(default_value, wx.GetDefaultPyEncoding())
+
         self.m_entry_expr = wx.TextCtrl(self, value = default_value, size = (200, -1))
         self.m_entry_expr.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_expr)
@@ -3889,6 +3928,10 @@ class CPwdDialog(wx.Dialog):
         label = wx.StaticText(self, -1, LABEL_PWD)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         pwd = [current_password, ''][current_password is None]
+
+        if not g_fUnicode:
+            pwd = rpdb2.as_string(pwd, wx.GetDefaultPyEncoding())
+
         self.m_entry_pwd = wx.TextCtrl(self, value = pwd, size = (200, -1))
         self.m_entry_pwd.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_pwd)
@@ -4036,6 +4079,9 @@ class CLaunchDialog(wx.Dialog):
 
         label = wx.StaticText(self, -1, LABEL_LAUNCH_COMMAND_LINE)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
+
+        if not g_fUnicode:
+            command_line = rpdb2.as_string(command_line, wx.GetDefaultPyEncoding())
 
         self.m_entry_commandline = wx.TextCtrl(self, value = command_line, size = (200, -1))
         self.m_entry_commandline.SetFocus()
