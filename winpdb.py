@@ -403,6 +403,8 @@ STR_EXIT_WARNING = """The debugger is attached to a script. Would you like to st
 If you click 'No' the debugger will attempt to detach before exiting."""
 STR_WXPYTHON_ANSI_WARNING_TITLE = 'wxPython ANSI Warning'
 STR_WXPYTHON_ANSI_WARNING_MSG = """The version of wxPython that was found does not support Unicode. wxPython is the graphical user interface toolkit used by Winpdb. You may experience some functionality limitations when debugging Unicode programs with this version of wxPython. If you need to debug Unicode programs it is recommended that you install the Unicode version of wxPython. You can find more information on wxPython at http://www.wxpython.org/"""
+STR_MORE_ABOUT_BREAKPOINTS = """You can set conditional breakpoints with the 'bp' console command, disable or enable specific breakpoints with the 'bd' and 'be' commands and even load and save different sets of breakpoints with the 'load' and 'save' console commands. To learn more about these commands type 'help <command>' at the console prompt."""
+STR_HOW_TO_JUMP = """You can jump to a different line in the current scope with the 'jump' console command. Type 'help jump' at the console prompt for more information."""
 
 DLG_EXPR_TITLE = "Enter Expression"
 DLG_ENCODING_TITLE = "encoding"
@@ -513,6 +515,7 @@ ML_ENABLE = "&Enable All"
 ML_CLEAR = "&Clear All"
 ML_LOAD = "&Load"
 ML_SAVE = "&Save"
+ML_MORE = "&More..."
 
 ML_CONTROL = "&Control"
 ML_ANALYZE = "&Toggle Analyze" + AC_CHAR + AC_ANALYZE 
@@ -521,7 +524,8 @@ ML_BREAK = "&Break" + AC_CHAR + AC_BREAK
 ML_STEP = "&Step Into" + AC_CHAR + AC_STEP
 ML_NEXT = "&Next" + AC_CHAR + AC_NEXT
 ML_RETURN = "&Return" + AC_CHAR + AC_RETURN
-ML_GOTO = "&Run to Line" + AC_CHAR + AC_GOTO
+ML_GOTO = "Run to &Line" + AC_CHAR + AC_GOTO
+ML_JUMP = "&Jump"
 
 ML_WINDOW = "&Window"
 
@@ -576,6 +580,7 @@ ENABLE_TIP = "Enable all breakpoints."
 CLEAR_TIP = "Clear all breakpoints."
 LOAD_TIP = "Load breakpoints from file."
 SAVE_TIP = "Save breakpoints to file."
+MORE_TIP = "Learn more about Winpdb..."
 
 TOOLTIP_UNLOCKED = "Communication channel is authenticated but NOT encrypted."
 TOOLTIP_LOCKED = "Communication channel is authenticated AND encrypted."
@@ -609,13 +614,13 @@ SHOW = "Show"
 VALUE = "Value"
 BITMAP = "Bitmap"
 
-STATE_SPAWNING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
-STATE_ATTACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
-STATE_BROKEN_MENU = {ENABLED: [ML_ANALYZE, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH, ML_BREAK]}
-STATE_ANALYZE_MENU = {ENABLED: [ML_ANALYZE, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH, ML_BREAK, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO]}
-STATE_RUNNING_MENU = {ENABLED: [ML_BREAK, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_ANALYZE, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO]}
-STATE_DETACHED_MENU = {ENABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART]}
-STATE_DETACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
+STATE_SPAWNING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_JUMP, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_MORE, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
+STATE_ATTACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_JUMP, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_MORE, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
+STATE_BROKEN_MENU = {ENABLED: [ML_ANALYZE, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_JUMP, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_MORE, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH, ML_BREAK]}
+STATE_ANALYZE_MENU = {ENABLED: [ML_ANALYZE, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_MORE, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH, ML_BREAK, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_JUMP, ML_GOTO]}
+STATE_RUNNING_MENU = {ENABLED: [ML_BREAK, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_MORE, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART], DISABLED: [ML_ANALYZE, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_GO, ML_STEP, ML_NEXT, ML_RETURN, ML_JUMP, ML_GOTO]}
+STATE_DETACHED_MENU = {ENABLED: [ML_PWD, ML_LAUNCH, ML_ATTACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_JUMP, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_MORE, ML_SAVE, ML_OPEN, ML_STOP, ML_DETACH, ML_RESTART]}
+STATE_DETACHING_MENU = {ENABLED: [ML_STOP, ML_DETACH], DISABLED: [ML_ANALYZE, ML_GO, ML_BREAK, ML_STEP, ML_NEXT, ML_RETURN, ML_JUMP, ML_GOTO, ML_TOGGLE, ML_DISABLE, ML_ENABLE, ML_CLEAR, ML_LOAD, ML_MORE, ML_SAVE, ML_OPEN, ML_PWD, ML_LAUNCH, ML_ATTACH, ML_RESTART]}
 
 STATE_BROKEN_TOOLBAR = {ENABLED: [TB_EXCEPTION, TB_FILTER, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO], DISABLED: [TB_BREAK]}
 STATE_ANALYZE_TOOLBAR = {ENABLED: [TB_EXCEPTION, TB_FILTER], DISABLED: [TB_BREAK, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO]}
@@ -1281,6 +1286,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/1/" + ML_BREAKPOINTS + "/3/" + ML_CLEAR: {COMMAND: self.do_clear, TOOLTIP: CLEAR_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/4/" + ML_LOAD: {COMMAND: self.do_load, TOOLTIP: LOAD_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/5/" + ML_SAVE: {COMMAND: self.do_save, TOOLTIP: SAVE_TIP}, 
+            "/1/" + ML_BREAKPOINTS + "/6/" + ML_MORE: {COMMAND: self.do_more_bp, TOOLTIP: MORE_TIP}, 
             "/2/" + ML_CONTROL + "/0/" + ML_ANALYZE: {COMMAND: self.do_analyze_menu}, 
             "/2/" + ML_CONTROL + "/1/" + ML_BREAK: {COMMAND: self.do_break}, 
             "/2/" + ML_CONTROL + "/2/" + ML_GO: {COMMAND: self.do_go}, 
@@ -1288,6 +1294,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/2/" + ML_CONTROL + "/4/" + ML_STEP: {COMMAND: self.do_step}, 
             "/2/" + ML_CONTROL + "/5/" + ML_GOTO: {COMMAND: self.do_goto}, 
             "/2/" + ML_CONTROL + "/6/" + ML_RETURN: {COMMAND: self.do_return}, 
+            "/2/" + ML_CONTROL + "/7/" + ML_JUMP: {COMMAND: self.do_jump}, 
             "/3/" + ML_WINDOW + "/0/" + ML_EMPTY: None,
             "/4/" + ML_HELP +   "/0/" + ML_WEBSITE: {COMMAND: self.do_website, TOOLTIP: WEBSITE_TIP}, 
             "/4/" + ML_HELP +   "/1/" + ML_SUPPORT: {COMMAND: self.do_support, TOOLTIP: SUPPORT_TIP}, 
@@ -1934,6 +1941,18 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         
     def do_save(self, event):
         self.m_async_sm.with_callback(self.callback_save).save_breakpoints()
+
+
+    def do_more_bp(self, event):
+        dlg = wx.MessageDialog(self, STR_MORE_ABOUT_BREAKPOINTS, MORE_TIP, wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+
+    def do_jump(self, event):
+        dlg = wx.MessageDialog(self, STR_HOW_TO_JUMP, MORE_TIP, wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
 
 
     def callback_save(self, r, exc_info):

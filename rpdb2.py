@@ -1261,7 +1261,7 @@ class CSessionManager:
 
     def stop_debuggee(self):
         """
-        Stop the debuggee with the os.abort() command.
+        Stop the debuggee immediately.
         """
         
         return self.__smi.stop_debuggee()
@@ -1677,7 +1677,7 @@ STR_ATTACH_FAILED_NAME = "Failed to attach to '%s'."
 STR_ATTACH_CRYPTO_MODE = "Debug Channel is%s encrypted."
 STR_ATTACH_CRYPTO_MODE_NOT = "NOT"
 STR_ATTACH_SUCCEEDED = "Successfully attached to '%s'."
-STR_ATTEMPTING_TO_STOP = "Requesting script to stop with os.abort(). This operation might produce a core dump."
+STR_ATTEMPTING_TO_STOP = "Requesting script to stop."
 STR_ATTEMPTING_TO_DETACH = "Detaching from script..."
 STR_DETACH_SUCCEEDED = "Detached from script."
 STR_DEBUGGEE_UNKNOWN = "Failed to find script."
@@ -8190,7 +8190,6 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        print_debug('Will try to abort process using os.abort(). This operation might result in a core dump.')
         CThread(name = '_atexit', target = _atexit, args = (True, )).start()
 
 
@@ -12412,7 +12411,12 @@ def _atexit(fabort = False):
     g_server.shutdown()
     g_debugger.shutdown()
 
-    if fabort:
+    if not fabort:
+        return
+
+    if hasattr(os, 'kill') and hasattr(signal, 'SIGKILL'):
+        os.kill(os.getpid(), signal.SIGKILL)
+    else:
         os.abort()
         
 
