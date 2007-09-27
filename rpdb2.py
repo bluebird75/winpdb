@@ -7475,7 +7475,7 @@ class CDebuggerEngine(CDebuggerCore):
         
             #print >> sys.__stderr__, path, path_dict[path]
                 
-        __s = [(path_dict[a], b, as_unicode(c), as_unicode(d)) for (a, b, c, d) in s]
+        __s = [(path_dict[a], b, as_unicode(c), as_unicode([d, ''][d == None])) for (a, b, c, d) in s]
 
         if (ctx.m_uef_lineno is not None) and (len(__s) > 0):
             (a, b, c, d) = __s[0]
@@ -8018,9 +8018,13 @@ class CDebuggerEngine(CDebuggerCore):
             ctx = self.get_current_ctx()
             filename = ctx.m_code_context.m_filename
 
-        encoding = get_file_encoding(filename)
+        try:
+            encoding = get_file_encoding(filename)
+            return encoding
 
-        return encoding
+        except:
+            return 'utf-8'
+        
 
 
     def get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding, fraw):
