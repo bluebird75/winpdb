@@ -367,6 +367,7 @@ def start_embedded_debugger(
             fAllowUnencrypted = True, 
             fAllowRemote = False, 
             timeout = TIMEOUT_FIVE_MINUTES, 
+            source_provider = None, 
             fDebug = False
             ):
 
@@ -380,11 +381,19 @@ def start_embedded_debugger(
 
     _rpdb2_pwd - The password that governs security of client/server communication
     fAllowUnencrypted - Allow unencrypted communications. Communication will
-                        be authenticated but encrypted only if possible.
+        be authenticated but encrypted only if possible.
     fAllowRemote - Allow debugger consoles from remote machines to connect.
     timeout - Seconds to wait for attachment before giving up. If None, 
-              never give up. Once the timeout period expires, the debuggee will
-              resume execution.
+        never give up. Once the timeout period expires, the debuggee will
+        resume execution.
+    source_provider - When script source is not available on file system it is
+        possible to specify a function that receives a "filename" and returns
+        its source. If filename specifies a file that does not fall under
+        the jurisdiction of this function it should raise IOError. If this
+        function is responsible for the specified file but the source is
+        not available it should raise IOError(SOURCE_NOT_AVAILABLE). You can
+        study the way source_provider_blender() works. Note that a misbehaving 
+        function can break the debugger.
     fDebug  - debug output.
 
     IMPORTNAT SECURITY NOTE:
@@ -400,6 +409,7 @@ def start_embedded_debugger(
                         fAllowUnencrypted, 
                         fAllowRemote, 
                         timeout, 
+                        source_provider,
                         fDebug
                         )
     
@@ -409,6 +419,7 @@ def start_embedded_debugger_interactive_password(
                 fAllowUnencrypted = True, 
                 fAllowRemote = False, 
                 timeout = TIMEOUT_FIVE_MINUTES, 
+                source_provider = None,
                 fDebug = False, 
                 stdin = sys.stdin, 
                 stdout = sys.stdout
@@ -430,6 +441,7 @@ def start_embedded_debugger_interactive_password(
                                 fAllowUnencrypted, 
                                 fAllowRemote, 
                                 timeout, 
+                                source_provider,
                                 fDebug
                                 )
 
@@ -1517,6 +1529,78 @@ class AuthenticationBadIndex(CSecurityException):
 
 
 #
+#----------------- unicode handling for compatibility with py3k ----------------
+#
+
+
+
+def is_py3k():
+    return sys.version_info[0] >= 3
+
+
+
+def is_unicode(s):
+    if is_py3k() and type(s) == str:
+        return True
+
+    if type(s) == unicode:
+        return True
+
+    return False
+
+
+
+def as_unicode(s, encoding = 'utf-8', fstrict = False):
+    if is_unicode(s):
+        return s
+
+    if fstrict:
+        u = s.decode(encoding)
+    else:
+        u = s.decode(encoding, 'replace')
+
+    return u
+
+
+
+def as_string(s, encoding = 'utf-8', fstrict = False):
+    if is_py3k():
+        if is_unicode(s):
+            return s
+
+        if fstrict:
+            e = s.decode(encoding)
+        else:
+            e = s.decode(encoding, 'replace')
+
+        return e
+
+    if not is_unicode(s):
+        return s
+
+    if fstrict:
+        e = s.encode(encoding)
+    else:
+        e = s.encode(encoding, 'replace')
+
+    return e
+
+
+
+def as_bytes(s, encoding = 'utf-8', fstrict = True):
+    if not is_unicode(s):
+        return s
+
+    if fstrict:
+        b = s.encode(encoding)
+    else:
+        b = s.encode(encoding, 'replace')
+
+    return b
+
+
+
+#
 #----------------------- Infinite List of Globals ---------------------------
 #
 
@@ -1754,8 +1838,9 @@ PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo', '.so']
 
 MODULE_SCOPE = '?'
 MODULE_SCOPE2 = '<module>'
-BLENDER_NO_SOURCE_FILENAME = '<string>'
-ERROR_NO_BLENDER_SOURCE = 'Blender script source not available.'
+
+BLENDER_SOURCE_NOT_AVAILABLE = as_unicode('Blender script source not available.')
+SOURCE_NOT_AVAILABLE = as_unicode('source not available.')
 
 SCOPE_SEP = '.'
 
@@ -1868,11 +1953,8 @@ g_fDebug = False
 #
 g_traceback_lock = threading.RLock()
 
-#
-# Filename to Source-lines dictionary of blender Python scripts.
-#
-g_blender_text = {}
-g_line_cache = {}
+g_source_provider_aux = None
+g_lines_cache = {}
 
 g_initial_cwd = []
 
@@ -1944,6 +2026,11 @@ g_signals_pending = []
 
 
 
+g_safe_base64_to = string.maketrans(as_bytes('/+='), as_bytes('_-#'))
+g_safe_base64_from = string.maketrans(as_bytes('_-#'), as_bytes('/+='))
+
+
+
 #
 # ---------------------------- General Utils ------------------------------
 #
@@ -1969,11 +2056,6 @@ def safe_wait(lock, timeout = None):
             timeout -= (time.time() - t0)
             if timeout <= 0:
                 return
-
-
-
-def is_py3k():
-    return sys.version_info[0] >= 3
 
 
 
@@ -2031,72 +2113,6 @@ def _print(s, f = sys.stdout, feol = True):
         f.write(s + '\n')
     else:
         f.write(s)
-
-
-
-def is_unicode(s):
-    if is_py3k() and type(s) == str:
-        return True
-
-    if type(s) == unicode:
-        return True
-
-    return False
-
-
-
-def as_unicode(s, encoding = 'utf-8', fstrict = False):
-    if is_unicode(s):
-        return s
-
-    if fstrict:
-        u = s.decode(encoding)
-    else:
-        u = s.decode(encoding, 'replace')
-
-    return u
-
-
-
-def as_string(s, encoding = 'utf-8', fstrict = False):
-    if is_py3k():
-        if is_unicode(s):
-            return s
-
-        if fstrict:
-            e = s.decode(encoding)
-        else:
-            e = s.decode(encoding, 'replace')
-
-        return e
-
-    if not is_unicode(s):
-        return s
-
-    if fstrict:
-        e = s.encode(encoding)
-    else:
-        e = s.encode(encoding, 'replace')
-
-    return e
-
-
-
-def as_bytes(s, encoding = 'utf-8', fstrict = True):
-    if not is_unicode(s):
-        return s
-
-    if fstrict:
-        b = s.encode(encoding)
-    else:
-        b = s.encode(encoding, 'replace')
-
-    return b
-
-
-
-g_safe_base64_to = string.maketrans(as_bytes('/+='), as_bytes('_-#'))
-g_safe_base64_from = string.maketrans(as_bytes('_-#'), as_bytes('/+='))
 
 
 
@@ -2997,177 +3013,148 @@ def winlower(path):
     
     
 
-#
-# REVIEW: Check how unicode performs.
-#
-def is_blender_file(filename):
+
+def source_provider_blender(filename):
     """
-    Return True if filename refers to a blender file.
+    Return source code of the file referred by filename.
     
     Support for debugging of Blender Python scripts.
     Blender scripts are not always saved on disk, and their 
     source has to be queried directly from the Blender API.
     http://www.blender.org
     """
-    
+
     if not 'Blender.Text' in sys.modules:
-        return False
-
-    if filename == BLENDER_NO_SOURCE_FILENAME:
-        return True
-    
-    _filename = os.path.basename(filename)
-
-    try:
-        sys.modules['Blender.Text'].get(_filename)
-        return True
-
-    except NameError:
-        f = winlower(_filename)
-        tlist = sys.modules['Blender.Text'].get()
-        for t in tlist:
-            n = winlower(t.getName())
-            if n == f:
-                return True
-            
-        return False
-
-
-
-def get_blender_source(filename):
-    """
-    Return list of lines in the file refered by filename.
-    
-    Support for debugging of Blender Python scripts.
-    Blender scripts are not always saved on disk, and their 
-    source has to be queried directly from the Blender API.
-    http://www.blender.org
-    """
+        raise IOError
 
     if filename.startswith('<'):
-        raise IOError(ERROR_NO_BLENDER_SOURCE)
+        #
+        # This specifies blender source whose source is not
+        # available.
+        #
+        raise IOError(BLENDER_SOURCE_NOT_AVAILABLE)
         
     _filename = os.path.basename(filename)
-
-    lines = g_blender_text.get(_filename, None)
-    if lines is not None:
-        return lines
-        
-    f = winlower(_filename)
-    lines = g_blender_text.get(f, None)
-    if lines is not None:
-        return lines
 
     try:
         t = sys.modules['Blender.Text'].get(_filename)
         lines = t.asLines()
-        g_blender_text[_filename] = lines
-        return lines
+        return '\n'.join(lines) + '\n'
         
     except NameError:
         f = winlower(_filename)
         tlist = sys.modules['Blender.Text'].get()
 
+        t = None
         for _t in tlist:
             n = winlower(_t.getName())
             if n == f:
                 t = _t
                 break
         
+        if t == None:
+            #
+            # filename does not specify a blender file. Raise IOError
+            # so that search can continue on file system.
+            #
+            raise IOError
+
         lines = t.asLines()
-        g_blender_text[f] = lines
-        return lines
+        return '\n'.join(lines) + '\n'
 
+
+
+def source_provider_filesystem(filename):
+    f = open(filename, 'rb')
+    l = f.read()
+    f.close()
+
+    if l[:3] == as_bytes(ENCODING_UTF8_PREFIX_1):
+        l = l[3:]
+     
+    return l
+
+
+
+def source_provider(filename):
+    source = None
+    ffilesystem = False
+
+    try:
+        if g_source_provider_aux != None:
+            source = source_provider_blender(filename)
     
+    except IOError:
+        v = sys.exc_info()[1]
+        if SOURCE_NOT_AVAILABLE in v.args:
+            raise
 
-def get_source_line_bytes(filename, lineno):
-    if not filename in g_line_cache:
-        f = open(filename, 'rb')
-        l = f.read()
-        f.close()
+    try:
+        if source == None:
+            source = source_provider_blender(filename)
+    
+    except IOError:
+        v = sys.exc_info()[1]
+        if BLENDER_SOURCE_NOT_AVAILABLE in v.args:
+            raise
 
-        if l[:3] == as_bytes(ENCODING_UTF8_PREFIX_1):
-            l = l[3:]
-        
-        eol = as_bytes('\n')
-        ll = l.split(eol)
-        lll = [line + eol for line in ll]
+    if source == None:
+        source = source_provider_filesystem(filename)
+        ffilesystem = True
 
-        g_line_cache[filename] = lll
+    encoding = ParseEncoding(source)
 
-    if lineno > len(g_line_cache[filename]):
-        return as_bytes('')
+    if not is_unicode(source):
+        source = as_unicode(source, encoding)
 
-    line = g_line_cache[filename][lineno - 1]
+    return source, encoding, ffilesystem
 
-    return line 
+
+
+def lines_cache(filename):
+    filename = g_found_unicode_files.get(filename, filename)
+
+    if filename in g_lines_cache:
+        return g_lines_cache[filename]
+
+    (source, encoding, ffilesystem) = source_provider(filename)
+    source = source.replace(as_unicode('\r\n'), as_unicode('\n'))
+
+    lines = source.split(as_unicode('\n'))
+
+    g_lines_cache[filename] = (lines, encoding, ffilesystem)
+
+    return (lines, encoding, ffilesystem)
 
 
 
 def get_source(filename):
-    filename = g_found_unicode_files.get(filename, filename)
+    (lines, encoding, ffilesystem) = lines_cache(filename)
+    source = as_unicode('\n').join(lines) 
 
-    encoding = get_file_encoding(filename)
-
-    lines = as_bytes('').join(g_line_cache[filename])
-    source = as_unicode(lines, encoding)
-
-    return source
+    return (source, encoding)
 
 
 
-def get_source_line(filename, lineno, fdetect_encoding = True):
-    """
-    Return source line from file.
-    """
+def get_source_line(filename, lineno):
+    (lines, encoding, ffilesystem) = lines_cache(filename)
+
+    if lineno > len(lines):
+        return as_unicode('')
     
-    filename = g_found_unicode_files.get(filename, filename)
+    return lines[lineno - 1] + as_unicode('\n')
 
-    if fdetect_encoding:
-        encoding = get_file_encoding(filename)
-    else:
-        encoding = 'utf-8'
 
-    if is_blender_file(filename):
-        lines = get_blender_source(filename)
 
-        try:
-            line = lines[lineno - 1] + '\n'
-            line = as_unicode(line, encoding)
-
-            return line
-            
-        except IndexError:
-            return as_unicode('')
-
-    line = get_source_line_bytes(filename, lineno) 
-    line = as_unicode(line, encoding)
-
-    return line
+def is_provider_filesystem(filename):
+    (lines, encoding, ffilesystem) = lines_cache(filename)
+    return ffilesystem
 
 
 
 def get_file_encoding(filename):
-    filename = g_found_unicode_files.get(filename, filename)
-
-    if filename in g_file_encoding:
-        return g_file_encoding[filename]
-
-    for i in range(1, 10):
-        line = get_source_line(filename, i, fdetect_encoding = False)
-
-        encoding = ParseLineEncoding(line)
-        if encoding != None:
-            try:
-                codecs.lookup(encoding)
-            except:
-                encoding = 'utf-8'
-
-            g_file_encoding[filename] = encoding
-            return encoding
-
-    g_file_encoding[filename] = 'utf-8'
-    return 'utf-8'
+    (lines, encoding, ffilesystem) = lines_cache(filename)
+    return encoding
 
 
 
@@ -3189,10 +3176,15 @@ def ParseEncoding(txt):
     Parse document encoding according to: 
     http://docs.python.org/ref/encodings.html
     """
-    
-    l = txt.split('\n', 20)
+   
+    eol = '\n'
+    if not is_unicode(txt):
+        eol = as_bytes('\n')
+
+    l = txt.split(eol, 20)[:-1]
 
     for line in l:
+        line = as_unicode(line)
         encoding = ParseLineEncoding(line)
         if encoding is not None:
             try:
@@ -4954,20 +4946,8 @@ class CFileBreakInfo:
 
 
     def CalcBreakInfo(self):
-        if is_blender_file(self.m_filename):
-            lines = get_blender_source(self.m_filename)
-            source = '\n'.join(lines) + '\n'
-        else:    
-            source = get_source(self.m_filename)
-
-        self.__CalcBreakInfoFromSource(source)
-
-
-    def __CalcBreakInfoFromSource(self, source):
-        _source = source.replace('\r\n', '\n') + '\n'
-
-        encoding = ParseEncoding(_source)
-        _source = as_string(_source, encoding)
+        (source, encoding) = get_source(self.m_filename)
+        _source = as_string(source + as_unicode('\n'), encoding)
         
         code = compile(_source, self.m_filename, "exec")
         
@@ -6524,7 +6504,7 @@ class CDebuggerCore:
         self.m_threads[ctx.m_thread_id] = ctx
 
         if len(self.m_threads) == 1:
-            g_blender_text.clear()
+            g_lines_cache.clear()
             
             self.m_current_ctx = ctx
             self.notify_first_thread()
@@ -6961,7 +6941,7 @@ class CDebuggerCore:
 
             if filename in [None, '']:
                 _filename = self.get_current_filename(frame_index, fException)
-            elif is_blender_file(filename):
+            elif not is_provider_filesystem(filename):
                 _filename = as_string(filename, sys.getfilesystemencoding())
             else:
                 _filename = FindFile(filename, fModules = True)
@@ -7212,7 +7192,7 @@ class CDebuggerEngine(CDebuggerCore):
                 self.verify_broken()
                 
                 _filename = self.get_current_filename(frame_index, fException)
-            elif is_blender_file(filename):
+            elif not is_provider_filesystem(filename):
                 _filename = as_string(filename, sys.getfilesystemencoding())
             else:
                 _filename = FindFile(filename, fModules = True)
@@ -7550,7 +7530,7 @@ class CDebuggerEngine(CDebuggerCore):
         if filename in [None, '']:
             __filename = frame_filename
             r[DICT_KEY_TID] = ctx.m_thread_id
-        elif is_blender_file(filename):
+        elif not is_provider_filesystem(filename):
             __filename = as_string(filename, sys.getfilesystemencoding())
         else:    
             __filename = FindFile(filename, fModules = True)
@@ -9525,7 +9505,7 @@ class CSessionManagerInternal:
             u = g_found_unicode_files[ExpandedFilename]
             _u = as_bytes(u)
             _b = base64.encodestring(_u)
-            _b = _b.strip('\n').translate(g_safe_base64_to)
+            _b = _b.strip(as_bytes('\n')).translate(g_safe_base64_to)
             _b = as_string(_b, fstrict = True)
             b = ' --base64=%s' % _b
 
@@ -9974,6 +9954,9 @@ class CSessionManagerInternal:
                 
             for bp in bpl.values():
                 try:
+                    if bp.m_expr in [None, '']:
+                        bp.m_encoding = as_unicode('utf-8')
+
                     self.set_breakpoint(bp.m_filename, bp.m_scope_fqn, bp.m_scope_offset, bp.m_fEnabled, bp.m_expr, bp.m_encoding)
                 except:
                     print_debug_exception()
@@ -12448,11 +12431,12 @@ def workaround_import_deadlock():
 
 
 
-def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, fDebug):
+def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, source_provider, fDebug):
     global g_server
     global g_debugger
     global g_fDebug
     global g_initial_cwd
+    global g_source_provider_aux
 
     _rpdb2_pwd = as_unicode(_rpdb2_pwd)
 
@@ -12468,7 +12452,8 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
             raise BadArgument(STR_PASSWORD_BAD)
 
         g_fDebug = fDebug
-       
+        g_source_provider_aux = source_provider
+
         workaround_import_deadlock()
 
         if (not fAllowUnencrypted) and not is_encryption_supported():

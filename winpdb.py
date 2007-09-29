@@ -2279,7 +2279,7 @@ class CSourceManager:
                 dlg.Destroy()
                 return
 
-            if t == IOError and rpdb2.ERROR_NO_BLENDER_SOURCE in v.args and not self.is_in_files(filename):
+            if t == IOError and rpdb2.BLENDER_SOURCE_NOT_AVAILABLE in v.args and not self.is_in_files(filename):
                 dlg = wx.MessageDialog(None, STR_BLENDER_SOURCE_WARNING, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
                 dlg.Destroy()
