@@ -2015,8 +2015,6 @@ g_ignore_broken_pipe = 0
 #
 g_found_unicode_files = {}
 
-g_file_encoding = {}
-
 g_frames_path = {}
 
 g_signal_handlers = {}
@@ -3082,7 +3080,7 @@ def source_provider(filename):
 
     try:
         if g_source_provider_aux != None:
-            source = source_provider_blender(filename)
+            source = g_source_provider_aux(filename)
     
     except IOError:
         v = sys.exc_info()[1]
