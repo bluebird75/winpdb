@@ -3697,7 +3697,6 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         elif t != None:
             self.m_session_manager.report_exception(t, v, tb)
-            rpdb2.print_debug_exception(True)
             return
 
         self.m_async_sm.with_callback(self.update_body).calc_server_list()
@@ -3713,7 +3712,6 @@ class CAttachDialog(wx.Dialog, CJobs):
                 dlg.Destroy()
 
             self.m_session_manager.report_exception(t, v, tb)
-            rpdb2.print_debug_exception(True)
             return
 
         (self.m_server_list, self.m_errors) = r

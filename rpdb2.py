@@ -2022,6 +2022,8 @@ g_signals_pending = []
 
 #g_profile = None
 
+g_fFirewallTest = True
+
 
 
 g_safe_base64_to = string.maketrans(as_bytes('/+='), as_bytes('_-#'))
@@ -3770,6 +3772,7 @@ class CFirewallTest:
 
         while True:
             try:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((self.LOOPBACK, port))
                 break
                 
@@ -8432,6 +8435,10 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
         _marshaled_dispatch = __marshaled_dispatch
 
 
+    def server_activate(self):
+        self.socket.listen(1)
+
+
     def handle_error(self, request, client_address):
         print_debug("handle_error() in pid %d" % _getpid())
 
@@ -9392,9 +9399,12 @@ class CSessionManagerInternal:
             self.m_printer(STR_SPAWN_UNSUPPORTED)
             raise SpawnUnsupported
         
-        firewall_test = CFirewallTest()
-        if not firewall_test.run():
-            raise FirewallBlock
+        if g_fFirewallTest:
+            firewall_test = CFirewallTest()
+            if not firewall_test.run():
+                raise FirewallBlock
+        else:
+            print_debug('Skipping firewall test.')
 
         if self.m_rpdb2_pwd is None:
             self.set_random_password()
@@ -9568,10 +9578,12 @@ class CSessionManagerInternal:
             self.m_printer(STR_PASSWORD_MUST_BE_SET)
             raise UnsetPassword
        
-        if ffirewall_test:
+        if g_fFirewallTest and ffirewall_test:
             firewall_test = CFirewallTest()
             if not firewall_test.run():
                 raise FirewallBlock
+        elif not g_fFirewallTest and ffirewall_test:
+            print_debug('Skipping firewall test.')
 
         if name is None:
             name = key
@@ -10151,9 +10163,12 @@ class CSessionManagerInternal:
         if self.m_rpdb2_pwd is None:
             raise UnsetPassword
         
-        firewall_test = CFirewallTest()
-        if not firewall_test.run():
-            raise FirewallBlock
+        if g_fFirewallTest:
+            firewall_test = CFirewallTest()
+            if not firewall_test.run():
+                raise FirewallBlock
+        else:
+            print_debug('Skipping firewall test.')
 
         server_list = self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)
         errors = self.m_server_list_object.get_errors()
@@ -12622,6 +12637,7 @@ def PrintUsage(fExtended = False):
 def main(StartClient_func = StartClient):
     global g_fScreen
     global g_fDebug
+    global g_fFirewallTest
     
     create_rpdb_settings_folder()
 
@@ -12632,7 +12648,7 @@ def main(StartClient_func = StartClient):
         options, _rpdb2_args = getopt.getopt(
                             argv[1:], 
                             'hdao:rtep:sc', 
-                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'debug']
+                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'nofwtest', 'debug']
                             )
 
     except getopt.GetoptError:
@@ -12681,6 +12697,8 @@ def main(StartClient_func = StartClient):
             fchdir = True
         if o in ['--base64']:
             encoded_path = a
+        if o in ['--nofwtest']:
+            g_fFirewallTest = False
     
     arg = None
     argv = None
