@@ -1536,8 +1536,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def do_update_stack(self, _stack):
         self.m_stack = _stack
 
-        self.do_set_position(0)
         self.m_stack_viewer.update_stack_list(self.m_stack)
+        
+        index = self.m_session_manager.get_frame_index()
+        self.do_update_frame(index)
 
 
     def do_set_position(self, index):

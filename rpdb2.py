@@ -760,7 +760,7 @@ class CSessionManager:
         Attach to a debuggee (establish communication with the debuggee-server)
         key - a string specifying part of the filename or PID of the debuggee.
 
-        if command line is not a unicode string it will be decoded into unicode
+        if key is not a unicode string it will be decoded into unicode
         with the given encoding
         """
        
@@ -1839,8 +1839,8 @@ PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo', '.so']
 MODULE_SCOPE = '?'
 MODULE_SCOPE2 = '<module>'
 
-BLENDER_SOURCE_NOT_AVAILABLE = as_unicode('Blender script source not available.')
-SOURCE_NOT_AVAILABLE = as_unicode('source not available.')
+BLENDER_SOURCE_NOT_AVAILABLE = as_unicode('Blender script source code is not available.')
+SOURCE_NOT_AVAILABLE = as_unicode('Source code is not available.')
 
 SCOPE_SEP = '.'
 
@@ -2201,7 +2201,7 @@ def repr_list(pattern, l, length, encoding, is_valid):
     except AttributeError:
         is_valid[0] = False 
 
-    return pattern % s
+    return as_unicode(pattern % s)
 
 
 
@@ -2247,14 +2247,13 @@ def repr_dict(pattern, d, length, encoding, is_valid):
     except AttributeError:
         is_valid[0] = False 
 
-    return pattern % s
+    return as_unicode(pattern % s)
 
 
 
 def repr_bytes(s, length, encoding, is_valid):
     try:
         s = s.decode(encoding)
-
         r = repr_unicode(s, length, is_valid)
         return 'b' + r[1:]
 
@@ -2270,7 +2269,6 @@ def repr_bytes(s, length, encoding, is_valid):
 def repr_str8(s, length, encoding, is_valid):
     try:
         s = s.decode(encoding)
-
         r = repr_unicode(s, length, is_valid)
         return 's' + r[1:]
 
@@ -2285,9 +2283,7 @@ def repr_str8(s, length, encoding, is_valid):
 
 def repr_str(s, length, encoding, is_valid):
     try:
-        if not is_unicode(s):
-            s = s.decode(encoding)
-
+        s = as_unicode(s, encoding, fstrict = True)
         r = repr_unicode(s, length, is_valid)
         return r[1:]
 
@@ -2327,9 +2323,14 @@ def repr_unicode(s, length, is_valid):
 
 
 def repr_str_raw(s, length, is_valid):
+    if is_unicode(s):
+        eli = as_unicode('...')
+    else:
+        eli = as_bytes('...')
+
     if len(s) > length:
         is_valid[0] = False
-        s = s[: length] + as_bytes('...')
+        s = s[: length] + eli
 
     return as_unicode(repr(s))
 
@@ -2360,7 +2361,6 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
         pass
 
     if isinstance(x, sets.Set):
-        print_debug(repr(x))
         return repr_list('sets.Set([%s])', x, length, encoding, is_valid)
 
     if isinstance(x, sets.ImmutableSet):
@@ -2375,7 +2375,7 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
     if isinstance(x, dict):
         return repr_dict('{%s}', x, length, encoding, is_valid)
 
-    if encoding == ENCODING_RAW_I and type(x) in [str, unicode]:
+    if encoding == ENCODING_RAW_I and type(x) in [str, unicode, bytes, str8]:
         return repr_str_raw(x, length, is_valid)
 
     if type(x) == unicode:
@@ -2399,18 +2399,19 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
     if len(y) == length:
         y += '...'
 
+    if encoding == ENCODING_RAW_I:
+        encoding = 'utf-8'
+
     try:
-        if not is_unicode(y):
-            y = y.decode(encoding)
-        
+        y = as_unicode(y, encoding, fstrict = True)
         return y
         
     except:
         pass
 
     encoding = sys.getfilesystemencoding()
-    y = y.decode(encoding, 'replace')
-    
+    y = as_unicode(y, encoding)
+
     return y
 
 
@@ -2861,7 +2862,7 @@ def FindFile(
         finally:
             if not is_py3k() and is_unicode(scriptname):
                 fse = sys.getfilesystemencoding()
-                _l = scriptname.encode(fse)
+                _l = as_string(scriptname, fse)
                 if '?' in _l:
                     g_found_unicode_files[_l] = scriptname
                 return _l
@@ -2904,7 +2905,7 @@ def FindFile(
     finally:
         if not is_py3k() and is_unicode(lowered):
             fse = sys.getfilesystemencoding()
-            _l = lowered.encode(fse)
+            _l = as_string(lowered, fse)
             if '?' in _l:
                 g_found_unicode_files[_l] = lowered
             return _l
@@ -8112,7 +8113,7 @@ class CDebuggerEngine(CDebuggerCore):
                 _locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
 
             try:
-                _suite = as_bytes(ENCODING_SOURCE % encoding + suite, encoding)
+                _suite = as_string(ENCODING_SOURCE % encoding + suite, encoding, fstrict = True)
                 exec(_suite, _globals, _locals)
 
             finally:
@@ -9509,17 +9510,19 @@ class CSessionManagerInternal:
         p = ['', ' --pwd="%s"' % self.m_rpdb2_pwd][os.name == 'nt']
        
         b = ''
-        if ExpandedFilename in g_found_unicode_files:
-            u = g_found_unicode_files[ExpandedFilename]
-            _u = as_bytes(u)
+
+        encoding = detect_locale()
+        fse = sys.getfilesystemencoding()
+
+        ExpandedFilename = g_found_unicode_files.get(ExpandedFilename, ExpandedFilename)
+        Expandedilename = as_unicode(ExpandedFilename, fse)
+
+        if as_bytes('?') in as_bytes(ExpandedFilename, encoding, fstrict = False):
+            _u = as_bytes(ExpandedFilename)
             _b = base64.encodestring(_u)
             _b = _b.strip(as_bytes('\n')).translate(g_safe_base64_to)
             _b = as_string(_b, fstrict = True)
             b = ' --base64=%s' % _b
-
-        fse = sys.getfilesystemencoding()
-
-        ExpandedFilename = as_unicode(ExpandedFilename, fse)
 
         debugger = os.path.abspath(__file__)
         if debugger[-1:] == 'c':
@@ -9537,7 +9540,7 @@ class CSessionManagerInternal:
 
         python_exec = as_unicode(python_exec, fse)
 
-        if '?' in python_exec or '?' in debugger:
+        if as_bytes('?') in as_bytes(python_exec + debugger, encoding, fstrict = False):
             raise BadMBCSPath
 
         if name == POSIX:
@@ -9557,7 +9560,6 @@ class CSessionManagerInternal:
 
         print_debug('Terminal open string: %s' % repr(command))
 
-        encoding = detect_locale()
         command = as_string(command, encoding)
         
         if name == MAC:
