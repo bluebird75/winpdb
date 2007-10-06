@@ -2659,7 +2659,11 @@ def IsPythonSourceFile(path):
             return True
 
     if is_py3k():
-        return False
+        #
+        # py3k does not have compiler.parseFile, so return
+        # True anyway...
+        #
+        return True
 
     try:
         compiler.parseFile(path) 
@@ -3303,7 +3307,7 @@ def is_valid_pwd(_rpdb2_pwd):
         if c.isalnum():
             continue
 
-        if c in '_':
+        if c == '_':
             continue
 
         return False
@@ -3387,8 +3391,6 @@ def cleanup_bpl_folder(path):
         
     ll.sort()
 
-    print_debug(repr(ll))
-    
     for (t, f) in ll[: -MAX_BPL_FILES]:
         try:
             os.remove(os.path.join(path, f))
@@ -3644,7 +3646,8 @@ def SafeCmp(x, y):
 
 
 def recalc_sys_path(old_pythonpath):
-    del sys.path[1: 1 + len(old_pythonpath)]
+    opl = old_pythonpath.split(os.path.pathsep)
+    del sys.path[1: 1 + opl]
 
     pythonpath = os.environ.get('PYTHONPATH', '')
     ppl = pythonpath.split(os.path.pathsep)
@@ -3658,8 +3661,8 @@ def recalc_sys_path(old_pythonpath):
 
 
 def calc_signame(signum):
-    for k, v in list(vars(signal).items()):
-        if not k.startswith('SIG'):
+    for k, v in vars(signal).items():
+        if not k.startswith('SIG') or k in ['SIG_IGN', 'SIG_DFL']:
             continue
 
         if v == signum:
@@ -3676,11 +3679,14 @@ class CFirewallTest:
     m_lock = threading.RLock()
 
 
-    def __init__(self, baseport = 52000, timeout = 4):
-        self.LOOPBACK = '127.0.0.1'
-        self.TIMEOUT = timeout
+    def __init__(self, fremote = False, timeout = 4):
+        if fremote:
+            self.m_loopback = ''
+        else:
+            self.m_loopback = '127.0.0.1'
 
-        self.m_baseport = baseport
+        self.m_timeout = timeout
+
         self.m_result = None
 
         self.m_last_server_error = None
@@ -3697,13 +3703,13 @@ class CFirewallTest:
             #
             server = CFirewallTest.m_thread_server
             if server != None and server.isAlive():
-                server.join(self.TIMEOUT * 1.5)
+                server.join(self.m_timeout * 1.5)
                 if server.isAlive():
                     return False
 
             client = CFirewallTest.m_thread_client
             if client != None and client.isAlive():
-                client.join(self.TIMEOUT * 1.5)
+                client.join(self.m_timeout * 1.5)
                 if client.isAlive():
                     return False
 
@@ -3720,7 +3726,7 @@ class CFirewallTest:
             # it means it was blocked by a firewall.
             #
             while CFirewallTest.m_port == None and server.isAlive():
-                if time.time() - t0 > self.TIMEOUT * 1.5:
+                if time.time() - t0 > self.m_timeout * 1.5:
                     return False
 
                 time.sleep(0.1)
@@ -3734,7 +3740,7 @@ class CFirewallTest:
             CFirewallTest.m_thread_client = client
 
             while self.m_result == None and client.isAlive():
-                if time.time() - t0 > self.TIMEOUT * 1.5:
+                if time.time() - t0 > self.m_timeout * 1.5:
                     return False
 
                 time.sleep(0.1)
@@ -3747,11 +3753,11 @@ class CFirewallTest:
 
     def __client(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(self.TIMEOUT)
+        s.settimeout(self.m_timeout)
 
         try:
             try:
-                s.connect((self.LOOPBACK, CFirewallTest.m_port))
+                s.connect((self.m_loopback, CFirewallTest.m_port))
 
                 s.send('Hello, world')
                 data = self.__recv(s, 1024)
@@ -3767,23 +3773,32 @@ class CFirewallTest:
 
 
     def __server(self):
-        port = self.m_baseport
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(self.TIMEOUT)
+        s.settimeout(self.m_timeout)
+
+        if os.name == POSIX:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        port = SERVER_PORT_RANGE_START
 
         while True:
             try:
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind((self.LOOPBACK, port))
+                s.bind((self.m_loopback, port))
                 break
                 
             except socket.error:
                 e = sys.exc_info()[1]
+               
                 if self.__GetSocketError(e) != errno.EADDRINUSE:
                     self.m_last_server_error = e
                     s.close()
                     return
                     
+                if port >= SERVER_PORT_RANGE_START + SERVER_PORT_RANGE_LENGTH - 1:
+                    self.m_last_server_error = e
+                    s.close()
+                    return
+
                 port += 1
         
         CFirewallTest.m_port = port
@@ -3825,7 +3840,7 @@ class CFirewallTest:
                     print_debug('socket error was caught, %s' % repr(e))
                     raise
                 
-                if time.time() - t0 > self.TIMEOUT:
+                if time.time() - t0 > self.m_timeout:
                     raise
 
                 continue
@@ -4002,7 +4017,9 @@ class CCrypto:
         if _rpdb2_pwd in CCrypto.m_keys:
             return CCrypto.m_keys[_rpdb2_pwd]
 
-        key = as_bytes(_rpdb2_pwd)
+        _key = as_bytes(_rpdb2_pwd)
+        key = _key
+        
         d = hmac.new(key, digestmod = _md5)
 
         #
@@ -4012,7 +4029,7 @@ class CCrypto:
         # at ~45 bits strong key
         #
         for i in range(2 ** 16):
-            d.update(key * 64)       
+            d.update((key + _key) * 64)       
             key = d.digest()
             
         CCrypto.m_keys[_rpdb2_pwd] = key
@@ -4460,10 +4477,10 @@ class CEventBreakpoint(CEvent):
     A breakpoint or breakpoints changed.
     """
     
-    DISABLE = 'disable'
-    ENABLE = 'enable'
-    REMOVE = 'remove'
-    SET = 'set'
+    DISABLE = as_unicode('disable')
+    ENABLE = as_unicode('enable')
+    REMOVE = as_unicode('remove')
+    SET = as_unicode('set')
     
     def __init__(self, bp, action = SET, id_list = [], fAll = False):
         self.m_bp = breakpoint_copy(bp)
@@ -5026,7 +5043,8 @@ class CFileBreakInfo:
                 l = sbi.CalcScopeLine(sbi.m_first_line + offset)
                 return (sbi, l)
 
-        print_debug(repr(name))
+        print_debug('Invalid scope: %s' % repr(name))
+
         raise InvalidScopeName
     
 
@@ -6142,24 +6160,6 @@ class CDebuggerCoreThread:
             return frame.f_trace     
 
         return frame.f_trace     
-
-
-    def trace_dispatch_signal_break(self, frame, event, arg):
-        self.m_frame = frame
-
-        try:
-            self.m_code_context = self.m_core.m_code_contexts[frame.f_code]
-        except KeyError:
-            self.m_code_context = self.m_core.get_code_context(frame)
-
-        self.m_core.m_step_tid = thread.get_ident()
-
-        self.m_event = event
-        self.m_core._break(self, frame, event, arg)
-        if frame in self.m_locals_copy:
-            self.update_locals()
-            self.set_local_trace(frame)
-        return frame.f_trace
 
 
     def trace_dispatch_signal(self, frame, event, arg):
@@ -7869,10 +7869,15 @@ class CDebuggerEngine(CDebuggerCore):
                 is_valid = [True]
                 e = {}
 
-                if type(k) in [bool, int, float, bytes, str, str8, unicode, type(None)]:
+                if type(k) in [bool, int, float, bytes, str, unicode, type(None)]:
                     rk = repr(k)
                     if len(rk) < REPR_ID_LENGTH:
                         e[DICT_KEY_EXPR] = as_unicode('(%s)[%s]' % (expr, rk))
+
+                if type(k) == str8:
+                    rk = repr(k)
+                    if len(rk) < REPR_ID_LENGTH:
+                        e[DICT_KEY_EXPR] = as_unicode('(%s)[str8(%s)]' % (expr, rk[1:]))
 
                 if not DICT_KEY_EXPR in e:
                     rk = repr_ltd(k, REPR_ID_LENGTH, encoding = ENCODING_RAW_I)
@@ -8401,7 +8406,10 @@ def my_xmlrpclib_loads(data):
 # MOD
 #
 class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServer):
-    allow_reuse_address = False
+    if os.name == POSIX:
+        allow_reuse_address = True
+    else:
+        allow_reuse_address = False
     
     """
     Modification of Python 2.3 SimpleXMLRPCServer.SimpleXMLRPCDispatcher 
@@ -8436,8 +8444,8 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
         _marshaled_dispatch = __marshaled_dispatch
 
 
-    def server_activate(self):
-        self.socket.listen(1)
+    #def server_activate(self):
+    #    self.socket.listen(1)
 
 
     def handle_error(self, request, client_address):
@@ -8605,6 +8613,11 @@ class CIOServer:
         self.m_thread = None
 
         self.m_server.shutdown_work_queue()
+        
+        try:
+            self.m_server.socket.close()
+        except:
+            pass
 
         print_debug('Stopping IO server, done.')
 
@@ -8616,7 +8629,7 @@ class CIOServer:
     def run(self):
         if self.m_server == None:
             (self.m_port, self.m_server) = self.__StartXMLRPCServer()
-
+       
         self.m_server.init_work_queue()
         self.m_server.register_function(self.dispatcher_method)        
         
@@ -9401,7 +9414,7 @@ class CSessionManagerInternal:
             raise SpawnUnsupported
         
         if g_fFirewallTest:
-            firewall_test = CFirewallTest()
+            firewall_test = CFirewallTest(self.get_remote())
             if not firewall_test.run():
                 raise FirewallBlock
         else:
@@ -9581,7 +9594,7 @@ class CSessionManagerInternal:
             raise UnsetPassword
        
         if g_fFirewallTest and ffirewall_test:
-            firewall_test = CFirewallTest()
+            firewall_test = CFirewallTest(self.get_remote())
             if not firewall_test.run():
                 raise FirewallBlock
         elif not g_fFirewallTest and ffirewall_test:
@@ -9676,6 +9689,8 @@ class CSessionManagerInternal:
         self.refresh(True)
         
         self.__start_event_monitor()
+        
+        print_debug('Attached to debuggee on port %d.' % session.m_port)
 
         #self.enable_breakpoint([], fAll = True)
 
@@ -10166,7 +10181,7 @@ class CSessionManagerInternal:
             raise UnsetPassword
         
         if g_fFirewallTest:
-            firewall_test = CFirewallTest()
+            firewall_test = CFirewallTest(self.get_remote())
             if not firewall_test.run():
                 raise FirewallBlock
         else:
