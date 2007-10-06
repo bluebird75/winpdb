@@ -2647,7 +2647,10 @@ class CConsole(wx.Panel, CCaptionManager):
         #
         # CConsole acts as stdin and stdout so it exposes the encoding property.
         #
-        self.encoding = wx.GetDefaultPyEncoding()
+        if not g_fUnicode:
+            self.encoding = wx.GetDefaultPyEncoding()
+        else:
+            self.encoding = 'utf-8'
 
         self.m_history = ['']
         self.m_history_index = 0
@@ -2735,7 +2738,10 @@ class CConsole(wx.Panel, CCaptionManager):
 
 
     def write(self, _str):
-        _str = rpdb2.as_string(_str, wx.GetDefaultPyEncoding())
+        if not g_fUnicode:
+            _str = rpdb2.as_string(_str, wx.GetDefaultPyEncoding())
+        else:
+            _str = rpdb2.as_unicode(_str, self.encoding)
 
         sl = _str.split('\n')
         

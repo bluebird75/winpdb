@@ -272,6 +272,7 @@ import commands
 import tempfile
 import __main__
 import copy_reg
+import platform
 import weakref
 import httplib
 import os.path
@@ -1664,7 +1665,7 @@ LOOPBACK = '127.0.0.1'
 LOCALHOST = 'localhost'
 
 SERVER_PORT_RANGE_START = 51000
-SERVER_PORT_RANGE_LENGTH = 20
+SERVER_PORT_RANGE_LENGTH = 24
 
 SOURCE_EVENT_CALL = 'C'
 SOURCE_EVENT_LINE = 'L'
@@ -3647,7 +3648,7 @@ def SafeCmp(x, y):
 
 def recalc_sys_path(old_pythonpath):
     opl = old_pythonpath.split(os.path.pathsep)
-    del sys.path[1: 1 + opl]
+    del sys.path[1: 1 + len(opl)]
 
     pythonpath = os.environ.get('PYTHONPATH', '')
     ppl = pythonpath.split(os.path.pathsep)
@@ -8222,19 +8223,18 @@ class CDebuggerEngine(CDebuggerCore):
             
             try:
                 g_fignorefork = True
-                (i, o, e) = os.popen3(command)
+                f = platform.popen(command)
 
             finally:
                 g_fignorefork = False
 
-            value = o.read()[:-1]
+            value = f.read()
+            f.close()
+            
+            if value[-1:] == '\n':
+                value = value[:-1]
 
             os.environ[k] = value
-
-        try:
-            os.wait()
-        except:
-            pass
 
         if 'PYTHONPATH' in [k for (k, v) in envmap]:
             recalc_sys_path(old_pythonpath)
@@ -9236,7 +9236,7 @@ class CServerList:
         self.m_errors = {}
 
 
-    def calcList(self, _rpdb2_pwd, rid):
+    def calcList(self, _rpdb2_pwd, rid, key = None):
         sil = []
         sessions = []
         self.m_errors = {}
@@ -9261,8 +9261,18 @@ class CServerList:
             if si is not None:
                 sil.append((-si.m_age, si))
         
-        sil.sort()
-        self.m_list = [s[1] for s in sil]
+            sil.sort()
+            self.m_list = [s[1] for s in sil]
+
+            if key != None:
+                try:
+                    return self.findServers(key)[0]
+                except:
+                    pass
+
+        if key != None:
+            raise UnknownServer
+
         return self.m_list 
 
 
@@ -9384,16 +9394,23 @@ class CSessionManagerInternal:
 
     def __wait_for_debuggee(self, rid):
         try:
-            for i in range(0,STARTUP_RETRIES):
+            time.sleep(STARTUP_TIMEOUT / 2)
+
+            for i in range(STARTUP_RETRIES):
                 try:
-                    self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)
-                    return self.m_server_list_object.findServers(rid)[0]
+                    print_debug('Scanning for debuggee...')
+
+                    t0 = time.time()
+                    return self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid, rid)
+                
                 except UnknownServer:
-                    time.sleep(STARTUP_TIMEOUT)
+                    dt = time.time() - t0
+                    if dt < STARTUP_TIMEOUT:
+                        time.sleep(STARTUP_TIMEOUT - dt)
+
                     continue
                     
-            self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)
-            return self.m_server_list_object.findServers(rid)[0]
+            return self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid, rid)
 
         finally:
             errors = self.m_server_list_object.get_errors()
@@ -9448,7 +9465,7 @@ class CSessionManagerInternal:
             try:
                 self._spawn_server(fchdir, ExpandedFilename, args, rid)            
                 server = self.__wait_for_debuggee(rid)
-                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True, ffirewall_test = False)
+                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True, ffirewall_test = False, server = server)
 
                 self.m_last_command_line = command_line
                 self.m_last_fchdir = fchdir
@@ -9581,7 +9598,7 @@ class CSessionManagerInternal:
             os.popen(command)
 
     
-    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True):
+    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True, server = None):
         assert(is_unicode(key))
 
         self.__verify_unattached()
@@ -9609,9 +9626,11 @@ class CSessionManagerInternal:
         self.m_state_manager.set_state(STATE_ATTACHING)
 
         try:
-            self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)                
-            servers = self.m_server_list_object.findServers(key)
-            server = servers[0] 
+            servers = [server]
+            if server == None:
+                self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid)                
+                servers = self.m_server_list_object.findServers(key)
+                server = servers[0] 
 
             _name = server.m_filename
             
@@ -9981,6 +10000,15 @@ class CSessionManagerInternal:
                 
             for bp in bpl.values():
                 try:
+                    if bp.m_scope_fqn != None:
+                        bp.m_scope_fqn = as_unicode(bp.m_scope_fqn)
+
+                    if bp.m_filename != None:
+                        bp.m_filename = as_unicode(bp.m_filename)
+
+                    if bp.m_expr != None:
+                        bp.m_expr = as_unicode(bp.m_expr)
+
                     if bp.m_expr in [None, '']:
                         bp.m_encoding = as_unicode('utf-8')
 
@@ -10409,7 +10437,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.fAnalyzeMode = False
         self.fPrintBroken = True
 
-        self.m_filename = ''
+        self.m_filename = as_unicode('')
         
         self.use_rawinput = [1, 0][fSplit]
         self.m_fSplit = fSplit
@@ -11107,7 +11135,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 frame_lineno = d.get(DICT_KEY_FRAME_LINENO, 0)
                 
                 if m is not None:
-                    print >> self.m_stdout
+                    _print('', self.m_stdout)
                     
                 _print(STR_SOURCE_LINES % (tid, filename), self.m_stdout)    
                 for i, line in enumerate(source_lines):
@@ -11557,7 +11585,7 @@ list        - List source code.
 stack       - Display stack trace.
 up          - Go up one frame in stack.
 down        - Go down one frame in stack.
-encoding    - Set the source encoding used by exec or eval commands.
+encoding    - Set the source encoding used by exec and eval commands.
 eval        - Evaluate expression in the context of the current frame.
 exec        - Execute suite in the context of the current frame.
 analyze     - Toggle analyze last exception mode.
