@@ -8633,10 +8633,10 @@ class CIOServer:
 
         self.m_server.shutdown_work_queue()
         
-        try:
-            self.m_server.socket.close()
-        except:
-            pass
+        #try:
+        #    self.m_server.socket.close()
+        #except:
+        #    pass
 
         print_debug('Stopping IO server, done.')
 
@@ -9568,7 +9568,7 @@ class CSessionManagerInternal:
         fse = sys.getfilesystemencoding()
 
         ExpandedFilename = g_found_unicode_files.get(ExpandedFilename, ExpandedFilename)
-        Expandedilename = as_unicode(ExpandedFilename, fse)
+        ExpandedFilename = as_unicode(ExpandedFilename, fse)
 
         if as_bytes('?') in as_bytes(ExpandedFilename, encoding, fstrict = False):
             _u = as_bytes(ExpandedFilename)
