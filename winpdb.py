@@ -407,7 +407,7 @@ STR_MORE_ABOUT_BREAKPOINTS = """You can set conditional breakpoints with the 'bp
 STR_HOW_TO_JUMP = """You can jump to a different line in the current scope with the 'jump' console command. Type 'help jump' at the console prompt for more information."""
 
 DLG_EXPR_TITLE = "Enter Expression"
-DLG_ENCODING_TITLE = "encoding"
+DLG_ENCODING_TITLE = "Encoding"
 DLG_PWD_TITLE = "Password"
 DLG_OPEN_TITLE = "Open Source"
 DLG_LAUNCH_TITLE = "Launch"
@@ -459,9 +459,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.2.3"
-WINPDB_VERSION = "WINPDB_1_2_3"
-VERSION = (1, 2, 3, 0, '')
+WINPDB_TITLE = "Winpdb 1.2.5"
+WINPDB_VERSION = "WINPDB_1_2_5"
+VERSION = (1, 2, 5, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -569,6 +569,14 @@ DETACH_TIP = "Detach from debugged script."
 STOP_TIP = "Shutdown the debugged script."
 RESTART_TIP = "Restart the debugged script."
 OPEN_TIP = "Open source file in the source viewer."
+ANALYZE_TIP = "Toggle analyze exception mode."
+BREAK_TIP = "Pause script for inspection."
+GO_TIP = "Let script continue its run."
+STEP_TIP = "Continue to the next code line, possibly in an inner scope."
+NEXT_TIP = "Continue to the next code line at the current scope."
+GOTO_TIP = "Continue to the line under the cursor."
+RETURN_TIP = "Continue to the end of the current scope."
+JUMP_TIP = "Jump to another line in the current scope."
 WEBSITE_TIP = "Open the Winpdb homepage."
 SUPPORT_TIP = "Open the Winpdb support web page."
 DOCS_TIP = "Open the Winpdb online documentation web page."
@@ -863,7 +871,7 @@ class CToolBar:
             id = wx.NewId()
 
             if TEXT in e:
-                button = wx.Button(self.m_toolbar, id, e[TEXT] % 'auto', style = wx.NO_BORDER)
+                button = wx.Button(self.m_toolbar, id, e[TEXT], style = wx.NO_BORDER)
                 self.m_toolbar.AddControl(button)
                 self.m_items[item_label] = {ID: id}
                 wx.EVT_BUTTON(self.m_toolbar, id, command)
@@ -1287,14 +1295,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/1/" + ML_BREAKPOINTS + "/4/" + ML_LOAD: {COMMAND: self.do_load, TOOLTIP: LOAD_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/5/" + ML_SAVE: {COMMAND: self.do_save, TOOLTIP: SAVE_TIP}, 
             "/1/" + ML_BREAKPOINTS + "/6/" + ML_MORE: {COMMAND: self.do_more_bp, TOOLTIP: MORE_TIP}, 
-            "/2/" + ML_CONTROL + "/0/" + ML_ANALYZE: {COMMAND: self.do_analyze_menu}, 
-            "/2/" + ML_CONTROL + "/1/" + ML_BREAK: {COMMAND: self.do_break}, 
-            "/2/" + ML_CONTROL + "/2/" + ML_GO: {COMMAND: self.do_go}, 
-            "/2/" + ML_CONTROL + "/3/" + ML_NEXT: {COMMAND: self.do_next}, 
-            "/2/" + ML_CONTROL + "/4/" + ML_STEP: {COMMAND: self.do_step}, 
-            "/2/" + ML_CONTROL + "/5/" + ML_GOTO: {COMMAND: self.do_goto}, 
-            "/2/" + ML_CONTROL + "/6/" + ML_RETURN: {COMMAND: self.do_return}, 
-            "/2/" + ML_CONTROL + "/7/" + ML_JUMP: {COMMAND: self.do_jump}, 
+            "/2/" + ML_CONTROL + "/0/" + ML_ANALYZE: {COMMAND: self.do_analyze_menu, TOOLTIP: ANALYZE_TIP}, 
+            "/2/" + ML_CONTROL + "/1/" + ML_BREAK: {COMMAND: self.do_break, TOOLTIP: BREAK_TIP}, 
+            "/2/" + ML_CONTROL + "/2/" + ML_GO: {COMMAND: self.do_go, TOOLTIP: GO_TIP}, 
+            "/2/" + ML_CONTROL + "/3/" + ML_NEXT: {COMMAND: self.do_next, TOOLTIP: NEXT_TIP}, 
+            "/2/" + ML_CONTROL + "/4/" + ML_STEP: {COMMAND: self.do_step, TOOLTIP: STEP_TIP}, 
+            "/2/" + ML_CONTROL + "/5/" + ML_GOTO: {COMMAND: self.do_goto, TOOLTIP: GOTO_TIP}, 
+            "/2/" + ML_CONTROL + "/6/" + ML_RETURN: {COMMAND: self.do_return, TOOLTIP: RETURN_TIP}, 
+            "/2/" + ML_CONTROL + "/7/" + ML_JUMP: {COMMAND: self.do_jump, TOOLTIP: JUMP_TIP}, 
             "/3/" + ML_WINDOW + "/0/" + ML_EMPTY: None,
             "/4/" + ML_HELP +   "/0/" + ML_WEBSITE: {COMMAND: self.do_website, TOOLTIP: WEBSITE_TIP}, 
             "/4/" + ML_HELP +   "/1/" + ML_SUPPORT: {COMMAND: self.do_support, TOOLTIP: SUPPORT_TIP}, 
@@ -1324,6 +1332,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         ]
 
         self.init_toolbar(toolbar_resource)
+        self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % 'auto')
 
         ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
         self.set_toggle(TB_TRAP, ftrap)
@@ -3464,6 +3473,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
             e = s[-(1 + i)]
             
             filename = e[0]
+            lineno = e[1]
             function = e[2]
 
             if not g_fUnicode:
@@ -3472,7 +3482,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
 
             index = self.m_stack.InsertStringItem(sys.maxint, repr(i))
             self.m_stack.SetStringItem(index, 1, os.path.basename(filename))
-            self.m_stack.SetStringItem(index, 2, repr(e[1]))
+            self.m_stack.SetStringItem(index, 2, repr(lineno))
             self.m_stack.SetStringItem(index, 3, function)
             self.m_stack.SetStringItem(index, 4, os.path.dirname(filename))
             self.m_stack.SetItemData(index, i)
@@ -3862,6 +3872,9 @@ class CEncodingDialog(wx.Dialog):
         label = wx.StaticText(self, -1, LABEL_ENCODING)
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         encoding = [current_encoding, ''][current_encoding is None]
+        if not g_fUnicode:
+            encoding = rpdb2.as_string(encoding, wx.GetDefaultPyEncoding())
+
         self.m_entry_encoding = wx.TextCtrl(self, value = encoding, size = (200, -1))
         self.m_entry_encoding.SetFocus()
         self.Bind(wx.EVT_TEXT, self.OnText, self.m_entry_encoding)
@@ -4248,8 +4261,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_2_3":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_3", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_2_2_5":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_5", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient)

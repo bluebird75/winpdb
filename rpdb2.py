@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.2.3
+    rpdb2.py - version 2.2.5
 
     A remote Python debugger for CPython
 
@@ -482,9 +482,9 @@ def setbreak():
 
 
 
-VERSION = (2, 2, 3, 0, '')
-RPDB_VERSION = "RPDB_2_2_3"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_2_3"
+VERSION = (2, 2, 5, 0, '')
+RPDB_VERSION = "RPDB_2_2_5"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_2_5"
 
 
 
@@ -4265,6 +4265,15 @@ class CEvent(object):
 
 
 
+class CEventNull(CEvent):
+    """
+    The Null event is fired just to make the event waiter return.
+    """
+    
+    pass
+
+
+
 class CEventSignalIntercepted(CEvent):
     """
     This event is sent when a signal is intercepted inside tracing code.
@@ -7117,6 +7126,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventNamespace: {},
             CEventUnhandledException: {},
             CEventStack: {},
+            CEventNull: {},
             CEventExit: {},
             CEventForkSwitch: {},
             CEventExecSwitch: {},
@@ -7383,6 +7393,15 @@ class CDebuggerEngine(CDebuggerCore):
     def send_no_threads_event(self):
         _event = CEventNoThreads()
         self.m_event_dispatcher.fire_event(_event)
+
+
+    def send_event_null(self):
+        """
+        Make the event waiter return.
+        """
+        
+        event = CEventNull()
+        self.m_event_dispatcher.fire_event(event)
 
         
     def __get_stack(self, ctx, ctid, fException):
@@ -8789,6 +8808,10 @@ class CDebuggeeServer(CIOServer):
 
         self.m_debugger.record_client_heartbeat(id, finit, fdetach)
 
+        
+    def export_null(self):
+        return self.m_debugger.send_event_null()
+
 
     def export_server_info(self):
         age = time.time() - self.m_time
@@ -9880,7 +9903,12 @@ class CSessionManagerInternal:
     def __stop_event_monitor(self):
         self.m_fStop = True
         if self.m_worker_thread is not None:
-            if thread.get_ident() != self.m_worker_thread_ident:  
+            if thread.get_ident() != self.m_worker_thread_ident:
+                try:
+                    self.getSession().getProxy().null()
+                except:
+                    pass
+
                 self.m_worker_thread.join()
 
             self.m_worker_thread = None
@@ -12120,17 +12148,11 @@ def __find_debugger_frame():
     frame = None
 
     f = sys._getframe(0)
-    while f:
+    
+    while f != None:
         filename = f.f_code.co_filename
         name = f.f_code.co_name
         
-        if DEBUGGER_FILENAME in filename and name == '__del__':
-            try:
-                if f.f_locals['self'].__class__ == CSignalHandler:
-                    return None
-            except:
-                pass
-
         if DEBUGGER_FILENAME in filename and (name.startswith('trace_dispatch') or name == 'profile'):
             frame = f 
 
@@ -12143,11 +12165,10 @@ def __find_debugger_frame():
 class CSignalHandler:
     def __del__(self):
         while len(g_signals_pending) != 0:
-            (signum, frameobj) = g_signals_pending.pop(0)
+            (handler, signum, frameobj) = g_signals_pending.pop(0)
             print_debug('Handling pending signal: %s, %s' % (repr(signum), repr(frameobj)))
             
             try:
-                handler = signal.getsignal(signum)
                 handler(signum, frameobj)
 
             except:
@@ -12200,14 +12221,15 @@ def signal_handler(signum, frameobj):
     print_debug('Intercepted signal: %s, %s' % (repr(signum), repr(frameobj)))
 
     f = frameobj
-    while f:
+    while f != None:
         if f == frame:
             frameobj = frame.f_back
             break
 
         f = f.f_back
 
-    g_signals_pending.append((signum, frameobj))
+    handler = signal.getsignal(signum)
+    g_signals_pending.append((handler, signum, frameobj))
 
     if not 'signal_handler' in frame.f_locals:
         frame.f_locals.update({'signal_handler': CSignalHandler()})
