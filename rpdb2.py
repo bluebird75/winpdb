@@ -2060,21 +2060,23 @@ def safe_wait(lock, timeout = None):
 
 
 
-if is_py3k():
-    unicode = 'unicode'
-    long = 'long'
+class _stub_type:
+    pass
 
-    class _sets:
-        pass
+
+
+if is_py3k():
+    unicode = _stub_type
+    long = _stub_type
 
     class sets:
-        Set = _sets
-        BaseSet = _sets
-        ImmutableSet = _sets
+        Set = _stub_type
+        BaseSet = _stub_type
+        ImmutableSet = _stub_type
 
 else:
-    bytes = 'bytes'
-    str8 = 'str8'
+    bytes = _stub_type
+    str8 = _stub_type
 
     def foo(s, e):
         return s.encode(e)
@@ -2135,7 +2137,7 @@ def detect_locale():
 
 
 def class_name(c):
-    s = str(c)
+    s = safe_str(c)
     
     if "'" in s:
         s = s.split("'")[1]
@@ -2158,6 +2160,15 @@ def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
     clip = '...' + suffix[index:]
 
     return clip
+    
+
+
+def safe_str(x):
+    try:
+        return str(x)
+
+    except:
+        return 'N/A'
     
 
 
@@ -2349,71 +2360,76 @@ def repr_base(v, length, is_valid):
 
 
 def repr_ltd(x, length, encoding, is_valid = [True]):
-    length = max(0, length)
-
     try:
-        if isinstance(x, frozenset):
-            return repr_list('frozenset([%s])', x, length, encoding, is_valid)
+        length = max(0, length)
 
-        if isinstance(x, set):
-            return repr_list('set([%s])', x, length, encoding, is_valid)
+        try:
+            if isinstance(x, frozenset):
+                return repr_list('frozenset([%s])', x, length, encoding, is_valid)
 
-    except NameError:
-        pass
+            if isinstance(x, set):
+                return repr_list('set([%s])', x, length, encoding, is_valid)
 
-    if isinstance(x, sets.Set):
-        return repr_list('sets.Set([%s])', x, length, encoding, is_valid)
+        except NameError:
+            pass
 
-    if isinstance(x, sets.ImmutableSet):
-        return repr_list('sets.ImmutableSet([%s])', x, length, encoding, is_valid)
+        if isinstance(x, sets.Set):
+            return repr_list('sets.Set([%s])', x, length, encoding, is_valid)
 
-    if isinstance(x, list):
-        return repr_list('[%s]', x, length, encoding, is_valid)
+        if isinstance(x, sets.ImmutableSet):
+            return repr_list('sets.ImmutableSet([%s])', x, length, encoding, is_valid)
 
-    if isinstance(x, tuple):
-        return repr_list('(%s)', x, length, encoding, is_valid)
+        if isinstance(x, list):
+            return repr_list('[%s]', x, length, encoding, is_valid)
 
-    if isinstance(x, dict):
-        return repr_dict('{%s}', x, length, encoding, is_valid)
+        if isinstance(x, tuple):
+            return repr_list('(%s)', x, length, encoding, is_valid)
 
-    if encoding == ENCODING_RAW_I and type(x) in [str, unicode, bytes, str8]:
-        return repr_str_raw(x, length, is_valid)
+        if isinstance(x, dict):
+            return repr_dict('{%s}', x, length, encoding, is_valid)
 
-    if type(x) == unicode:
-        return repr_unicode(x, length, is_valid)
+        if encoding == ENCODING_RAW_I and type(x) in [str, unicode, bytes, str8]:
+            return repr_str_raw(x, length, is_valid)
 
-    if type(x) == bytes:
-        return repr_bytes(x, length, encoding, is_valid)
+        if type(x) == unicode:
+            return repr_unicode(x, length, is_valid)
 
-    if type(x) == str8:
-        return repr_str8(x, length, encoding, is_valid)
+        if type(x) == bytes:
+            return repr_bytes(x, length, encoding, is_valid)
 
-    if type(x) == str:
-        return repr_str(x, length, encoding, is_valid)
+        if type(x) == str8:
+            return repr_str8(x, length, encoding, is_valid)
 
-    if type(x) in [bool, int, float, long, type(None)]:
-        return repr_base(x, length, is_valid)
+        if type(x) == str:
+            return repr_str(x, length, encoding, is_valid)
 
-    is_valid[0] = False
+        if type(x) in [bool, int, float, long, type(None)]:
+            return repr_base(x, length, is_valid)
 
-    y = safe_repr(x)[: length]
-    if len(y) == length:
-        y += '...'
+        is_valid[0] = False
 
-    if encoding == ENCODING_RAW_I:
-        encoding = 'utf-8'
+        y = safe_repr(x)[: length]
+        if len(y) == length:
+            y += '...'
 
-    try:
-        y = as_unicode(y, encoding, fstrict = True)
+        if encoding == ENCODING_RAW_I:
+            encoding = 'utf-8'
+
+        try:
+            y = as_unicode(y, encoding, fstrict = True)
+            return y
+            
+        except:
+            pass
+
+        encoding = sys.getfilesystemencoding()
+        y = as_unicode(y, encoding)
+
         return y
-        
+
     except:
-        pass
-
-    encoding = sys.getfilesystemencoding()
-    y = as_unicode(y, encoding)
-
-    return y
+        print_debug_exception()
+        return 'N/A'
 
 
 
@@ -5877,10 +5893,10 @@ class CDebuggerCoreThread:
         (lc, base) = lct
         cr = copy.copy(self.m_frame.f_locals)
         
-        b = [(k, repr(v)) for k, v in base.items()]
+        b = [(k, safe_repr(v)) for k, v in base.items()]
         sb = set(b)
 
-        c = [(k, repr(v)) for k, v in cr.items()]
+        c = [(k, safe_repr(v)) for k, v in cr.items()]
         sc = set(c)
 
         nsc = [k for (k, v) in sc - sb]
@@ -7781,7 +7797,7 @@ class CDebuggerEngine(CDebuggerCore):
 
 
     def __parse_type(self, t):
-        rt = repr(t)
+        rt = safe_repr(t)
         st = rt.split("'")[1]
         return st
 
@@ -8001,7 +8017,7 @@ class CDebuggerEngine(CDebuggerCore):
                 
         except:
             print_debug_exception()
-            e[DICT_KEY_ERROR] = as_unicode(repr(sys.exc_info()))
+            e[DICT_KEY_ERROR] = as_unicode(safe_repr(sys.exc_info()))
         
         lock.acquire()
         if len(rl) == index:    
@@ -8108,7 +8124,7 @@ class CDebuggerEngine(CDebuggerCore):
 
         except:
             exc_info = sys.exc_info()
-            e = "%s, %s" % (str(exc_info[0]), str(exc_info[1]))
+            e = "%s, %s" % (safe_str(exc_info[0]), safe_str(exc_info[1]))
 
         self.notify_namespace()
 
@@ -8147,13 +8163,13 @@ class CDebuggerEngine(CDebuggerCore):
 
         except:    
             exc_info = sys.exc_info()
-            e = "%s, %s" % (str(exc_info[0]), str(exc_info[1]))
+            e = "%s, %s" % (safe_str(exc_info[0]), safe_str(exc_info[1]))
 
         if frame_index > 0 and (not _globals is _locals) and _locals != _locals_copy:
-            l = [(k, repr(v)) for k, v in _locals.items()]
+            l = [(k, safe_repr(v)) for k, v in _locals.items()]
             sl = set(l)
 
-            lc = [(k, repr(v)) for k, v in _locals_copy.items()]
+            lc = [(k, safe_repr(v)) for k, v in _locals_copy.items()]
             slc = set(lc)
 
             nsc = [k for (k, v) in sl - slc if k in _original_locals_copy]
@@ -12178,11 +12194,11 @@ class CSignalHandler:
                 #
                 (t, v, tb) = sys.exc_info()
 
-                _t = repr(t)
+                _t = safe_repr(t)
                 if _t.startswith("<type '"):
                     _t = _t.split("'")[1]
 
-                event = CEventSignalException(signum, '%s: %s' % (_t, repr(v)))
+                event = CEventSignalException(signum, '%s: %s' % (_t, safe_repr(v)))
                 g_debugger.m_event_dispatcher.fire_event(event)
 
 
