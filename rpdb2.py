@@ -12641,14 +12641,29 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         g_server_lock.release()
 
 
-    
+
+def workaround_gtk_threading():
+    try:
+        import gtk
+
+        try:
+            gtk.gdk.threads_init()
+        
+        except:
+            gtk.threads_init()
+
+    except:
+        pass
+
+
+
 def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid): 
     assert(is_unicode(_rpdb2_pwd))
 
     global g_server
     global g_debugger
     global g_module_main
-   
+     
     try:
         ExpandedFilename = FindFile(args[0])
         _path = g_found_unicode_files.get(ExpandedFilename, ExpandedFilename)
@@ -12666,6 +12681,7 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     print_debug('Starting server with: %s' % ExpandedFilename)
 
+    workaround_gtk_threading()
     workaround_import_deadlock()
 
     #
