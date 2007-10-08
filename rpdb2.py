@@ -8092,7 +8092,7 @@ class CDebuggerEngine(CDebuggerCore):
         return _rl 
 
             
-    def evaluate(self, expr, frame_index, fException, encoding, fraw):
+    def _evaluate(self, expr, frame_index, fException, encoding, fraw):
         """
         Evaluate expression in context of frame at depth 'frame-index'.
         """
@@ -8111,7 +8111,13 @@ class CDebuggerEngine(CDebuggerCore):
             
             else:
                 _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
-                r = eval(_expr, _globals, _locals)
+
+                try:                
+                    redirect_exc_info = True
+                    r = eval(_expr, _globals, _locals)
+
+                finally:
+                    del redirect_exc_info
         
             if fraw:
                 encoding = ENCODING_RAW_I
@@ -8131,7 +8137,7 @@ class CDebuggerEngine(CDebuggerCore):
         return (as_unicode(v), as_unicode(w), as_unicode(e))
 
         
-    def execute(self, suite, frame_index, fException, encoding):
+    def _execute(self, suite, frame_index, fException, encoding):
         """
         Execute suite (Python statement) in context of frame at 
         depth 'frame-index'.
@@ -8155,7 +8161,13 @@ class CDebuggerEngine(CDebuggerCore):
 
             try:
                 _suite = as_string(ENCODING_SOURCE % encoding + suite, encoding, fstrict = True)
-                exec(_suite, _globals, _locals)
+                
+                try:
+                    redirect_exc_info = True
+                    exec(_suite, _globals, _locals)
+
+                finally:
+                    del redirect_exc_info
 
             finally:
                 if '_RPDB2_FindRepr' in suite and not '_RPDB2_FindRepr' in _original_locals_copy:
@@ -8939,12 +8951,12 @@ class CDebuggeeServer(CIOServer):
 
         
     def export_evaluate(self, expr, frame_index, fException, encoding, fraw):
-        (v, w, e) = self.m_debugger.evaluate(expr, frame_index, fException, encoding, fraw)
+        (v, w, e) = self.m_debugger._evaluate(expr, frame_index, fException, encoding, fraw)
         return (v, w, e)
 
         
     def export_execute(self, suite, frame_index, fException, encoding):
-        (w, e) = self.m_debugger.execute(suite, frame_index, fException, encoding)
+        (w, e) = self.m_debugger._execute(suite, frame_index, fException, encoding)
         return (w, e)
 
         
@@ -12160,6 +12172,49 @@ last set, last evaluated.""", self.m_stdout)
 
 
 
+def __find_eval_exec_frame_in_stack():
+    f = sys._getframe(0)
+    
+    while f != None:
+        filename = f.f_code.co_filename
+        name = f.f_code.co_name
+        
+        if DEBUGGER_FILENAME in filename and name in ['_evaluate', '_execute'] and 'redirect_exc_info' in f.f_locals:
+            return f
+
+        f = f.f_back
+
+    return None
+
+
+
+def __exc_info():
+    f = __find_eval_exec_frame_in_stack()
+    if f == None:
+        return g_sys_exc_info()
+
+    try:
+        frame_index = f.f_locals['frame_index']
+        fException = f.f_locals['fException']
+
+        e = g_debugger.get_exception(frame_index, fException)
+        exc_info = (e['type'], e['value'], e['traceback'])
+
+        return exc_info
+
+    except:
+        return g_sys_exc_info()
+
+
+
+g_sys_exc_info = None
+
+if __name__ == 'rpdb2' and 'exc_info' in dir(sys) and sys.exc_info != __exc_info:
+    g_sys_exc_info = sys.exc_info
+    sys.exc_info = __exc_info
+
+
+
 def __find_debugger_frame():
     frame = None
 
@@ -12708,6 +12763,16 @@ def PrintUsage(fExtended = False):
     -c, --chdir     Change the working directory to that of the launched 
                     script.
     --debug         Debug prints.
+
+    Note that each option is available in short form (example -e) and in a 
+    long form (example --encrypt).
+
+    Options that end with '=' accept an argument that should follow without
+    a space. For example to specify 192.168.0.10 as a host use the following 
+    option: 
+
+        long form: --host=192.168.0.10
+        short form: -o192.168.0.10
 """ % {"rpdb": scriptName})
     
     if not fExtended:
