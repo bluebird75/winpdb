@@ -1934,6 +1934,9 @@ N_WORK_QUEUE_THREADS = 8
 
 DEFAULT_PATH_SUFFIX_LENGTH = 55
 
+ELLIPSIS_UNICODE = as_unicode('...')
+ELLIPSIS_BYTES = as_bytes('...')
+
 
 
 g_server_lock = threading.RLock()
@@ -2336,9 +2339,9 @@ def repr_unicode(s, length, is_valid):
 
 def repr_str_raw(s, length, is_valid):
     if is_unicode(s):
-        eli = as_unicode('...')
+        eli = ELLIPSIS_UNICODE
     else:
-        eli = as_bytes('...')
+        eli = ELLIPSIS_BYTES
 
     if len(s) > length:
         is_valid[0] = False
@@ -2429,7 +2432,7 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
 
     except:
         print_debug_exception()
-        return 'N/A'
+        return as_unicode('N/A')
 
 
 
@@ -4034,19 +4037,19 @@ class CCrypto:
         if _rpdb2_pwd in CCrypto.m_keys:
             return CCrypto.m_keys[_rpdb2_pwd]
 
-        _key = as_bytes(_rpdb2_pwd)
-        key = _key
+        key = as_bytes(_rpdb2_pwd)
+        suffix = key[:16]
         
         d = hmac.new(key, digestmod = _md5)
 
         #
         # The following loop takes around a second to complete
-        # and should strengthen the password by ~16 bits.
+        # and should strengthen the password by ~12 bits.
         # a good password is ~30 bits strong so we are looking
-        # at ~45 bits strong key
+        # at ~42 bits strong key
         #
-        for i in range(2 ** 16):
-            d.update((key + _key) * 64)       
+        for i in range(2 ** 12):
+            d.update((key + suffix) * 16)       
             key = d.digest()
             
         CCrypto.m_keys[_rpdb2_pwd] = key
@@ -12784,7 +12787,7 @@ def PrintUsage(fExtended = False):
     long form (example --encrypt).
 
     Options that end with '=' accept an argument that should follow without
-    a space. For example to specify 192.168.0.10 as a host use the following 
+    a space. For example to specify 192.168.0.10 as host use the following 
     option: 
 
         long form: --host=192.168.0.10
