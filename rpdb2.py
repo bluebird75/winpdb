@@ -5848,7 +5848,7 @@ class CDebuggerCoreThread:
         A copy scheme is used for locals to work around a bug in 
         Python 2.3 and 2.4 that prevents modifying the local dictionary.
         """
-        
+       
         try:
             base_frame = self.frame_acquire()
 
@@ -5895,18 +5895,15 @@ class CDebuggerCoreThread:
 
         (lc, base) = lct
         cr = copy.copy(self.m_frame.f_locals)
-        
-        b = [(k, safe_repr(v)) for k, v in base.items()]
-        sb = set(b)
 
-        c = [(k, safe_repr(v)) for k, v in cr.items()]
-        sc = set(c)
+        for k in cr:
+            if not k in base:
+                lc[k] = cr[k]
+                continue
 
-        nsc = [k for (k, v) in sc - sb]
-
-        for k in nsc:
-            lc[k] = cr[k]
-
+            if not cr[k] is base[k]:
+                lc[k] = cr[k]
+ 
             
     def update_locals(self):
         """
