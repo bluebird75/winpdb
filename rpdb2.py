@@ -4286,9 +4286,18 @@ class CEvent(object):
 
 class CEventNull(CEvent):
     """
-    The Null event is fired just to make the event waiter return.
+    Sent to release event listeners (Internal, speeds up shutdown).
     """
     
+    pass
+
+
+
+class CEventClearSourceCache(CEvent):
+    """
+    Sent when the source cache is cleared.
+    """
+
     pass
 
 
@@ -4332,7 +4341,7 @@ class CEventEncoding(CEvent):
 
 class CEventPsycoWarning(CEvent):
     """
-    The psyco module was detected. Rpdb2 is incompatible with this module.
+    The psyco module was detected. rpdb2 is incompatible with this module.
     """
     
     pass
@@ -4341,7 +4350,8 @@ class CEventPsycoWarning(CEvent):
 
 class CEventSyncReceivers(CEvent):
     """
-    A base class for events that sync all receivers before being fired.
+    A base class for events that need to be received by all listeners at
+    the same time. The synchronization mechanism is internal to rpdb2.
     """
 
     def __init__(self, sync_n):
@@ -6504,6 +6514,13 @@ class CDebuggerCore:
             signal.signal(value, handler)
 
 
+    def clear_source_cache(self):
+        g_lines_cache.clear()
+        
+        event = CEventClearSourceCache()
+        self.m_event_dispatcher.fire_event(event)
+
+
     def trace_dispatch_init(self, frame, event, arg):   
         """
         Initial tracing method.
@@ -6532,7 +6549,7 @@ class CDebuggerCore:
         self.m_threads[ctx.m_thread_id] = ctx
 
         if len(self.m_threads) == 1:
-            g_lines_cache.clear()
+            self.clear_source_cache()
             
             self.m_current_ctx = ctx
             self.notify_first_thread()
@@ -7150,7 +7167,8 @@ class CDebuggerEngine(CDebuggerCore):
             CEventForkMode: {},
             CEventPsycoWarning: {},
             CEventSignalIntercepted: {},
-            CEventSignalException: {}
+            CEventSignalException: {},
+            CEventClearSourceCache: {}
             }
 
         self.m_event_queue = CEventQueue(self.m_event_dispatcher)

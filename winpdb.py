@@ -675,6 +675,8 @@ STR_NAMESPACE_DEADLOCK = 'Data Retrieval Timeout'
 STR_NAMESPACE_LOADING = 'Loading...'
 
 BAD_FILE_WARNING_TIMEOUT_SEC = 10.0
+DIRTY_CACHE = 1
+
 POSITION_TIMEOUT = 2.0
 
 
@@ -1421,6 +1423,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         event_type_dict = {rpdb2.CEventEncoding: {}}
         self.m_session_manager.register_callback(self.update_encoding, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {rpdb2.CEventClearSourceCache: {}}
+        self.m_session_manager.register_callback(self.update_source_cache, event_type_dict, fSingleUse = False)
+
         wx.CallAfter(self.__init2)
 
 
@@ -1713,6 +1718,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def do_none(self, event):
         pass
+
+
+    def update_source_cache(self, event):
+        wx.CallAfter(self.callback_source_cache, event)
+
+
+    def callback_source_cache(self, event):
+        self.m_source_manager.mark_files_dirty()
+        self.m_code_viewer.refresh()
 
 
     def update_encoding(self, event):
@@ -2235,6 +2249,11 @@ class CSourceManager:
         self.m_files = {}
 
 
+    def mark_files_dirty(self):
+        for k, v in list(self.m_files.items()):
+            self.m_files[k] = (DIRTY_CACHE, rpdb2.as_string(''))
+
+
     def is_in_files(self, filename):
         for k in list(self.m_files.keys()):
             if filename in k:
@@ -2248,12 +2267,14 @@ class CSourceManager:
             if not filename in k:
                 continue
 
-            if v[0] == 0:        
-                return (k, v[1])
+            (_time, source) = v
+
+            if _time == 0:        
+                return (k, source)
 
             t = time.time()
-            if t - v[0] < BAD_FILE_WARNING_TIMEOUT_SEC:
-                return (k, v[1])    
+            if t - _time < BAD_FILE_WARNING_TIMEOUT_SEC:
+                return (k, source)    
 
             #del self.m_files[k]
             raise KeyError
@@ -2268,6 +2289,9 @@ class CSourceManager:
         
     def callback_load_source(self, r, exc_info, filename, callback, args, fComplain):
         (t, v, tb) = exc_info
+
+        if self.m_session_manager.get_state() == rpdb2.STATE_DETACHED:
+            return
 
         if t == None:
             _time = 0
@@ -2498,7 +2522,17 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         self.m_notify_filename(filename, command)
 
-        
+    
+    def refresh(self):
+        if self.m_cur_filename == None:
+            return
+
+        filename = self.m_cur_filename
+        self.m_cur_filename = None
+
+        self.set_file(filename)
+
+
     def set_file(self, filename, fNoHistory = False, request_number = 0, fNotify = False, fComplain = False):
         if fNotify:
             self.__notify_filename(filename, fNew = True)
