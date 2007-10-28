@@ -1937,6 +1937,7 @@ DEFAULT_PATH_SUFFIX_LENGTH = 55
 ELLIPSIS_UNICODE = as_unicode('...')
 ELLIPSIS_BYTES = as_bytes('...')
 
+ERROR_NO_ATTRIBUTE = 'Error: No attribute.'
 
 
 g_server_lock = threading.RLock()
@@ -3580,37 +3581,49 @@ def CalcIdentity(r, fFilter):
 
 
 
+def getattr_nothrow(o, a):
+    try:
+        return getattr(o, a)
+
+    except AttributeError:
+        return ERROR_NO_ATTRIBUTE
+
+    except:
+        print_debug_exception()
+        return ERROR_NO_ATTRIBUTE
+
+
+
 def CalcDictKeys(r, fFilter):
     d = CalcFilteredDir(r, fFilter)
     rs = set(d)
 
-    if hasattr(r, '__class__'):
-        c = getattr(r, '__class__')
+    c = getattr_nothrow(r, '__class__')
+    if c != ERROR_NO_ATTRIBUTE:
         d = CalcFilteredDir(c, fFilter)
         cs = set(d)
         s = rs & cs
 
         for e in s:
-            o1 = getattr(r, e)
-            o2 = getattr(c, e)
+            o1 = getattr_nothrow(r, e)
+            o2 = getattr_nothrow(c, e)
 
-            if CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+            if o1 == ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
                 rs.discard(e)
 
-    if hasattr(r, '__bases__'):
-        bl = getattr(r, '__bases__')
-        if type(bl) == tuple:
-            for b in bl:
-                d = CalcFilteredDir(b, fFilter)
-                bs = set(d)
-                s = rs & bs
+    bl = getattr_nothrow(r, '__bases__')
+    if type(bl) == tuple:
+        for b in bl:
+            d = CalcFilteredDir(b, fFilter)
+            bs = set(d)
+            s = rs & bs
 
-                for e in s:
-                    o1 = getattr(r, e)
-                    o2 = getattr(b, e)
+            for e in s:
+                o1 = getattr_nothrow(r, e)
+                o2 = getattr_nothrow(b, e)
 
-                    if CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
-                        rs.discard(e)
+                if o1 == ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+                    rs.discard(e)
       
     l = [a for a in rs]
 
