@@ -3151,7 +3151,9 @@ class CNamespacePanel(wx.Panel, CJobs):
                 _type = rpdb2.as_string(r[rpdb2.DICT_KEY_TYPE], wx.GetDefaultPyEncoding())
                 _repr = rpdb2.as_string(r[rpdb2.DICT_KEY_REPR], wx.GetDefaultPyEncoding())
 
-            identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
+            identation = '' 
+            #identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
+
             child = self.m_tree.AppendItem(item, identation + _name)
             self.m_tree.SetItemText(child, ' ' + _repr, 2)
             self.m_tree.SetItemText(child, ' ' + _type, 1)

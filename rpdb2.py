@@ -6527,7 +6527,10 @@ class CDebuggerCore:
             if handler in [signal.SIG_IGN, signal.SIG_DFL]:
                 continue
 
-            signal.signal(value, handler)
+            try:
+                signal.signal(value, handler)
+            except:
+                print_debug('Failed to set signal handler for signal %s(%d)' % (key, value))
 
 
     def clear_source_cache(self):
