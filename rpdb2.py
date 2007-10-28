@@ -2126,6 +2126,9 @@ def _print(s, f = sys.stdout, feol = True):
 def detect_locale():
     encoding = locale.getdefaultlocale()[1]
 
+    if encoding == None:
+        return 'ascii'
+
     try:
         codecs.lookup(encoding)
         return encoding
