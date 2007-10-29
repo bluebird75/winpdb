@@ -619,6 +619,9 @@ class CSimpleSessionManager:
             self.request_go()
             return
             
+        if self.__sm.is_unhandled_exception():
+            return
+
         sl = self.__sm.get_stack(tid_list = [], fAll = False)
         if len(sl) == 0:
             self.request_go()
@@ -8105,12 +8108,12 @@ class CDebuggerEngine(CDebuggerCore):
         rl = []
         index = 0
         lock = threading.Condition()
-        event = threading.Event()
         
         for (expr, fExpand) in nl:
             if self.is_child_of_failure(failed_expr_list, expr):
                 continue
 
+            event = threading.Event()
             args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
             g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name = 'calc_expr %s' % expr)
             safe_wait(event, 2)
@@ -8275,6 +8278,10 @@ class CDebuggerEngine(CDebuggerCore):
 
         event = CEventTrap(ftrap)
         self.m_event_dispatcher.fire_event(event)
+
+
+    def is_unhandled_exception(self):
+        return self.m_fUnhandledException
 
 
     def set_fork_mode(self, ffork_into_child, ffork_auto):
@@ -9013,6 +9020,10 @@ class CDebuggeeServer(CIOServer):
     def export_set_trap_unhandled_exceptions(self, ftrap):
         self.m_debugger.set_trap_unhandled_exceptions(ftrap)
         return 0
+
+
+    def export_is_unhandled_exception(self):
+        return self.m_debugger.is_unhandled_exception()
 
 
     def export_set_fork_mode(self, ffork_into_child, ffork_auto):
@@ -10149,6 +10160,12 @@ class CSessionManagerInternal:
     
     def get_trap_unhandled_exceptions(self):
         return self.m_ftrap
+
+
+    def is_unhandled_exception(self):
+        self.__verify_attached()
+
+        return self.getSession().getProxy().is_unhandled_exception()
 
 
     def on_event_fork_mode(self, event):
