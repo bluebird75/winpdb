@@ -515,7 +515,6 @@ class CSimpleSessionManager:
                             )
 
         self.m_fRunning = False
-        self.m_termination_lineno = None
         
         event_type_dict = {CEventUnhandledException: {}}
         self.__sm.register_callback(self.__unhandled_exception, event_type_dict, fSingleUse = False)
@@ -531,7 +530,6 @@ class CSimpleSessionManager:
         command_line = as_unicode(command_line, encoding, fstrict = True)
 
         self.m_fRunning = False
-        self.m_termination_lineno = None
 
         self.__sm.launch(fchdir, command_line, fload_breakpoints = False)
 
@@ -616,6 +614,7 @@ class CSimpleSessionManager:
             #
             # First break comes immediately after launch.
             #
+            print_debug('Simple session manager continues on first break.')
             self.m_fRunning = True
             self.request_go()
             return
@@ -640,6 +639,7 @@ class CSimpleSessionManager:
             #
             # This is a user breakpoint (e.g. rpdb2.setbreak())
             #
+            print_debug('Simple session manager continues on user break point.')
             self.script_paused()
             return
 
@@ -1658,6 +1658,7 @@ COMMUNICATION_RETRIES = 5
 
 WAIT_FOR_BREAK_TIMEOUT = 3.0
 
+SHUTDOWN_TIMEOUT = 4.0
 STARTUP_TIMEOUT = 3.0
 STARTUP_RETRIES = 3
 
@@ -2048,16 +2049,15 @@ def safe_wait(lock, timeout = None):
     # even if they return normally.
     #
 
-    if timeout == None:
-        return lock.wait()
-    
     while True:
         try:
             t0 = time.time()
-            lock.wait(timeout)
-            return
+            return lock.wait(timeout)
 
         except:
+            if timeout == None:
+                continue
+            
             timeout -= (time.time() - t0)
             if timeout <= 0:
                 return
@@ -3602,7 +3602,7 @@ def CalcDictKeys(r, fFilter):
     rs = set(d)
 
     c = getattr_nothrow(r, '__class__')
-    if c != ERROR_NO_ATTRIBUTE:
+    if not c is ERROR_NO_ATTRIBUTE:
         d = CalcFilteredDir(c, fFilter)
         cs = set(d)
         s = rs & cs
@@ -3611,7 +3611,7 @@ def CalcDictKeys(r, fFilter):
             o1 = getattr_nothrow(r, e)
             o2 = getattr_nothrow(c, e)
 
-            if o1 == ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+            if o1 is ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
                 rs.discard(e)
 
     bl = getattr_nothrow(r, '__bases__')
@@ -3625,7 +3625,7 @@ def CalcDictKeys(r, fFilter):
                 o1 = getattr_nothrow(r, e)
                 o2 = getattr_nothrow(b, e)
 
-                if o1 == ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+                if o1 is ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
                     rs.discard(e)
       
     l = [a for a in rs]
@@ -3980,7 +3980,7 @@ class CThread (threading.Thread):
         t0 = time.time()
 
         while len(CThread.m_threads) > 0:
-            if time.time() - t0 > 16:
+            if time.time() - t0 > SHUTDOWN_TIMEOUT:
                 print_debug('Shut down of debugger threads has TIMED OUT!')
                 return
 
@@ -8024,7 +8024,7 @@ class CDebuggerEngine(CDebuggerCore):
         return False        
 
 
-    def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit, encoding):
+    def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding):
         e = {}
 
         try:
@@ -8060,6 +8060,8 @@ class CDebuggerEngine(CDebuggerCore):
         if len(rl) == index:    
             rl.append(e)
         lock.release()    
+
+        event.set()
 
     
     def __calc_encoding(self, encoding, fvalidate = False, filename = None):
@@ -8103,16 +8105,15 @@ class CDebuggerEngine(CDebuggerCore):
         rl = []
         index = 0
         lock = threading.Condition()
+        event = threading.Event()
         
         for (expr, fExpand) in nl:
             if self.is_child_of_failure(failed_expr_list, expr):
                 continue
 
-            args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, rl, index, repr_limit, encoding)
-            t = CThread(name = 'calc_expr %s' % expr, target = self.calc_expr, args = args)
-            t.start()
-            t.join(2)
-            t = None
+            args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
+            g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name = 'calc_expr %s' % expr)
+            safe_wait(event, 2)
             
             lock.acquire()
             if len(rl) == index:
@@ -8266,7 +8267,7 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        CThread(name = '_atexit', target = _atexit, args = (True, )).start()
+        g_server.m_work_queue.post_work_item(target = _atexit, args = (True, ), name = '_atexit')
 
 
     def set_trap_unhandled_exceptions(self, ftrap):
@@ -8368,11 +8369,17 @@ class CWorkQueue:
         self.m_f_shutdown = True
         self.m_lock.notifyAll()
 
+        t0 = time.time()
+
         while self.m_n_threads > 0:
-            self.m_lock.wait()
+            if time.time() - t0 > SHUTDOWN_TIMEOUT:
+                self.m_lock.release()
+                print_debug('Shut down of worker queue has TIMED OUT!')
+                return
+
+            safe_wait(self.m_lock, 0.1)
             
         self.m_lock.release()
-
         print_debug('Shutting down worker queue, done.')
 
 
@@ -8392,7 +8399,7 @@ class CWorkQueue:
             self.m_lock.acquire()
 
             while not self.m_f_shutdown:
-                self.m_lock.wait()
+                safe_wait(self.m_lock)
 
                 if self.m_f_shutdown:
                     break
@@ -8402,18 +8409,23 @@ class CWorkQueue:
                     
                 fcreate_thread = self.m_n_available == 1
 
-                (target, args) = self.m_work_items.pop()
+                (target, args, name) = self.m_work_items.pop()
 
                 self.m_n_available -= 1                
                 self.m_lock.release()
 
                 if fcreate_thread:
+                    print_debug('Creating an extra worker thread.')
                     self.__create_thread()
                     
+                threading.currentThread().setName('__worker_target - ' + name)
+
                 try:
                     target(*args)
                 except:
                     print_debug_exception()
+
+                threading.currentThread().setName('__worker_target')
 
                 self.m_lock.acquire()
                 self.m_n_available += 1
@@ -8429,7 +8441,7 @@ class CWorkQueue:
             self.m_lock.release()
 
 
-    def post_work_item(self, target, args):
+    def post_work_item(self, target, args, name = ''):
         if self.m_f_shutdown:
             return
             
@@ -8439,7 +8451,7 @@ class CWorkQueue:
             if self.m_f_shutdown:
                 return
             
-            self.m_work_items.append((target, args))
+            self.m_work_items.append((target, args, name))
 
             self.m_lock.notify()
             
@@ -8458,15 +8470,9 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     This mod was needed to resolve deadlocks that were generated in some 
     circumstances.
     """
-    
-    def init_work_queue(self):
-        self.m_work_queue = CWorkQueue()
-    
-    def shutdown_work_queue(self):
-        self.m_work_queue.shutdown()
 
     def process_request(self, request, client_address):
-        self.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address))
+        g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name = 'process_request')
 
 
 
@@ -8660,6 +8666,8 @@ class CIOServer:
         self.m_port = None
         self.m_stop = False
         self.m_server = None
+
+        self.m_work_queue = None
         
 
     def shutdown(self):
@@ -8696,8 +8704,8 @@ class CIOServer:
 
         self.m_thread = None
 
-        self.m_server.shutdown_work_queue()
-        
+        self.m_work_queue.shutdown()
+
         #try:
         #    self.m_server.socket.close()
         #except:
@@ -8714,7 +8722,7 @@ class CIOServer:
         if self.m_server == None:
             (self.m_port, self.m_server) = self.__StartXMLRPCServer()
        
-        self.m_server.init_work_queue()
+        self.m_work_queue = CWorkQueue()
         self.m_server.register_function(self.dispatcher_method)        
         
         while not self.m_stop:
