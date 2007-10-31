@@ -642,7 +642,6 @@ class CSimpleSessionManager:
             #
             # This is a user breakpoint (e.g. rpdb2.setbreak())
             #
-            print_debug('Simple session manager continues on user break point.')
             self.script_paused()
             return
 
