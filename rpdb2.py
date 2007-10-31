@@ -2451,7 +2451,15 @@ def print_debug(_str):
     l = time.localtime(t)
     s = time.strftime('%H:%M:%S', l) + '.%03d' % ((t - int(t)) * 1000)
 
-    _print(s + ' RPDB2: ' + _str, sys.__stderr__)
+    f = sys._getframe(1)
+    
+    filename = os.path.basename(f.f_code.co_filename)
+    lineno = f.f_lineno
+    name = f.f_code.co_name
+
+    str = '%s %s:%d in %s: %s' % (s, filename, lineno, name, _str)
+
+    _print(str, sys.__stderr__)
 
 
 
@@ -12658,6 +12666,7 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         
         if g_debugger is not None:
             f = sys._getframe(2)
+            g_debugger.record_client_heartbeat(0, True, False)
             g_debugger.setbreak(f)
             return
 
