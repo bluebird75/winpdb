@@ -28,7 +28,7 @@ import os
 
 
 
-def PrepareFoder():
+def PrepareFolder():
     #
     # First remove previous directory if found under user\start\program_files.
     #
@@ -75,7 +75,7 @@ def PrepareFoder():
 
 
 def InstallWinpdb():
-    dest_dir = PrepareFoder()
+    dest_dir = PrepareFolder()
 
     homepage_link = os.path.join(dest_dir, 'winpdb-homepage.lnk')
     create_shortcut('http://www.digitalpeers.com/pythondebugger/','Winpdb Homepage', homepage_link)

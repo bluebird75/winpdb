@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.2.5
+    rpdb2.py - version 2.3.0
 
     A remote Python debugger for CPython
 
@@ -482,9 +482,9 @@ def setbreak():
 
 
 
-VERSION = (2, 2, 5, 0, '')
-RPDB_VERSION = "RPDB_2_2_5"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_2_5"
+VERSION = (2, 3, 0, 0, '')
+RPDB_VERSION = "RPDB_2_3_0"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_0"
 
 
 
@@ -12194,15 +12194,13 @@ Type 'help up' or 'help down' for more information on focused frames.""", self.m
     def help_encoding(self):
         _print("""encoding [<encoding> [, raw]]
 
-Set the encoding that will be used as source encoding for 
-exec and eval commands.
+Set the source encoding for the exec and eval commands.
 
 Without an argument returns the current encoding.
 
-The encoding value can be either 'auto' or any encoding accepted 
-by the codecs module. If 'auto' is specified, the encoding used 
-will be the source encoding of the active scope, 
-which is utf-8 by default.
+The specified encoding can be either 'auto' or any encoding accepted 
+by the codecs module. If 'auto' is specified, the source encoding of 
+the active scope will be used, which is utf-8 by default.
 
 The default encoding value is 'auto'.
 
@@ -12832,16 +12830,28 @@ def PrintUsage(fExtended = False):
     scriptName = os.path.basename(sys.argv[0])
     _print(""" %(rpdb)s [options] [<script-name> [<script-args>...]]
 
-    Where the options can be a combination of the following:
-    -h, --help      print this help.
-    -d, --debuggee  start debuggee and break into it, without starting a 
-                    debugger console. 
-    -a, --attach    Attach to an already started debuggee.
-    -o, --host      Specify host for attachment.
+    %(rpdb)s uses the client-server model where the debugger UI/console is
+    the client and the debugged script is the server (also called debuggee).
+    The client and the server are separate processes and communicate over 
+    sockets.
+
+    Example: The following command starts the debugger UI/console and then 
+    launches and attaches to the specified script:
+    %(rpdb)s some_script.py 
+
+    Options can be a combination of the following:
+    -h, --help      Print this help.
+    -d, --debuggee  Start the debugged script (server) paused and wait for a 
+                    debugger console (client) to attach. 
+    -a, --attach    Start the debugger console (client) and attach to the 
+                    specified debugged script (server) which is assumed to 
+                    be running already.
+    -o, --host=     Specify host (or IP address) for remote connections.
     -r, --remote    Allow debuggees to accept connections from remote machines.
-    -e, --encrypt   Force encrypted connections between debugger and debuggees.
-    -p, --pwd       Password. This flag is available only on NT systems. 
-                    On other systems the password will be queried interactively 
+    -e, --encrypt   Force encrypted socket communication.
+    -p, --pwd=      Specify password for socket communication. 
+                    This flag is available only on NT systems. On other 
+                    systems the password will be queried interactively 
                     if it is needed.
     -s, --screen    Use the Unix screen utility when starting the debuggee.
                     Note that the debugger should be started as follows:

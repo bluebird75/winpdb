@@ -7,16 +7,18 @@ Contact: Nir Aides
 Email:   nir@digitalpeers.com
 Website: http://www.digitalpeers.com/pythondebugger/
          http://sourceforge.net/projects/winpdb/
-Version: 1.2.5		 
+Version: 1.3.0		 
 
 
 
 Requirements
 
-    CPython - Winpdb is compatible with CPython 2.3 or later. Winpdb is NOT 
+    CPython
+    Winpdb is compatible with CPython 2.3 or later. Winpdb is NOT 
     compatible with Jython or IronPython. (http://www.python.org/download/)
 
-    wxPython - To use the Winpdb GUI you need wxPython 2.6.x or later 
+    wxPython
+    To use the Winpdb GUI you need wxPython 2.6.x or later 
     installed. You can still use rpdb2 which is the console version of the 
     debugger without wxPython. (http://www.wxpython.org/)
 
@@ -52,8 +54,7 @@ Installation
 
     In the event of insufficient permissions, installation can be avoided 
     completely. To use Winpdb simply launch it from the folder in which it is 
-    placed. On Linux don't forget to add the (x) bit to 'rpdb2' and 'winpdb' 
-    with chmod to allow these scripts to run.
+    placed.
 
 
 

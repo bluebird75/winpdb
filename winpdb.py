@@ -415,14 +415,14 @@ DLG_ATTACH_TITLE = "Attach"
 STATIC_EXPR = """The new expression will be evaluated at the debuggee
 and its value will be set to the item."""
 CHECKBOX_ENCODING = "Output non ASCII characters as an escape sequence."
-STATIC_ENCODING = """The encoding is used as source encoding for the name-space viewer and for the exec and eval console commands. Valid values are either 'auto' or an encoding known by the codecs module. If 'auto' is specified, the encoding used will be the source encoding of the active scope, which is utf-8 by default."""
-STATIC_ENCODING_SPLIT = """The encoding is used as source encoding for 
-the name-space viewer and for the exec and eval 
-console commands. Valid values are either 'auto' 
-or an encoding known by the codecs module. 
-If 'auto' is specified, the encoding used will 
-be the source encoding of the active scope, 
-which is utf-8 by default."""
+STATIC_ENCODING = """The specified encoding is used as source encoding for the name-space viewer and for the exec and eval console commands. Valid values are either 'auto' or an encoding known by the codecs module. If 'auto' is specified, the source encoding of the active scope will be used, which is utf-8 by default."""
+STATIC_ENCODING_SPLIT = """The specified encoding is used as source encoding 
+for the name-space viewer and for the exec and 
+eval console commands. Valid values are either 
+'auto' or an encoding known by the codecs module. 
+If 'auto' is specified, the source encoding of 
+the active scope will be used, which is utf-8 
+by default."""
 STATIC_PWD = """The password is used to secure communication between the debugger console and the debuggee. Debuggees with un-matching passwords will not appear in the attach query list."""
 STATIC_PWD_SPLIT = """The password is used to secure communication 
 between the debugger console and the debuggee. 
@@ -459,9 +459,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.2.5"
-WINPDB_VERSION = "WINPDB_1_2_5"
-VERSION = (1, 2, 5, 0, '')
+WINPDB_TITLE = "Winpdb 1.3.0"
+WINPDB_VERSION = "WINPDB_1_3_0"
+VERSION = (1, 3, 0, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -4297,8 +4297,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_2_5":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_2_5", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_2_3_0":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_3_0", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient)
