@@ -1732,6 +1732,7 @@ STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'hel
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
 STR_PSYCO_WARNING = "The psyco module was detected. The debugger is incompatible with the psyco module and will not function correctly as long as the psyco module is imported and used."
+STR_CONFLICTING_MODULES = "The modules: %s, which are incompatible with the debugger were detected and will likely cause the debugger to fail."
 STR_SIGNAL_INTERCEPT = "The signal %s(%d) was intercepted inside debugger tracing logic. It will be held pending until the debugger continues. Any exceptions raised by the handler will be ignored!"
 STR_SIGNAL_EXCEPTION = "Exception %s raised by handler of signal %s(%d) inside debugger tracing logic was ignored!"
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
@@ -1923,6 +1924,8 @@ DISPACHER_METHOD = 'dispatcher_method'
 
 BASIC_TYPES_LIST = ['bytes', 'str', 'str8', 'unicode', 'int', 'long', 'float', 'bool', 'NoneType']
 
+CONFLICTING_MODULES = ['psyco', 'pdb', 'bdb', 'doctest']
+
 XML_DATA = """<?xml version='1.0'?>
 <methodCall>
 <methodName>dispatcher_method</methodName>
@@ -2010,7 +2013,7 @@ g_fos_exit = False
 #
 g_module_main = None
 
-g_fsent_psyco_warning = False
+g_found_conflicting_modules = []
 
 g_fignore_atexit = False
 g_ignore_broken_pipe = 0
@@ -3186,8 +3189,13 @@ def get_source_line(filename, lineno):
 
 
 def is_provider_filesystem(filename):
-    (lines, encoding, ffilesystem) = lines_cache(filename)
-    return ffilesystem
+    try:
+        (lines, encoding, ffilesystem) = lines_cache(filename)
+        return ffilesystem
+
+    except IOError:
+        v = sys.exc_info()[1]
+        return not (BLENDER_SOURCE_NOT_AVAILABLE in v.args or SOURCE_NOT_AVAILABLE in v.args)
 
 
 
@@ -4371,6 +4379,16 @@ class CEventPsycoWarning(CEvent):
     """
     
     pass
+
+
+
+class CEventConflictingModules(CEvent):
+    """
+    Conflicting modules were detected. rpdb2 is incompatible with these modules.
+    """
+    
+    def __init__(self, modules_list):
+        self.m_modules_list = modules_list
 
 
 
@@ -7195,6 +7213,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventTrap: {},
             CEventForkMode: {},
             CEventPsycoWarning: {},
+            CEventConflictingModules: {},
             CEventSignalIntercepted: {},
             CEventSignalException: {},
             CEventClearSourceCache: {}
@@ -7228,16 +7247,33 @@ class CDebuggerEngine(CDebuggerCore):
         return index
 
 
-    def trap_psyco_module(self):
-        global g_fsent_psyco_warning
-       
-        if g_fsent_psyco_warning or not 'psyco' in sys.modules:
-            return
+    def trap_conflicting_modules(self):
+        modules_list = []
 
-        g_fsent_psyco_warning = True
+        for m in CONFLICTING_MODULES:
+            if m in g_found_conflicting_modules:
+                continue
 
-        event = CEventPsycoWarning()
+            if not m in sys.modules:
+                continue
+
+            if m == 'psyco':
+                #
+                # Old event kept for compatibility.
+                # 
+                event = CEventPsycoWarning()
+                self.m_event_dispatcher.fire_event(event)
+            
+            g_found_conflicting_modules.append(m)
+            modules_list.append(as_unicode(m))
+
+        if modules_list == []:
+            return False
+
+        event = CEventConflictingModules(modules_list)
         self.m_event_dispatcher.fire_event(event)
+
+        return True
 
 
     def wait_for_event(self, timeout, event_index):
@@ -7246,9 +7282,13 @@ class CDebuggerEngine(CDebuggerCore):
         """
 
         self.cancel_request_go_timer()
-        self.trap_psyco_module()
+        self.trap_conflicting_modules()
 
         (new_event_index, sel) = self.m_event_queue.wait_for_event(timeout, event_index)
+
+        if self.trap_conflicting_modules():
+            (new_event_index, sel) = self.m_event_queue.wait_for_event(timeout, event_index)
+
         return (new_event_index, sel)
 
 
@@ -9451,8 +9491,8 @@ class CSessionManagerInternal:
         event_type_dict = {CEventExit: {}}
         self.register_callback(self.on_event_exit, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {CEventPsycoWarning: {}}
-        self.register_callback(self.on_event_psyco, event_type_dict, fSingleUse = False)
+        event_type_dict = {CEventConflictingModules: {}}
+        self.register_callback(self.on_event_conflicting_modules, event_type_dict, fSingleUse = False)
         
         event_type_dict = {CEventSignalIntercepted: {}}
         self.register_callback(self.on_event_signal_intercept, event_type_dict, fSingleUse = False)
@@ -9916,8 +9956,9 @@ class CSessionManagerInternal:
                 return
 
 
-    def on_event_psyco(self, event):
-        self.m_printer(STR_PSYCO_WARNING)
+    def on_event_conflicting_modules(self, event):
+        s = ', '.join(event.m_modules_list)
+        self.m_printer(STR_CONFLICTING_MODULES % s)
 
 
     def on_event_signal_intercept(self, event):
