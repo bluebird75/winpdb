@@ -6393,6 +6393,12 @@ class CDebuggerCore:
         _timeout = max(5.0, timeout)
         self.m_timer_embedded_giveup = threading.Timer(_timeout, self.request_go)
         self.m_timer_embedded_giveup.start()
+        
+        #
+        # sleep() releases control and allow timer thread to actually start 
+        # before this scope returns.
+        #
+        time.sleep(0.1)
 
     
     def cancel_request_go_timer(self):
