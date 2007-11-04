@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.3.0
+    rpdb2.py - version 2.3.1
 
     A remote Python debugger for CPython
 
@@ -434,7 +434,7 @@ def start_embedded_debugger_interactive_password(
             stdout.write('Please type password:')
             
         _rpdb2_pwd = stdin.readline().rstrip('\n')
-        _rpdb2_pwd = as_unicode(_rpdb2_pwd, stdin.encoding, fstrict = True)
+        _rpdb2_pwd = as_unicode(_rpdb2_pwd, detect_encoding(stdin), fstrict = True)
 
         try:
             return __start_embedded_debugger(
@@ -482,9 +482,9 @@ def setbreak():
 
 
 
-VERSION = (2, 3, 0, 0, '')
-RPDB_VERSION = "RPDB_2_3_0"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_0"
+VERSION = (2, 3, 1, 0, '')
+RPDB_VERSION = "RPDB_2_3_1"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_1"
 
 
 
@@ -1652,6 +1652,9 @@ RPDB_BPL_FOLDER = os.path.join(RPDB_SETTINGS_FOLDER, 'breakpoints')
 RPDB_BPL_FOLDER_NT = 'rpdb2_breakpoints'
 MAX_BPL_FILES = 100
 
+EMBEDDED_SYNC_THRESHOLD = 1.0
+EMBEDDED_SYNC_TIMEOUT = 5.0
+
 HEARTBEAT_TIMEOUT = 16
 IDLE_MAX_RATE = 2.0
 PING_TIMEOUT = 4.0
@@ -2102,7 +2105,7 @@ def _raw_input(s):
         return input(s)
 
     i = raw_input(s)
-    i = as_unicode(i, sys.stdin.encoding, fstrict = True)
+    i = as_unicode(i, detect_encoding(sys.stdin), fstrict = True)
 
     return i
 
@@ -2111,12 +2114,7 @@ def _raw_input(s):
 def _print(s, f = sys.stdout, feol = True):
     s = as_unicode(s)
 
-    encoding = None
-    if hasattr(f, 'encoding'):
-        encoding = f.encoding
-
-    if encoding == None:
-        encoding = detect_locale()
+    encoding = detect_encoding(f)
 
     s = as_bytes(s, encoding, fstrict = False)
     s = as_string(s, encoding)
@@ -2125,6 +2123,29 @@ def _print(s, f = sys.stdout, feol = True):
         f.write(s + '\n')
     else:
         f.write(s)
+
+
+
+def detect_encoding(file):
+    try:
+        encoding = file.encoding
+        if encoding == None:
+            return detect_locale()
+
+    except:
+        return detect_locale()
+
+    try:
+        codecs.lookup(encoding)
+        return encoding
+
+    except:
+        pass
+
+    if encoding.lower().startswith('utf_8'):
+        return 'utf-8'
+
+    return 'ascii'
 
 
 
@@ -4327,6 +4348,16 @@ class CEventNull(CEvent):
 
 
 
+class CEventEmbeddedSync(CEvent):
+    """
+    Sent when an embedded interpreter becomes active if it needs to 
+    determine if there are pending break requests. (Internal)
+    """
+
+    pass
+
+
+
 class CEventClearSourceCache(CEvent):
     """
     Sent when the source cache is cleared.
@@ -4750,7 +4781,7 @@ class CEventQueue:
     def __init__(self, event_dispatcher, max_event_list_length = MAX_EVENT_LIST_LENGTH):
         self.m_event_dispatcher = event_dispatcher
 
-        self.m_event_lock = threading.Condition(threading.RLock())
+        self.m_event_lock = threading.Condition()
         self.m_max_event_list_length = max_event_list_length
         self.m_event_list = []
         self.m_event_index = 0
@@ -4838,7 +4869,7 @@ class CStateManager:
             if self.m_event_dispatcher_output is not None:
                 self.m_event_dispatcher_output.register_chain_override(event_type_dict)
 
-        self.m_state_lock = threading.Condition(threading.Lock())
+        self.m_state_lock = threading.Condition()
 
         self.m_state_queue = []
         self.m_state_index = 0        
@@ -5758,7 +5789,7 @@ class CDebuggerCoreThread:
         self.m_core = core_debugger
         self.m_bp_manager = core_debugger.m_bp_manager
 
-        self.m_frame_lock = threading.Condition(threading.Lock())
+        self.m_frame_lock = threading.Condition()
         self.m_frame_external_references = 0
 
         
@@ -6305,7 +6336,7 @@ class CDebuggerCore:
 
         self.m_timer_embedded_giveup = None
         
-        self.m_threads_lock = threading.Condition(threading.Lock())
+        self.m_threads_lock = threading.Condition()
 
         self.m_threads = {}
 
@@ -6331,6 +6362,9 @@ class CDebuggerCore:
         self.m_code_contexts = {None: None}
 
         self.m_fembedded = fembedded
+        self.m_embedded_event = threading.Event()
+        self.m_embedded_sync_t0 = 0
+        self.m_embedded_sync_t1 = 0
 
         self.m_heartbeats = {0: time.time() + 3600}
         
@@ -6599,9 +6633,20 @@ class CDebuggerCore:
 
         ctx = CDebuggerCoreThread(name, self, frame, event)
         ctx.set_tracers()
-        self.m_threads[ctx.m_thread_id] = ctx
 
-        if len(self.m_threads) == 1:
+        try:
+            self.m_threads_lock.acquire() 
+
+            self.m_threads[ctx.m_thread_id] = ctx
+            nthreads = len(self.m_threads)
+
+            if nthreads == 1:
+                self.prepare_embedded_sync()
+
+        finally:
+            self.m_threads_lock.release()
+
+        if nthreads == 1:
             self.clear_source_cache()
             
             self.m_current_ctx = ctx
@@ -6613,13 +6658,63 @@ class CDebuggerCore:
 
         sys.settrace(ctx.trace_dispatch_call)
         sys.setprofile(ctx.profile)
-        
+      
+        self.wait_embedded_sync(nthreads == 1)
+
         if event == 'call':
             return ctx.trace_dispatch_call(frame, event, arg)
         elif hasattr(frame, 'f_trace') and (frame.f_trace is not None):    
             return frame.f_trace(frame, event, arg)
         else:
             return None
+
+    
+    def prepare_embedded_sync(self):
+        if not self.m_fembedded:
+            return
+
+        t = time.time()
+        t0 = self.m_embedded_sync_t0
+
+        if t0 != 0:
+            self.fix_heartbeats(t - t0)
+
+        if self.get_clients_attached() == 0:
+            return
+
+        if t - t0 < EMBEDDED_SYNC_THRESHOLD:
+            return
+
+        self.m_embedded_sync_t1 = t
+        self.m_embedded_event.clear()
+
+
+    def wait_embedded_sync(self, ftrigger):
+        if not self.m_fembedded:
+            return
+
+        t = time.time()
+        t0 = self.m_embedded_sync_t0
+        t1 = self.m_embedded_sync_t1
+
+        if t - t0 < EMBEDDED_SYNC_THRESHOLD:
+            return
+
+        if t - t1 >= EMBEDDED_SYNC_TIMEOUT:
+            return
+
+        if ftrigger:
+            event = CEventEmbeddedSync()
+            self.m_event_dispatcher.fire_event(event)
+
+        safe_wait(self.m_embedded_event, EMBEDDED_SYNC_TIMEOUT - (t - t1))
+
+        if ftrigger:
+            self.m_embedded_sync_t1 = 0
+
+
+    def embedded_sync(self):
+        self.m_embedded_event.set()
 
 
     def set_all_tracers(self):
@@ -6639,7 +6734,7 @@ class CDebuggerCore:
                 self.m_current_ctx = list(self.m_threads.values())[0]
                 
         except (KeyError, IndexError):
-            pass            
+            self.m_embedded_sync_t0 = time.time()           
 
 
     def set_break_flag(self):
@@ -6679,6 +6774,11 @@ class CDebuggerCore:
 
         if finit or id in self.m_heartbeats:
             self.m_heartbeats[id] = time.time()
+
+
+    def fix_heartbeats(self, missing_pulse):
+        for k, v in list(self.m_heartbeats.items()):
+            self.m_heartbeats[k] = v + missing_pulse
 
 
     def get_clients_attached(self):
@@ -7222,7 +7322,8 @@ class CDebuggerEngine(CDebuggerCore):
             CEventConflictingModules: {},
             CEventSignalIntercepted: {},
             CEventSignalException: {},
-            CEventClearSourceCache: {}
+            CEventClearSourceCache: {},
+            CEventEmbeddedSync: {}
             }
 
         self.m_event_queue = CEventQueue(self.m_event_dispatcher)
@@ -9089,6 +9190,11 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
+    def export_embedded_sync(self):
+        self.m_debugger.embedded_sync()
+        return 0
+
+
         
 #
 # ------------------------------------- RPC Client --------------------------------------------
@@ -9505,6 +9611,9 @@ class CSessionManagerInternal:
         
         event_type_dict = {CEventSignalException: {}}
         self.register_callback(self.on_event_signal_exception, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {CEventEmbeddedSync: {}}
+        self.register_callback(self.on_event_embedded_sync, event_type_dict, fSingleUse = False)
         
         event_type_dict = {CEventTrap: {}}
         self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
@@ -9974,6 +10083,14 @@ class CSessionManagerInternal:
 
     def on_event_signal_exception(self, event):
         self.m_printer(STR_SIGNAL_EXCEPTION % (event.m_description, event.m_signame, event.m_signum))
+
+
+    def on_event_embedded_sync(self, event):
+        #
+        # time.sleep() allows pending break requests to go through...
+        #
+        time.sleep(0.001)
+        self.getSession().getProxy().embedded_sync()
 
 
     def on_event_exit(self, event):
@@ -10637,18 +10754,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.cmdqueue.insert(0, '')
 
         self.m_stdout = self.stdout
-        self.m_encoding = self.__detect_encoding(self.stdin)
+        self.m_encoding = detect_encoding(self.stdin)
 
         g_fDefaultStd = (stdin == None)
-
-
-    def __detect_encoding(self, file):
-        try:
-            return file.encoding
-        except:
-            pass
-
-        return detect_locale()
 
 
     def set_filename(self, filename):
