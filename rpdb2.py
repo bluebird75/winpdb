@@ -3128,7 +3128,7 @@ def source_provider_blender(filename):
 
 
 def source_provider_filesystem(filename):
-    f = open(filename, 'rb')
+    f = open(filename, 'r')
     l = f.read()
     f.close()
 
@@ -3737,7 +3737,7 @@ def recalc_sys_path(old_pythonpath):
 
 def calc_signame(signum):
     for k, v in vars(signal).items():
-        if not k.startswith('SIG') or k in ['SIG_IGN', 'SIG_DFL']:
+        if not k.startswith('SIG') or k in ['SIG_IGN', 'SIG_DFL', 'SIGRTMIN', 'SIGRTMAX']:
             continue
 
         if v == signum:
@@ -6588,7 +6588,7 @@ class CDebuggerCore:
         Set rpdb2 to wrap all signal handlers.
         """
         for key, value in list(vars(signal).items()):
-            if not key.startswith('SIG') or key in ['SIG_IGN', 'SIG_DFL']:
+            if not key.startswith('SIG') or key in ['SIG_IGN', 'SIG_DFL', 'SIGRTMIN', 'SIGRTMAX']:
                 continue
 
             handler = signal.getsignal(value)
@@ -10238,7 +10238,7 @@ class CSessionManagerInternal:
             return
 
         path = calc_bpl_filename(module_name + filename)            
-        file = open(path, 'wb')
+        file = open(path, 'w')
 
         try:
             try:
@@ -10262,7 +10262,7 @@ class CSessionManagerInternal:
             return
 
         path = calc_bpl_filename(module_name + filename)                            
-        file = open(path, 'rb')
+        file = open(path, 'r')
 
         ferror = False
         
