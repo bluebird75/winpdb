@@ -6423,9 +6423,15 @@ class CDebuggerCore:
         
         if timeout is None:
             return
-            
-        _timeout = max(5.0, timeout)
-        self.m_timer_embedded_giveup = threading.Timer(_timeout, self.request_go)
+       
+        _timeout = max(1.0, timeout)
+
+        f = lambda: ( 
+            self.record_client_heartbeat(0, False, True),
+            self.request_go()
+            )
+ 
+        self.m_timer_embedded_giveup = threading.Timer(_timeout, f)
         self.m_timer_embedded_giveup.start()
         
         #
@@ -7105,7 +7111,7 @@ class CDebuggerCore:
         """
         Let debugger run.
         """
-        
+       
         try:
             if fLock:
                 self.m_state_manager.acquire()
