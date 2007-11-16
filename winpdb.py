@@ -388,7 +388,7 @@ Python interpreter path is:
 MSG_WARNING_TRAP = "Are you sure that you want to disable the trapping of unhandled exceptions? If you click Yes unhandled exceptions will not be caught."
 MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you like to analyze it?"
 MSG_WARNING_TITLE = "Warning"
-MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in the future."
+MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in this session."
 MSG_ERROR_TITLE = "Error"
 MSG_ERROR_FILE_NOT_FOUND = "File not found."
 MSG_ERROR_FILE_NOT_PYTHON = "'%s' does not seem to be a Python source file. Only Python files are accepted."
@@ -2780,6 +2780,7 @@ class CConsole(wx.Panel, CCaptionManager):
 
         
     def stop(self):
+        self.m_queue.put('exit\n')
         self.m_queue.put('exit\n')
         self.m_console.join()
 
