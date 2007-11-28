@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.3.1
+    rpdb2.py - version 2.3.2
 
     A remote Python debugger for CPython
 
@@ -482,9 +482,9 @@ def setbreak():
 
 
 
-VERSION = (2, 3, 1, 0, '')
-RPDB_VERSION = "RPDB_2_3_1"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_1"
+VERSION = (2, 3, 2, 0, '')
+RPDB_VERSION = "RPDB_2_3_2"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_2"
 
 
 
@@ -6813,7 +6813,9 @@ class CDebuggerCore:
         ctx.m_fBroken = True
         f_full_notification = False
         f_uhe_notification = False
-        
+      
+        step_tid = self.m_step_tid
+
         try: 
             self.m_state_manager.acquire()
             if self.m_state_manager.get_state() != STATE_BROKEN:
@@ -6875,6 +6877,9 @@ class CDebuggerCore:
         elif self.get_clients_attached() == 0:
             #print_debug('state: %s' % self.m_state_manager.get_state())
             self.request_go_quiet()
+
+        elif step_tid == ctx.m_thread_id and frame.f_code.co_name == 'rpdb2_import':
+            self.request_step_quiet()
 
         else:
             if f_full_notification:
@@ -7156,6 +7161,14 @@ class CDebuggerCore:
 
         finally:    
             self.m_state_manager.release()
+
+
+    def request_step_quiet(self, fLock = True):
+        try:
+            self.request_step(fLock)
+        
+        except DebuggerNotBroken:
+            pass
 
 
     def request_step(self, fLock = True):
@@ -12400,6 +12413,37 @@ last set, last evaluated.""", self.m_stdout)
 
 
 
+def rpdb2_import(*args, **kwargs):
+    if len(args) > 0:
+        name = args[0]
+    elif 'name' in kwargs:
+        name = kwargs['name']
+    else:
+        return g_import(*args, **kwargs)
+
+    if name in sys.modules:
+        return g_import(*args, **kwargs)
+
+    m = g_import(*args, **kwargs)
+
+    if name == 'gtk':
+        try:
+            m.gdk.threads_init()
+        except:
+            m.threads_init()
+
+    return m
+
+
+
+g_import = None
+
+if __name__ == 'rpdb2' and sys.modules['__builtin__'].__import__ != rpdb2_import:
+    g_import = sys.modules['__builtin__'].__import__
+    sys.modules['__builtin__'].__import__ = rpdb2_import
+
+
+
 def __find_eval_exec_frame_in_stack():
     f = sys._getframe(0)
     
@@ -12787,7 +12831,7 @@ def _atexit(fabort = False):
         
 
 
-def myimport(*args, **kwargs):
+def my_pickle_import(*args, **kwargs):
     if len(args) != 1 or len(kwargs) != 0:
         return __import__(*args, **kwargs)
 
@@ -12806,7 +12850,7 @@ def workaround_import_deadlock():
     xmlrpclib.loads(XML_DATA)
     s = as_bytes('(S\'\\xb3\\x95\\xf9\\x1d\\x105c\\xc6\\xe2t\\x9a\\xa5_`\\xa59\'\np0\nS"(I0\\nI1\\nS\'5657827\'\\np0\\n(S\'server_info\'\\np1\\n(tI0\\ntp2\\ntp3\\n."\np1\ntp2\n.0000000')
     pickle.loads(s)
-    pickle.__import__ = myimport
+    pickle.__import__ = my_pickle_import
 
 
 
@@ -12871,21 +12915,6 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
 
 
 
-def workaround_gtk_threading():
-    try:
-        import gtk
-
-        try:
-            gtk.gdk.threads_init()
-        
-        except:
-            gtk.threads_init()
-
-    except:
-        pass
-
-
-
 def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid): 
     assert(is_unicode(_rpdb2_pwd))
 
@@ -12910,7 +12939,6 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     print_debug('Starting server with: %s' % ExpandedFilename)
 
-    workaround_gtk_threading()
     workaround_import_deadlock()
 
     #
