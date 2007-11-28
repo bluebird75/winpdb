@@ -6421,9 +6421,11 @@ class CDebuggerCore:
         to attach.
         """
         
+        self.cancel_request_go_timer()
+
         if timeout is None:
             return
-       
+        
         _timeout = max(1.0, timeout)
 
         f = lambda: ( 
@@ -6796,6 +6798,16 @@ class CDebuggerCore:
                 n += 1
 
         return n
+
+
+    def is_waiting_for_attach(self):
+        if self.get_clients_attached() != 1:
+            return False
+
+        if list(self.m_heartbeats.keys()) != [0]:
+            return False
+
+        return True
 
 
     def _break(self, ctx, frame, event, arg):
@@ -9753,7 +9765,7 @@ class CSessionManagerInternal:
             try:
                 self._spawn_server(fchdir, ExpandedFilename, args, rid)            
                 server = self.__wait_for_debuggee(rid)
-                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True, ffirewall_test = False, server = server)
+                self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True, ffirewall_test = False, server = server, fload_breakpoints = fload_breakpoints)
 
                 self.m_last_command_line = command_line
                 self.m_last_fchdir = fchdir
@@ -9763,12 +9775,6 @@ class CSessionManagerInternal:
                     self.m_state_manager.set_state(STATE_DETACHED)
 
                 raise
-
-            try:
-                if fload_breakpoints:
-                    self.load_breakpoints()
-            except:
-                pass
 
         finally:
             delete_pwd_file(rid)
@@ -9886,7 +9892,7 @@ class CSessionManagerInternal:
             os.popen(command)
 
     
-    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True, server = None):
+    def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True, server = None, fload_breakpoints = True):
         assert(is_unicode(key))
 
         self.__verify_unattached()
@@ -9931,7 +9937,12 @@ class CSessionManagerInternal:
                 self.m_printer(STR_MULTIPLE_DEBUGGEES % key)
             self.m_printer(STR_ATTACH_CRYPTO_MODE % ([' ' + STR_ATTACH_CRYPTO_MODE_NOT, ''][self.get_encryption()]))    
             self.m_printer(STR_ATTACH_SUCCEEDED % server.m_filename)
-            return
+
+            try:
+                if fload_breakpoints:
+                    self.load_breakpoints()
+            except:
+                pass
 
         except (socket.error, CConnectionException):
             self.m_printer(STR_ATTACH_FAILED_NAME % _name)
@@ -12579,6 +12590,9 @@ def signal_handler(signum, frameobj):
 
     event = CEventSignalIntercepted(signum)
     g_debugger.m_event_dispatcher.fire_event(event)
+
+    if signum == signal.SIGINT and g_debugger.is_waiting_for_attach():
+        g_debugger.set_request_go_timer(0)
 
 
 
