@@ -1735,7 +1735,7 @@ STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'hel
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
 STR_PSYCO_WARNING = "The psyco module was detected. The debugger is incompatible with the psyco module and will not function correctly as long as the psyco module is imported and used."
-STR_CONFLICTING_MODULES = "The modules: %s, which are incompatible with the debugger were detected and will likely cause the debugger to fail."
+STR_CONFLICTING_MODULES = "The modules: %s, which are incompatible with the debugger were detected and will possibly cause the debugger to fail."
 STR_SIGNAL_INTERCEPT = "The signal %s(%d) was intercepted inside debugger tracing logic. It will be held pending until the debugger continues. Any exceptions raised by the handler will be ignored!"
 STR_SIGNAL_EXCEPTION = "Exception %s raised by handler of signal %s(%d) inside debugger tracing logic was ignored!"
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
@@ -6890,7 +6890,7 @@ class CDebuggerCore:
             #print_debug('state: %s' % self.m_state_manager.get_state())
             self.request_go_quiet()
 
-        elif step_tid == ctx.m_thread_id and frame.f_code.co_name == 'rpdb2_import':
+        elif step_tid == ctx.m_thread_id and frame.f_code.co_name == 'rpdb2_import_wrapper':
             self.request_step_quiet()
 
         else:
@@ -12424,7 +12424,7 @@ last set, last evaluated.""", self.m_stdout)
 
 
 
-def rpdb2_import(*args, **kwargs):
+def rpdb2_import_wrapper(*args, **kwargs):
     if len(args) > 0:
         name = args[0]
     elif 'name' in kwargs:
@@ -12435,6 +12435,12 @@ def rpdb2_import(*args, **kwargs):
     if name in sys.modules:
         return g_import(*args, **kwargs)
 
+    #
+    # rpdb2 avoids stepping through this 
+    # function (rpdb2_import_wrapper) to
+    # prevent confusion when stepping into
+    # an import statement.
+    #
     m = g_import(*args, **kwargs)
 
     if name == 'gtk':
@@ -12449,9 +12455,9 @@ def rpdb2_import(*args, **kwargs):
 
 g_import = None
 
-if __name__ == 'rpdb2' and sys.modules['__builtin__'].__import__ != rpdb2_import:
+if __name__ == 'rpdb2' and sys.modules['__builtin__'].__import__ != rpdb2_import_wrapper:
     g_import = sys.modules['__builtin__'].__import__
-    sys.modules['__builtin__'].__import__ = rpdb2_import
+    sys.modules['__builtin__'].__import__ = rpdb2_import_wrapper
 
 
 
