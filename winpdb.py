@@ -408,6 +408,7 @@ STR_HOW_TO_JUMP = """You can jump to a different line in the current scope with 
 
 DLG_EXPR_TITLE = "Enter Expression"
 DLG_ENCODING_TITLE = "Encoding"
+DLG_SYNCHRONICITY_TITLE = "Synchronicity"
 DLG_PWD_TITLE = "Password"
 DLG_OPEN_TITLE = "Open Source"
 DLG_LAUNCH_TITLE = "Launch"
@@ -423,6 +424,18 @@ eval console commands. Valid values are either
 If 'auto' is specified, the source encoding of 
 the active scope will be used, which is utf-8 
 by default."""
+CHECKBOX_SYNCHRONICITY = "Use synchronicity."
+STATIC_SYNCHRONICITY = """Synchronicity allows the debugger to query and modify the script namespace even if its threads are still running or blocked in some C library code. In some rare cases querying or modifying data in synchronicity can crash the script. For example in some Linux builds of wxPython querying the state of wx data structures from a non GUI thread can crash the script. If this happens try to debug with synchronicity disabled."""
+STATIC_SYNCHRONICITY_SPLIT = """Synchronicity allows the debugger to query
+and modify the script namespace even if its
+threads are still running or blocked in some
+C library code. In some rare cases 
+querying or modifying data in synchronicity
+can crash the script. For example in some
+Linux builds of wxPython querying the state
+of wx data structures from a non GUI thread
+can crash the script. If this happens try
+to debug with synchronicity disabled."""
 STATIC_PWD = """The password is used to secure communication between the debugger console and the debuggee. Debuggees with un-matching passwords will not appear in the attach query list."""
 STATIC_PWD_SPLIT = """The password is used to secure communication 
 between the debugger console and the debuggee. 
@@ -459,9 +472,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.3.2"
-WINPDB_VERSION = "WINPDB_1_3_2"
-VERSION = (1, 3, 2, 0, '')
+WINPDB_TITLE = "Winpdb 1.3.3"
+WINPDB_VERSION = "WINPDB_1_3_3"
+VERSION = (1, 3, 3, 0, '')
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -546,10 +559,12 @@ TB_RETURN = "Return"
 TB_GOTO = "Run to line"
 TB_FILTER = "Filter out __methods__ from objects and classes in the namespace viewer"
 TB_EXCEPTION = "Toggle 'analyze exception' mode"
-TB_ENCODING = "Set the source encoding for the name-space viewer and the exec/eval console commands."
+TB_ENCODING = "Set the source encoding for the name-space viewer and the exec/eval console commands"
+TB_SYNCHRONICITY = "Set the synchronicity mode"
 TB_TRAP = "Toggle 'trap unhandled exceptions' mode"
 
-TB_ENCODING_TEXT = "Encoding: %s "
+TB_ENCODING_TEXT = " Encoding: %s "
+TB_SYNCHRONICITY_TEXT = " Synchronicity: %s "
 
 COMMAND = "command"
 TOOLTIP = "tooltip"
@@ -1330,11 +1345,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             {LABEL: TB_EXCEPTION, DATA: BASE64_EXCEPTION, DATA2: BASE64_EXCEPTION, COMMAND: self.do_analyze},
             {LABEL: TB_TRAP, DATA: BASE64_TRAP, DATA2: BASE64_TRAP, COMMAND: self.do_trap},
             {LABEL: ML_SEPARATOR},
-            {LABEL: TB_ENCODING, TEXT: TB_ENCODING_TEXT, COMMAND: self.do_encoding}
+            {LABEL: TB_ENCODING, TEXT: TB_ENCODING_TEXT, COMMAND: self.do_encoding},
+            {LABEL: ML_SEPARATOR},
+            {LABEL: TB_SYNCHRONICITY, TEXT: TB_SYNCHRONICITY_TEXT, COMMAND: self.do_synchronicity}
         ]
 
         self.init_toolbar(toolbar_resource)
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % 'auto')
+        self.set_toolbar_item_text(TB_SYNCHRONICITY, TB_SYNCHRONICITY_TEXT % 'True')
 
         ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
         self.set_toggle(TB_TRAP, ftrap)
@@ -1422,6 +1440,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         event_type_dict = {rpdb2.CEventEncoding: {}}
         self.m_session_manager.register_callback(self.update_encoding, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {rpdb2.CEventSynchronicity: {}}
+        self.m_session_manager.register_callback(self.update_synchronicity, event_type_dict, fSingleUse = False)
 
         event_type_dict = {rpdb2.CEventClearSourceCache: {}}
         self.m_session_manager.register_callback(self.update_source_cache, event_type_dict, fSingleUse = False)
@@ -1581,6 +1602,17 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         if r == wx.ID_OK:
             encoding, fraw = dlg.get_encoding()
             self.m_session_manager.set_encoding(encoding, fraw)
+
+        dlg.Destroy()
+
+
+    def do_synchronicity(self, event):
+        fsynchronicity = self.m_session_manager.get_synchronicity()
+        dlg = CSynchronicityDialog(self, fsynchronicity)
+        r = dlg.ShowModal()
+        if r == wx.ID_OK:
+            fsynchronicity = dlg.get_synchronicity()
+            self.m_session_manager.set_synchronicity(fsynchronicity)
 
         dlg.Destroy()
 
@@ -1750,6 +1782,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             encoding += ', ' + rpdb2.ENCODING_RAW
 
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % encoding)
+
+
+    def update_synchronicity(self, event):
+        wx.CallAfter(self.callback_synchronicity, event)
+
+
+    def callback_synchronicity(self, event):
+        fsynchronicity = self.m_session_manager.get_synchronicity()
+        self.set_toolbar_item_text(TB_SYNCHRONICITY, TB_SYNCHRONICITY_TEXT % str(fsynchronicity))
 
 
     def update_state(self, event):
@@ -3987,6 +4028,44 @@ class CEncodingDialog(wx.Dialog):
 
 
     
+class CSynchronicityDialog(wx.Dialog):
+    def __init__(self, parent, current_fsynchronicity):
+        wx.Dialog.__init__(self, parent, -1, DLG_SYNCHRONICITY_TITLE)
+        
+        sizerv = wx.BoxSizer(wx.VERTICAL)
+
+        label = wx.StaticText(self, -1, STATIC_SYNCHRONICITY, size = (300, -1))
+        try:
+            label.Wrap(300)
+        except:
+            label.SetLabel(STATIC_SYNCHRONICITY_SPLIT)
+
+        sizerv.Add(label, 1, wx.ALIGN_LEFT | wx.ALL, 5)
+
+        self.m_cb = wx.CheckBox(self, -1, CHECKBOX_SYNCHRONICITY)
+        self.m_cb.SetValue(current_fsynchronicity)
+        sizerv.Add(self.m_cb, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        
+        btnsizer = wx.StdDialogButtonSizer()
+        sizerv.Add(btnsizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+        
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        self.SetSizer(sizerv)
+        sizerv.Fit(self)        
+
+                   
+    def get_synchronicity(self):
+        return self.m_cb.GetValue()
+
+
+    
 class CPwdDialog(wx.Dialog):
     def __init__(self, parent, current_password):
         wx.Dialog.__init__(self, parent, -1, DLG_PWD_TITLE)
@@ -4302,8 +4381,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_3_2":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_3_2", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_2_3_3":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_3_3", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient)

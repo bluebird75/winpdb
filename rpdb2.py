@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.3.2
+    rpdb2.py - version 2.3.3
 
     A remote Python debugger for CPython
 
@@ -482,9 +482,9 @@ def setbreak():
 
 
 
-VERSION = (2, 3, 2, 0, '')
-RPDB_VERSION = "RPDB_2_3_2"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_2"
+VERSION = (2, 3, 3, 0, '')
+RPDB_VERSION = "RPDB_2_3_3"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_3"
 
 
 
@@ -1169,6 +1169,32 @@ class CSessionManager:
         return self.__smi.get_encoding()
 
 
+    def set_synchronicity(self, fsynchronicity):
+        """
+        Set the synchronicity mode. 
+        
+        Synchronicity allows the debugger to query and modify the script 
+        namespace even if its threads are still running or blocked in 
+        some C library code. In some rare cases querying or modifying 
+        data in synchronicity can crash the script. For example in some
+        Linux builds of wxPython querying the state of wx data structures 
+        from a non GUI thread can crash the script. If this happens try
+        to debug with synchronicity disabled.
+
+        On the other hand when synchronicity is off it is possible to 
+        accidentally deadlock or block indefinitely the script threads by 
+        querying or modifying particular data structures.
+
+        The default is on (True).
+        """
+
+        return self.__smi.set_synchronicity(fsynchronicity)
+
+
+    def get_synchronicity(self):
+        return self.__smi.get_synchronicity()
+
+
     def get_state(self):
         """
         Get the session manager state. Return one of the STATE_* constants
@@ -1815,6 +1841,8 @@ STR_ENCODING_MODE_SET = 'Encoding was set to: %s'
 STR_ENCODING_BAD = 'The specified encoding was not recognized by the debugger.'
 STR_ENVIRONMENT = 'The current environment mapping is:'
 STR_ENVIRONMENT_EMPTY = 'The current environment mapping is not set.'
+STR_SYNCHRONICITY_BAD = "Can not process command when thread is running unless synchronicity mode is turned on. Type 'help synchro' at the command prompt for more information."
+STR_SYNCHRONICITY_MODE = 'The synchronicity mode is set to: %s'
 STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
 STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
 STR_FORK_MODE = "Fork mode is set to: %s, %s."
@@ -2045,10 +2073,68 @@ g_safe_base64_from = string.maketrans(as_bytes('_-#'), as_bytes('/+='))
 
 
 
+g_alertable_waiters = {}
+
+
+
 #
 # ---------------------------- General Utils ------------------------------
 #
+
+
+
+def job_wrapper(event, foo, *args, **kwargs):
+    try:
+        #print_debug('Thread %d doing job %s' % (thread.get_ident(), foo.__name__))
+        foo(*args, **kwargs)
+    finally:
+        event.set()
+
+
+
+def send_job(tid, timeout, foo, *args, **kwargs):
+    #
+    # Attempt to send job to thread tid.
+    # Will throw KeyError if thread tid is not available for jobs.
+    #
+
+    (lock, jobs) = g_alertable_waiters[tid]
+
+    event = threading.Event()
+    f = lambda: job_wrapper(event, foo, *args, **kwargs)
+    jobs.append(f)
+    
+    try:
+        lock.acquire()
+        lock.notifyAll()
+    finally:
+        lock.release()
+
+    safe_wait(event, timeout)
+
+
+
+def alertable_wait(lock, timeout = None):
+    jobs = []
+    tid = thread.get_ident()
+    g_alertable_waiters[tid] = (lock, jobs)
+
+    try:
+        safe_wait(lock, timeout)
+        
+        while len(jobs) != 0:
+            job = jobs.pop(0)
+            try:
+                job()
+            except:
+                pass
             
+            if len(jobs) == 0:
+                time.sleep(0.1)
+
+    finally:
+        del g_alertable_waiters[tid]
+
 
 
 def safe_wait(lock, timeout = None):
@@ -4476,6 +4562,21 @@ class CEventState(CEvent):
 
 
 
+class CEventSynchronicity(CEvent):
+    """
+    Mode of synchronicity.
+    Sent when mode changes.
+    """
+
+    def __init__(self, fsynchronicity):
+        self.m_fsynchronicity = fsynchronicity
+
+
+    def is_match(self, arg):
+        return self.m_fsynchronicity == arg
+
+
+
 class CEventTrap(CEvent):
     """
     Mode of "trap unhandled exceptions".
@@ -4988,7 +5089,7 @@ class CStateManager:
             while True:
                 index = self.__add_waiter()
             
-                safe_wait(self.m_state_lock, PING_TIMEOUT)
+                alertable_wait(self.m_state_lock, PING_TIMEOUT)
 
                 states = self.__get_states(index)
                 self.__remove_waiter(index)
@@ -6346,6 +6447,7 @@ class CDebuggerCore:
         self.m_ffork_into_child = False
         self.m_ffork_auto = False
 
+        self.m_fsynchronicity = True
         self.m_ftrap = True
         self.m_fUnhandledException = False        
         self.m_fBreak = False
@@ -7347,6 +7449,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventExit: {},
             CEventForkSwitch: {},
             CEventExecSwitch: {},
+            CEventSynchronicity: {},
             CEventTrap: {},
             CEventForkMode: {},
             CEventPsycoWarning: {},
@@ -8300,7 +8403,17 @@ class CDebuggerEngine(CDebuggerCore):
 
             event = threading.Event()
             args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
-            g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name = 'calc_expr %s' % expr)
+
+            if self.m_fsynchronicity:
+                g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name = 'calc_expr %s' % expr)
+            else:
+                try:
+                    ctx = self.get_current_ctx()
+                    tid = ctx.m_thread_id
+                    send_job(tid, 0, self.calc_expr, *args)
+                except:
+                    pass
+
             safe_wait(event, 2)
             
             lock.acquire()
@@ -8317,8 +8430,28 @@ class CDebuggerEngine(CDebuggerCore):
         
         return _rl 
 
+
+    def evaluate(self, expr, frame_index, fException, encoding, fraw):
+        """
+        Evaluate expression in context of frame at depth 'frame-index'.
+        """
+        
+        result = [(as_unicode(''), as_unicode(STR_SYNCHRONICITY_BAD), as_unicode(''))]
+
+        if self.m_fsynchronicity:
+            self._evaluate(result, expr, frame_index, fException, encoding, fraw)
+        else:
+            try:
+                ctx = self.get_current_ctx()
+                tid = ctx.m_thread_id
+                send_job(tid, 1000, self._evaluate, result, expr, frame_index, fException, encoding, fraw) 
+            except:
+                pass
+
+        return result[-1]
+
             
-    def _evaluate(self, expr, frame_index, fException, encoding, fraw):
+    def _evaluate(self, result, expr, frame_index, fException, encoding, fraw):
         """
         Evaluate expression in context of frame at depth 'frame-index'.
         """
@@ -8360,10 +8493,31 @@ class CDebuggerEngine(CDebuggerCore):
 
         self.notify_namespace()
 
-        return (as_unicode(v), as_unicode(w), as_unicode(e))
+        result.append((as_unicode(v), as_unicode(w), as_unicode(e)))
 
         
-    def _execute(self, suite, frame_index, fException, encoding):
+    def execute(self, suite, frame_index, fException, encoding):
+        """
+        Execute suite (Python statement) in context of frame at 
+        depth 'frame-index'.
+        """
+        
+        result = [(as_unicode(STR_SYNCHRONICITY_BAD), as_unicode(''))]
+
+        if self.m_fsynchronicity:
+            self._execute(result, suite, frame_index, fException, encoding)
+        else:
+            try:
+                ctx = self.get_current_ctx()
+                tid = ctx.m_thread_id
+                send_job(tid, 1000, self._execute, result, suite, frame_index, fException, encoding) 
+            except:
+                pass
+
+        return result[-1]
+
+
+    def _execute(self, result, suite, frame_index, fException, encoding):
         """
         Execute suite (Python statement) in context of frame at 
         depth 'frame-index'.
@@ -8416,7 +8570,7 @@ class CDebuggerEngine(CDebuggerCore):
         
         self.notify_namespace()
         
-        return (as_unicode(w), as_unicode(e))
+        result.append((as_unicode(w), as_unicode(e)))
 
 
     def __decode_thread_name(self, name):
@@ -8456,6 +8610,13 @@ class CDebuggerEngine(CDebuggerCore):
         """
 
         g_server.m_work_queue.post_work_item(target = _atexit, args = (True, ), name = '_atexit')
+
+
+    def set_synchronicity(self, fsynchronicity):
+        self.m_fsynchronicity = fsynchronicity
+
+        event = CEventSynchronicity(fsynchronicity)
+        self.m_event_dispatcher.fire_event(event)
 
 
     def set_trap_unhandled_exceptions(self, ftrap):
@@ -9188,17 +9349,22 @@ class CDebuggeeServer(CIOServer):
 
         
     def export_evaluate(self, expr, frame_index, fException, encoding, fraw):
-        (v, w, e) = self.m_debugger._evaluate(expr, frame_index, fException, encoding, fraw)
+        (v, w, e) = self.m_debugger.evaluate(expr, frame_index, fException, encoding, fraw)
         return (v, w, e)
 
         
     def export_execute(self, suite, frame_index, fException, encoding):
-        (w, e) = self.m_debugger._execute(suite, frame_index, fException, encoding)
+        (w, e) = self.m_debugger.execute(suite, frame_index, fException, encoding)
         return (w, e)
 
         
     def export_stop_debuggee(self):
         self.m_debugger.stop_debuggee()
+        return 0
+
+    
+    def export_set_synchronicity(self, fsynchronicity):
+        self.m_debugger.set_synchronicity(fsynchronicity)
         return 0
 
 
@@ -9646,6 +9812,10 @@ class CSessionManagerInternal:
         event_type_dict = {CEventEmbeddedSync: {}}
         self.register_callback(self.on_event_embedded_sync, event_type_dict, fSingleUse = False)
         
+        event_type_dict = {CEventSynchronicity: {}}
+        self.m_event_dispatcher_proxy.register_callback(self.on_event_synchronicity, event_type_dict, fSingleUse = False)
+        self.m_event_dispatcher.register_chain_override(event_type_dict)
+        
         event_type_dict = {CEventTrap: {}}
         self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
         self.m_event_dispatcher.register_chain_override(event_type_dict)
@@ -9659,6 +9829,7 @@ class CSessionManagerInternal:
         self.m_last_command_line = None
         self.m_last_fchdir = None
 
+        self.m_fsynchronicity = True
         self.m_ftrap = True
 
         self.m_ffork_into_child = False
@@ -9997,6 +10168,7 @@ class CSessionManagerInternal:
         
         self.m_server_info = self.get_server_info()
 
+        self.getSession().getProxy().set_synchronicity(self.m_fsynchronicity)
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
         self.getSession().getProxy().set_fork_mode(self.m_ffork_into_child, self.m_ffork_auto)
 
@@ -10335,6 +10507,32 @@ class CSessionManagerInternal:
                 
         finally:
             file.close()
+
+
+    def on_event_synchronicity(self, event):
+        ffire = self.m_fsynchronicity != event.m_fsynchronicity
+        self.m_fsynchronicity = event.m_fsynchronicity
+
+        if ffire:
+            event = CEventSynchronicity(event.m_fsynchronicity)
+            self.m_event_dispatcher.fire_event(event)
+
+
+    def set_synchronicity(self, fsynchronicity):
+        self.m_fsynchronicity = fsynchronicity
+
+        if self.__is_attached():
+            try:
+                self.getSession().getProxy().set_synchronicity(fsynchronicity)
+            except NotAttached:
+                pass
+
+        event = CEventSynchronicity(fsynchronicity)
+        self.m_event_dispatcher.fire_event(event)
+
+    
+    def get_synchronicity(self):
+        return self.m_fsynchronicity
 
 
     def on_event_trap(self, event):
@@ -10770,6 +10968,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         event_type_dict = {CEventState: {}}
         self.m_session_manager.register_callback(self.event_handler, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {CEventSynchronicity: {}}
+        self.m_session_manager.register_callback(self.synchronicity_handler, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventTrap: {}}
         self.m_session_manager.register_callback(self.trap_handler, event_type_dict, fSingleUse = False)
 
@@ -10915,6 +11116,10 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.prompt = [CONSOLE_PROMPT_ANALYZE, ""][self.m_fSplit]
             self.printer(STR_ANALYZE_MODE_TOGGLE % MODE_ON)
             return
+
+
+    def synchronicity_handler(self, event):
+        self.printer(STR_SYNCHRONICITY_MODE % str(event.m_fsynchronicity))
 
 
     def trap_handler(self, event):
@@ -11645,7 +11850,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         _print(STR_ENCODING_MODE_SET % encoding, self.m_stdout)
 
-    
+
     def do_thread(self, arg):
         if self.fAnalyzeMode and (arg != ''):
             self.printer(STR_ILEGAL_ANALYZE_MODE_ARG)
@@ -11689,6 +11894,23 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             self.m_session_manager.report_exception(*sys.exc_info())
 
     do_a = do_analyze
+
+   
+    def do_synchro(self, arg):
+        if arg == '':
+            fsynchronicity = self.m_session_manager.get_synchronicity()
+            _print(STR_SYNCHRONICITY_MODE % str(fsynchronicity), self.m_stdout)
+            return
+
+        if arg == str(True):
+            fsynchronicity = True
+        elif arg == str(False):
+            fsynchronicity = False
+        else:
+            _print(STR_BAD_ARGUMENT, self.m_stdout)
+            return
+
+        self.m_session_manager.set_synchronicity(fsynchronicity)
 
    
     def do_trap(self, arg):
@@ -11901,6 +12123,7 @@ exec        - Execute suite in the context of the current frame.
 analyze     - Toggle analyze last exception mode.
 trap        - Get or set "trap unhandled exceptions" mode.
 fork        - Get or set fork handling mode.
+synchro     - Get or set synchronicity mode.
 
 License:
 ----------------
@@ -11997,6 +12220,22 @@ Debuggee will ignore unhandled exceptions.
 
 When set to True: 
 Debuggee will pause on unhandled exceptions for inspection.""", self.m_stdout)
+
+
+    def help_synchro(self):
+        _print("""synchro [True | False]
+
+Get or set the synchronicity mode.
+
+Synchronicity allows the debugger to query and modify the script 
+namespace even if its threads are still running or blocked in 
+some C library code. In some rare cases querying or modifying 
+data in synchronicity can crash the script. For example in some
+Linux builds of wxPython querying the state of wx data structures 
+from a non GUI thread can crash the script. If this happens try
+to debug with synchronicity disabled.
+
+Default is True.""", self.m_stdout)
 
 
     def help_fork(self):
