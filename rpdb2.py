@@ -8618,6 +8618,9 @@ class CDebuggerEngine(CDebuggerCore):
         event = CEventSynchronicity(fsynchronicity)
         self.m_event_dispatcher.fire_event(event)
 
+        if self.m_state_manager.get_state() == STATE_BROKEN:
+            self.notify_namespace()
+
 
     def set_trap_unhandled_exceptions(self, ftrap):
         self.m_ftrap = ftrap
@@ -12533,7 +12536,7 @@ is reached or it returns.""", self.m_stdout)
     
 
     def help_step(self):
-        _print("""next
+        _print("""step
 
 (shorthand - s)
 
