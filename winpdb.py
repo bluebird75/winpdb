@@ -557,12 +557,13 @@ TB_STEP = "Step into"
 TB_NEXT = "Next"
 TB_RETURN = "Return"
 TB_GOTO = "Run to line"
-TB_FILTER = "Filter out __methods__ from objects and classes in the namespace viewer"
+TB_FILTER = "Filter out methods and functions from classes and objects in the namespace viewer"
 TB_EXCEPTION = "Toggle 'analyze exception' mode"
 TB_ENCODING = "Set the source encoding for the name-space viewer and the exec/eval console commands"
 TB_SYNCHRONICITY = "Set the synchronicity mode"
 TB_TRAP = "Toggle 'trap unhandled exceptions' mode"
 
+TB_FILTER_TEXT = " Filter: %s "
 TB_ENCODING_TEXT = " Encoding: %s "
 TB_SYNCHRONICITY_TEXT = " Synchronicity: %s "
 
@@ -619,7 +620,6 @@ BASE64_GOTO = 'iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALE
 BASE64_LOCKED = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAhUlEQVR42u2UQRLAEAxFP+NguRm5WW6WbrRjOkqorurvmHiR5ANsVeQsQSlBb2u3JHtKUBFRAApAcyK1nPU9MJGAiM4qXd6HJYHvBRTg4Zb4LwcaZgZa7rcqcaPASpzZdRfYop5zwoJnMNdz5paLBADNw2NsmhQiv7s58/u/6YmgCxhbdR19GFJ+yzjAWQAAAABJRU5ErkJggg=="
 BASE64_UNLOCKED = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAjklEQVR42u1TQQ7DIAyzUR8WXkb4WX7mnSqtFetCxU6rb0jYJLYBHgzAOyR36HTmkmncoYgQSZGUO0RSo7tlVtgsUGuFJEoiALQmjB4os5PvwhlLyi8D3TKBLWtLVrh3HuxJBZbBVUO+2oJFtd3GK38mmAUAuy/e2hXFEPF3k/fOZZ/ooJSp146pjj94xwuYKl+HgD9iOwAAAABJRU5ErkJggg=="
 
-BASE64_FILTER = 'iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA\nrElEQVQ4y2NgGAX0BozIHC4xjR8MDIzsZJr169ur6yh6WdDsYv/68jpBU54+ZWB48QJVzM5Lkw1d\nHRMy59ur64zc4pp4Df7zh4Hh1SsMgxm+vbrOiNdwYix4/56B4d8/wgZjNRyfBf//o7oan8EEAZeY\n5v///xng+P17hv9nzkAwl5jmf4qTE7IFN29S0WB0C0g1mImWmWjUcKyAhUh1f7nFNZmh7J+jRfLg\nBQA+b1au9tcluAAAAABJRU5ErkJggg==\n'
 BASE64_EXCEPTION = 'iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAAC\nD0lEQVQ4y+2UTUsbURSGn9zcNJMQSVPH7CxMBF0EjIugmxaEbJq9UNv5DfoL3Ar+AH+BJf1aCm6E\nuHLXEJrFLCK0QoUS2kAYCpkxTu50kTjGfBHBpWd37znnPR/3vS882RgLTXNms2UJbAshTE3T8kKE\nU0p1W67rVpRSH4FPllXwHgyezZaXpZRfdD29lkwmEUIEPqUUtm3TbP6peZ731rIK9ZnBs9nysqbF\nzhcXXy5IKSdO5nkeV1e//rqu83pcgdC4VUgpK4axlLsFDodhdTWKrgsajS6W1UGpuwKXlz9rnneT\nH17RuLa2dT0dAM/NCfb2npPJRIKAev2G/f0WjuMjpUTXF3KNxu93wIdBIDGMLIQwk8lkcDbNBJlM\nhNNTh52dJicnbVZWImxtJYKY/pu8H8Eavuix4u56YyMKwNmZg1JQLjv4PqyvRwcbQtO0/DCWHO08\nnAqcMkQi0St0cPDiXtz8vJiYNxFcqW4L0AG6XR/H8YnFQuzuNmm3fYToFe10/HF509fS/yAA+D5U\nq9cAFItxlILNzRiHhzqmmbjHe9d1KzN0rkq2bb9JpXpTHh39wzAiFItxisU4AK2W4vi4HeTYto1S\nqjQrz78ZxtLaLR0jkRC53DPS6TC2rahWr3Ecf4DnP2qe543w/LF+6CvLKlw8VFu+6no6N0Vbvve1\n5eKxVbEEfJ6mik821v4D0B75yPNHQ9UAAAAASUVORK5CYII=\n'
 BASE64_TRAP = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVCAYAAACt4nWrAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA\nB3RJTUUH1wMWBzIMELT6ewAAAixJREFUeNrNlVtIkwEUx39z35zOteU252X6hbNpEeZW5oUyejC7\naEEIERhRPVTMhx6rh3rLqCB8iaSHejGiqF588QJFD3bZg4HQCsNLuE2deNk3v29urtV7N9RvQef1\nnPPjcPif/4F/GFrVBEdOFUm7jmRU+jmVoY7c1EIw7zCajNTvsuuGl3DVa8TalkNFEGUylBZ4B1fK\nPVRdg6mmbAqXTzi6P6Rl50fZ7HlPb1uuJWSOxMyCicon/dGDg3+q16wW3FBEvcHG5XoX04qE/vmA\neXmUyAXVanFS3crG0JmLl9Dt8GAaHWOLaIw/TQZNcj4Oayk1FnBbJT7NrwlewLH2JeabHZZpf2UV\nzlIRo82OYTzBAckQPzT3fWHviDSzTyZel0WDlODz+KrgG6g7KRNs0RCRY7JUkJTILRaxlXuw2woJ\nGc34ZQVhbjah6OKuzkUG3q568gSB4eraxsBU8OuLPamKNxOTS8VlrnjBVjeZgS8MPbxH5sQwvjJl\nZ9dHfP51n4uYxblGJw9edXCj5xYDrW5e70I83ld936lKLdnk7naIC+e9pwjPjlA2NsiiEsx53IPc\nr0otetyub0TPxldi7wJhtgfCzNgi3HmmrPhUOUdzzc1KHY67AoXXBUydwOm19P91LTo2eVMs12vQ\nhCD1Mkm4Ly1erCf/iBZrr0DRbT21rrSZvIC4X4u1W0dJuxrOL66YxTYRojVgfOQyN3el9TUJ5DXo\nMTv53+MHY3Sxa+ko45EAAAAASUVORK5CYII=\n"
 BASE64_FORK = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAVBAMAAABfzGiYAAAAD1BMVEWZAACsqJn///8BAQEAAIBm\nb8BsAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElN\nRQfXBwQRJRb/bmGBAAAAT0lEQVQY02NgIA4wCoIAjKMEBIoMDlg4ysa4ZJSMjY0VWVyQZFhcXFyQ\nZViQ9UA4ysZGCA6KDEiPi4sDC5JpKMpYQGbDXe3igOQXFnweBQD3YA+4tU+1lQAAAABJRU5ErkJg\ngg==\n"
@@ -693,6 +693,8 @@ BAD_FILE_WARNING_TIMEOUT_SEC = 10.0
 DIRTY_CACHE = 1
 
 POSITION_TIMEOUT = 2.0
+
+FILTER_LEVELS = ['Off', 'Medium', 'Maxium']
 
 
 
@@ -889,6 +891,7 @@ class CToolBar:
 
             if TEXT in e:
                 button = wx.Button(self.m_toolbar, id, e[TEXT], style = wx.NO_BORDER)
+                button.SetToolTipString(item_label)
                 self.m_toolbar.AddControl(button)
                 self.m_items[item_label] = {ID: id}
                 wx.EVT_BUTTON(self.m_toolbar, id, command)
@@ -1288,6 +1291,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         
         self.m_state = rpdb2.STATE_DETACHED
         self.m_fembedded_warning = True
+        self.m_filter_level = 1
         
         self.SetMinSize(WINPDB_SIZE_MIN)
         self.SetSize(settings[WINPDB_SIZE])
@@ -1341,9 +1345,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             {LABEL: TB_GOTO,    DATA: BASE64_GOTO,  COMMAND: self.do_goto},
             {LABEL: TB_RETURN,  DATA: BASE64_RETURN, COMMAND: self.do_return},
             {LABEL: ML_SEPARATOR},
-            {LABEL: TB_FILTER,  DATA: BASE64_FILTER, DATA2: BASE64_FILTER, COMMAND: self.do_filter},
             {LABEL: TB_EXCEPTION, DATA: BASE64_EXCEPTION, DATA2: BASE64_EXCEPTION, COMMAND: self.do_analyze},
             {LABEL: TB_TRAP, DATA: BASE64_TRAP, DATA2: BASE64_TRAP, COMMAND: self.do_trap},
+            {LABEL: ML_SEPARATOR},
+            {LABEL: TB_FILTER, TEXT: TB_FILTER_TEXT, COMMAND: self.do_filter},
             {LABEL: ML_SEPARATOR},
             {LABEL: TB_ENCODING, TEXT: TB_ENCODING_TEXT, COMMAND: self.do_encoding},
             {LABEL: ML_SEPARATOR},
@@ -1351,6 +1356,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         ]
 
         self.init_toolbar(toolbar_resource)
+        self.set_toolbar_item_text(TB_FILTER, TB_FILTER_TEXT % FILTER_LEVELS[self.m_filter_level])
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % 'auto')
         self.set_toolbar_item_text(TB_SYNCHRONICITY, TB_SYNCHRONICITY_TEXT % 'True')
 
@@ -1379,8 +1385,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_splitterh2.SetSashGravity(0.5)
         
         self.m_namespace_viewer = CNamespaceViewer(self.m_splitterh2, style = wx.NO_BORDER, session_manager = self.m_session_manager)
-        self.m_namespace_viewer.set_filter(True)
-        self.set_toggle(TB_FILTER, True)
+        self.m_namespace_viewer.set_filter(self.m_filter_level)
 
         self.m_threads_viewer = CThreadsViewer(self.m_splitterh2, style = wx.NO_BORDER, select_command = self.OnThreadSelected)
 
@@ -1683,8 +1688,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         
     
     def do_filter(self, event):
-        f = event.IsChecked()
-        self.m_namespace_viewer.set_filter(f)
+        self.m_filter_level = (self.m_filter_level + 1) % 3
+        self.set_toolbar_item_text(TB_FILTER, TB_FILTER_TEXT % FILTER_LEVELS[self.m_filter_level])
+        self.m_namespace_viewer.set_filter(self.m_filter_level)
         self.m_namespace_viewer.update_namespace(self.m_stack)
 
     
@@ -3027,7 +3033,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_jobs = []
         self.m_n_workers = 0
         
-        self.m_fFilter = False
+        self.m_filter_level = 0
         self.m_key = None
 
         sizerv = wx.BoxSizer(wx.VERTICAL)
@@ -3065,8 +3071,8 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.DeleteAllItems()
 
 
-    def set_filter(self, fFilter):
-        self.m_fFilter = fFilter
+    def set_filter(self, filter_level):
+        self.m_filter_level = filter_level
 
         
     def bind_caption(self, caption_manager):
@@ -3231,7 +3237,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         (expr, is_valid) = self.m_tree.GetPyData(item)
 
         f = lambda r, exc_info: self.callback_ns(r, exc_info, expr)        
-        self.m_async_sm.with_callback(f).get_namespace([(expr, True)], self.m_fFilter)
+        self.m_async_sm.with_callback(f).get_namespace([(expr, True)], self.m_filter_level)
         
         event.Skip()
 
@@ -3316,13 +3322,13 @@ class CNamespacePanel(wx.Panel, CJobs):
         if el is None:
             el = [(self.get_root_expr(), True)]
 
-        self.post(el, self.m_fFilter)
+        self.post(el, self.m_filter_level)
 
         return (old_key, old_el)
 
 
-    def post(self, el, fFilter):
-        self.m_jobs.insert(0, (el, fFilter))
+    def post(self, el, filter_level):
+        self.m_jobs.insert(0, (el, filter_level))
 
         if self.m_n_workers == 0:
             self.job_post(self.job_update_namespace, ())
@@ -3336,8 +3342,8 @@ class CNamespacePanel(wx.Panel, CJobs):
             
             try:
                 del self.m_jobs[1:]
-                (el, fFilter) = self.m_jobs.pop()
-                rl = self.m_session_manager.get_namespace(el, fFilter)
+                (el, filter_level) = self.m_jobs.pop()
+                rl = self.m_session_manager.get_namespace(el, filter_level)
                 wx.CallAfter(self.do_update_namespace, rl)
 
             except (rpdb2.ThreadDone, rpdb2.NoThreads):
@@ -3449,10 +3455,10 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
         self.m_exception.Enable()
 
         
-    def set_filter(self, fFilter):
-        self.m_locals.set_filter(fFilter)
-        self.m_globals.set_filter(fFilter)
-        self.m_exception.set_filter(fFilter)
+    def set_filter(self, filter_level):
+        self.m_locals.set_filter(filter_level)
+        self.m_globals.set_filter(filter_level)
+        self.m_exception.set_filter(filter_level)
 
 
     def get_local_key(self, _stack):

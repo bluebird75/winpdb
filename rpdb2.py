@@ -1043,7 +1043,7 @@ class CSessionManager:
         return self.__smi.get_server_info()
 
 
-    def get_namespace(self, nl, fFilter, repr_limit = 128):
+    def get_namespace(self, nl, filter_level, repr_limit = 128, fFilter = "DEPRECATED"):
         """
         get_namespace is designed for locals/globals panes that let 
         the user inspect a namespace tree in GUI debuggers such as Winpdb.
@@ -1054,8 +1054,8 @@ class CSessionManager:
              value, that is, to return its children as well in case it has 
              children e.g. lists, dictionaries, etc...
              
-        fFilter - Flag. Filter out __methods__ from objects and classes in 
-             the namespace viewer.
+        filter_level - 0, 1, or 2. Filter out methods and functions from
+            classes and objects.
 
         repr_limit - Length limit (approximated) to be imposed repr() of 
              returned items.
@@ -1102,8 +1102,13 @@ class CSessionManager:
                           in a list or in a dictionary or members of a class, 
                           etc, this key will have their number as value.
         """
-        
-        return self.__smi.get_namespace(nl, fFilter, repr_limit)
+       
+        if fFilter != "DEPRECATED":
+            filter_level = fFilter
+
+        filter_level = int(filter_level)
+
+        return self.__smi.get_namespace(nl, filter_level, repr_limit)
 
 
     #
@@ -1761,7 +1766,7 @@ STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'hel
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
 STR_PSYCO_WARNING = "The psyco module was detected. The debugger is incompatible with the psyco module and will not function correctly as long as the psyco module is imported and used."
-STR_CONFLICTING_MODULES = "The modules: %s, which are incompatible with the debugger were detected and will possibly cause the debugger to fail."
+STR_CONFLICTING_MODULES = "The modules: %s, which are incompatible with the debugger were detected and can possibly cause the debugger to fail."
 STR_SIGNAL_INTERCEPT = "The signal %s(%d) was intercepted inside debugger tracing logic. It will be held pending until the debugger continues. Any exceptions raised by the handler will be ignored!"
 STR_SIGNAL_EXCEPTION = "Exception %s raised by handler of signal %s(%d) inside debugger tracing logic was ignored!"
 STR_DEBUGGEE_TERMINATED = "Debuggee has terminated."
@@ -3679,27 +3684,45 @@ def IsFilteredProperty(a):
     if not (a.startswith('__') and a.endswith('__')):
         return False
 
-    if a in ['__class__', '__bases__', '__file__', '__doc__', '__name__']:
+    if a in ['__class__', '__bases__', '__file__', '__doc__', '__name__', '__all__', '__builtins__']:
         return False
 
     return True
 
 
 
-def CalcFilteredDir(r, fFilter):
+def IsMethodProperty(r, a):
+    try:
+        o = getattr(r, a)
+        r = repr(type(o))
+
+        if 'function' in r or 'method' in r:
+            return True
+
+        return False
+
+    except:
+        return False
+
+
+
+def CalcFilteredDir(r, filter_level):
     d = dir(r)
 
-    if not fFilter:
+    if filter_level == 0:
         return d
 
-    fd = [e for e in d if not IsFilteredProperty(e)]
+    fd = [a for a in d if not IsFilteredProperty(a)]
+
+    if filter_level == 2:
+        fd = [a for a in fd if not IsMethodProperty(r, a)]
 
     return fd
 
 
 
-def CalcIdentity(r, fFilter):
-    if not fFilter:
+def CalcIdentity(r, filter_level):
+    if filter_level == 0:
         return r
 
     if not hasattr(r, 'im_func'):
@@ -3722,13 +3745,13 @@ def getattr_nothrow(o, a):
 
 
 
-def CalcDictKeys(r, fFilter):
-    d = CalcFilteredDir(r, fFilter)
+def CalcDictKeys(r, filter_level):
+    d = CalcFilteredDir(r, filter_level)
     rs = set(d)
 
     c = getattr_nothrow(r, '__class__')
     if not c is ERROR_NO_ATTRIBUTE:
-        d = CalcFilteredDir(c, fFilter)
+        d = CalcFilteredDir(c, False)
         cs = set(d)
         s = rs & cs
 
@@ -3736,13 +3759,19 @@ def CalcDictKeys(r, fFilter):
             o1 = getattr_nothrow(r, e)
             o2 = getattr_nothrow(c, e)
 
-            if o1 is ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+            if o1 is ERROR_NO_ATTRIBUTE or CalcIdentity(o1, filter_level) is CalcIdentity(o2, filter_level):
                 rs.discard(e)
+
+            try:
+                if filter_level == 1 and getattr(o1, '__self__') is getattr(o2, '__self__'):
+                    rs.discard(e)
+            except:
+                pass
 
     bl = getattr_nothrow(r, '__bases__')
     if type(bl) == tuple:
         for b in bl:
-            d = CalcFilteredDir(b, fFilter)
+            d = CalcFilteredDir(b, False)
             bs = set(d)
             s = rs & bs
 
@@ -3750,8 +3779,14 @@ def CalcDictKeys(r, fFilter):
                 o1 = getattr_nothrow(r, e)
                 o2 = getattr_nothrow(b, e)
 
-                if o1 is ERROR_NO_ATTRIBUTE or CalcIdentity(o1, fFilter) is CalcIdentity(o2, fFilter):
+                if o1 is ERROR_NO_ATTRIBUTE or CalcIdentity(o1, filter_level) is CalcIdentity(o2, filter_level):
                     rs.discard(e)
+
+                try:
+                    if filter_level == 1 and getattr(o1, '__self__') is getattr(o2, '__self__'):
+                        rs.discard(e)
+                except:
+                    pass
       
     l = [a for a in rs]
 
@@ -8077,8 +8112,8 @@ class CDebuggerEngine(CDebuggerCore):
         return (_globals, _locals, _original_locals_copy)
 
 
-    def __calc_attribute_list(self, r, fFilter):
-        al = CalcDictKeys(r, fFilter)    
+    def __calc_attribute_list(self, r, filter_level):
+        al = CalcDictKeys(r, filter_level)    
                 
         if hasattr(r, '__class__') and not '__class__' in al:
             al = ['__class__'] + al
@@ -8126,11 +8161,14 @@ class CDebuggerEngine(CDebuggerCore):
 
     def __parse_type(self, t):
         rt = safe_repr(t)
+        if not "'" in rt:
+            return rt
+
         st = rt.split("'")[1]
         return st
 
 
-    def __calc_subnodes(self, expr, r, fForceNames, fFilter, repr_limit, encoding):
+    def __calc_subnodes(self, expr, r, fForceNames, filter_level, repr_limit, encoding):
         snl = []
         
         try:
@@ -8257,7 +8295,7 @@ class CDebuggerEngine(CDebuggerCore):
 
             return snl            
 
-        al = self.__calc_attribute_list(r, fFilter)
+        al = self.__calc_attribute_list(r, filter_level)
         al.sort(SafeCmp)
 
         for a in al:
@@ -8315,7 +8353,7 @@ class CDebuggerEngine(CDebuggerCore):
         return False        
 
 
-    def calc_expr(self, expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding):
+    def calc_expr(self, expr, fExpand, filter_level, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding):
         e = {}
 
         try:
@@ -8340,7 +8378,7 @@ class CDebuggerEngine(CDebuggerCore):
             
             if fExpand and (e[DICT_KEY_N_SUBNODES] > 0):
                 fForceNames = (expr in ['globals()', 'locals()']) or (RPDB_EXEC_INFO in expr)
-                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, fFilter, repr_limit, encoding)
+                e[DICT_KEY_SUBNODES] = self.__calc_subnodes(expr, r, fForceNames, filter_level, repr_limit, encoding)
                 e[DICT_KEY_N_SUBNODES] = len(e[DICT_KEY_SUBNODES])
                 
         except:
@@ -8380,7 +8418,7 @@ class CDebuggerEngine(CDebuggerCore):
         
 
 
-    def get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding, fraw):
+    def get_namespace(self, nl, filter_level, frame_index, fException, repr_limit, encoding, fraw):
         if fraw:
             encoding = ENCODING_RAW_I
         else:
@@ -8402,7 +8440,7 @@ class CDebuggerEngine(CDebuggerCore):
                 continue
 
             event = threading.Event()
-            args = (expr, fExpand, fFilter, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
+            args = (expr, fExpand, filter_level, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
 
             if self.m_fsynchronicity:
                 g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name = 'calc_expr %s' % expr)
@@ -9346,8 +9384,8 @@ class CDebuggeeServer(CIOServer):
         return 0
 
 
-    def export_get_namespace(self, nl, fFilter, frame_index, fException, repr_limit, encoding, fraw):
-        r = self.m_debugger.get_namespace(nl, fFilter, frame_index, fException, repr_limit, encoding, fraw)
+    def export_get_namespace(self, nl, filter_level, frame_index, fException, repr_limit, encoding, fraw):
+        r = self.m_debugger.get_namespace(nl, filter_level, frame_index, fException, repr_limit, encoding, fraw)
         return r
 
         
@@ -10638,11 +10676,11 @@ class CSessionManagerInternal:
         self.getSession().getProxy().set_thread(tid)
 
         
-    def get_namespace(self, nl, fFilter, repr_limit):
+    def get_namespace(self, nl, filter_level, repr_limit):
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
-        r = self.getSession().getProxy().get_namespace(nl, fFilter, frame_index, fAnalyzeMode, repr_limit, self.m_encoding, self.m_fraw)
+        r = self.getSession().getProxy().get_namespace(nl, filter_level, frame_index, fAnalyzeMode, repr_limit, self.m_encoding, self.m_fraw)
         return r
 
 
