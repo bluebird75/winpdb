@@ -338,6 +338,7 @@ import cStringIO
 import threading
 import xmlrpclib
 import tempfile
+import textwrap
 import cPickle
 import keyword
 import weakref
@@ -371,6 +372,11 @@ CAPTION_STACK = "Stack"
 CAPTION_NAMESPACE = "Namespace"
 
 CONSOLE_PROMPT = "\n> "
+CONSOLE_COMPLETIONS = "\nAvailable completions:\n%s"
+
+COMPLETIONS_WARNING = "\nDisplay all %d possibilities? (y or n)"
+COMPLETIONS_WARNING_CONFIRM_CHARS = ['y', 'Y']
+COMPLETIONS_WARNING_THRESHOLD = 32
 
 ENABLED = True
 DISABLED = False
@@ -694,7 +700,7 @@ DIRTY_CACHE = 1
 
 POSITION_TIMEOUT = 2.0
 
-FILTER_LEVELS = ['Off', 'Medium', 'Maxium']
+FILTER_LEVELS = ['Off', 'Medium', 'Maximum']
 
 
 
@@ -703,6 +709,24 @@ g_ignored_warnings = {'': True}
 g_fUnicode = 'unicode' in wx.PlatformInfo
 
 assert(g_fUnicode or not rpdb2.is_py3k())
+
+
+
+def calc_denominator(string_list):
+    if string_list in [[], None]:
+        return ''
+
+    d = string_list[0]
+    for s in string_list[1:]:
+        i = 0
+        while i < min(len(d), len(s)):
+            if d[i] != s[i]:
+                break
+            i += 1
+
+        d = d[:i]
+
+    return d
 
 
 
@@ -2746,6 +2770,9 @@ class CConsole(wx.Panel, CCaptionManager):
         else:
             self.encoding = 'utf-8'
 
+        self.m_fcompletions_warning = False
+        self.m_completions = None
+
         self.m_history = ['']
         self.m_history_index = 0
         
@@ -2798,8 +2825,8 @@ class CConsole(wx.Panel, CCaptionManager):
         self.GetEventHandler().ProcessEvent(ne)
 
         event.Skip()
-            
-        
+    
+
     def set_focus(self):
         self.m_console_in.SetFocus()
 
@@ -2863,7 +2890,18 @@ class CConsole(wx.Panel, CCaptionManager):
 
     def OnChar(self, event):
         key = event.GetKeyCode()
-        
+       
+        if self.m_fcompletions_warning:
+            self.m_fcompletions_warning = False
+            if key in [ord(c) for c in COMPLETIONS_WARNING_CONFIRM_CHARS]:
+                self.CompleteExpression(fForce = True)
+            return
+
+        if (key + ord('a') - 1) in [ord('n'), ord('N')] and event.ControlDown():
+            self.CompleteExpression()
+            event.Skip()
+            return
+
         if key in [wx.WXK_UP, wx.WXK_DOWN]:
             value = self.m_console_in.GetValue()
             _value = self.get_history(key == wx.WXK_UP, value)
@@ -2874,7 +2912,54 @@ class CConsole(wx.Panel, CCaptionManager):
         event.Skip()    
 
 
+    def CompleteExpression(self, fForce = False):
+        v = self.m_console_in.GetValue()
+        ip = self.m_console_in.GetInsertionPoint()
+
+        ce = v[:ip]
+
+        completions = []
+        while True:
+            c = self.m_console.complete(ce, len(completions))
+            if c == None:
+                break
+            completions.append(c)
+
+        if completions == []:
+            return
+       
+        d = calc_denominator(completions)
+        nv = d + v[ip:]
+        self.m_console_in.SetValue(nv)
+        self.m_console_in.SetInsertionPoint(len(d))
+
+        if len(completions) == 1:
+            return
+
+        if len(completions) > COMPLETIONS_WARNING_THRESHOLD and not fForce:
+            self.m_console_out.write(COMPLETIONS_WARNING % len(completions))
+            self.m_fcompletions_warning = True
+            return
+
+        if ce != '' and ce.split()[0] in ['v', 'eval', 'x', 'exec']:
+            completions = [c.split()[-1].split('.')[-1] for c in completions]
+
+        if completions == self.m_completions:
+            return
+
+        self.m_completions = completions
+
+        out = ', '.join(completions)
+        lines = textwrap.wrap(out, 60)
+        text = '\n'.join(lines) + '\n'
+
+        self.m_console_out.write(CONSOLE_COMPLETIONS % text)
+        self.m_console_out.write(CONSOLE_PROMPT) 
+
+        
     def OnSendText(self, event):
+        self.m_completions = None
+
         value = self.m_console_in.GetValue()
         self.set_history(value)
 

@@ -297,6 +297,7 @@ import sys
 import cmd
 import imp
 import os
+import re
 
 try:
     import hashlib
@@ -1149,6 +1150,26 @@ class CSessionManager:
         return self.__smi.execute(suite)
 
 
+    def complete_expression(self, expr):
+        """
+        Return a list with matching completions for expression.
+        Accepted expressions are of the form a.b.c
+
+        Dictionary lookups or functions call are not accepted. For 
+        example: 'getobject().complete' or 'dict[item].complete' are
+        not allowed.
+
+        On the other hand partial expressions and statements are 
+        accepted. For example: 'foo(arg1, arg2.member.complete' will
+        be accepted and the completion for 'arg2.member.complete' will
+        be calculated.
+        """
+
+        expr = as_unicode(expr, fstrict = True)
+        
+        return self.__smi.complete_expression(expr)
+
+
     def set_encoding(self, encoding, fraw = False):
         """
         Set the encoding that will be used as source encoding for execute()
@@ -1367,7 +1388,19 @@ class CConsole:
 
         return self.m_ci.set_filename(filename)
 
-    
+
+    def complete(self, text, state):
+        """
+        Return the next possible completion for 'text'.
+        If a command has not been entered, then complete against command list.
+        Otherwise try to call complete_<command> to get list of completions.
+        """
+
+        text = as_unicode(text)
+
+        return self.m_ci.complete(text, state)
+
+
 
 #
 # ---------------------------- Exceptions ----------------------------------
@@ -9822,6 +9855,8 @@ class CSessionManagerInternal:
         self.m_frame_index = 0
         self.m_frame_index_exception = 0
 
+        self.m_completions = {}
+
         self.m_remote_event_index = 0
         self.m_event_dispatcher_proxy = CEventDispatcher()
         self.m_event_dispatcher = CEventDispatcher(self.m_event_dispatcher_proxy)
@@ -10684,7 +10719,7 @@ class CSessionManagerInternal:
         return r
 
 
-    def evaluate(self, expr):
+    def evaluate(self, expr, fclear_completions = True):
         assert(is_unicode(expr))
 
         self.__verify_attached()
@@ -10694,6 +10729,9 @@ class CSessionManagerInternal:
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
         (value, warning, error) = self.getSession().getProxy().evaluate(expr, frame_index, fAnalyzeMode, self.m_encoding, self.m_fraw)
+
+        self.m_completions.clear()
+
         return (value, warning, error)
 
         
@@ -10707,6 +10745,9 @@ class CSessionManagerInternal:
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE)
 
         (warning, error) = self.getSession().getProxy().execute(suite, frame_index, fAnalyzeMode, self.m_encoding)
+
+        self.m_completions.clear()
+
         return (warning, error)
 
 
@@ -10784,6 +10825,47 @@ class CSessionManagerInternal:
         return self.getSession().getServerInfo()
 
 
+    def complete_expression(self, expr):
+        match = re.search(
+                r'(?P<unsupported> \.)? (?P<match> ((?P<scope> (\w+\.)* \w+) \.)? (?P<complete>\w*) $)', 
+                expr, 
+                re.U | re.X
+                )
+
+        if match == None:
+            raise BadArgument
+
+        d = match.groupdict()
+
+        unsupported, scope, complete = (d['unsupported'], d['scope'], d['complete'])
+
+        if unsupported != None:
+            raise BadArgument
+
+        if scope == None:
+            _scope = as_unicode('globals().keys() + locals().keys()')
+        else:
+            _scope = 'dir(%s)' % scope
+
+        if not _scope in self.m_completions:
+            (v, w, e) = self.evaluate(_scope, fclear_completions = False)
+            if w != '' or e != '':
+                print_debug('evaluate() returned the following warning/error: %s' % w + e)
+                return (expr, [])
+
+            self.m_completions[_scope] = list(set(eval(v)))
+
+        completions = [attr for attr in self.m_completions[_scope] if attr.startswith(complete)]
+
+        if complete == '':
+            prefix = expr
+        else:
+            prefix = expr[:-len(complete)]
+
+        return (prefix, completions)
+
+
+
     def _reset_frame_indexes(self, event):
         self.reset_frame_indexes(None)
 
@@ -10800,6 +10882,8 @@ class CSessionManagerInternal:
             self.m_stack_depth_exception = None
             self.m_frame_index = 0
             self.m_frame_index_exception = 0
+
+            self.m_completions.clear()
 
         finally:
             self.m_state_manager.release()
@@ -11085,6 +11169,59 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         pass
 
         
+    def complete(self, text, state):
+        """
+        Return the next possible completion for 'text'.
+        If a command has not been entered, then complete against command list.
+        Otherwise try to call complete_<command> to get list of completions.
+        """
+
+        if self.use_rawinput:
+            #
+            # Strange bug in Python?
+            #
+            import cmd
+
+            return cmd.Cmd.complete(self, text, state)
+
+        #
+        # Without rawinput assuming text includes entire buffer up to cursor.
+        #
+
+        try:
+            if state != 0:
+                return self.completion_matches[state]
+
+            if not ' ' in text:
+                self.completion_matches = self.completenames(text)
+                return self.completion_matches[state]
+
+            cmd, args, foo = self.parseline(text)
+            if cmd == '' or not hasattr(self, 'complete_' + cmd):
+                self.completion_matches = self.completedefault(text)
+                return self.completion_matches[state]
+
+            compfunc = getattr(self, 'complete_' + cmd)
+            
+            self.completion_matches = compfunc(text)
+            return self.completion_matches[state]
+
+        except IndexError:
+            return None
+
+
+    def complete_eval(self, text, *ignored):
+        try:
+            (prefix, completions) = self.m_session_manager.complete_expression(text)
+            ce = [prefix + c for c in completions]
+
+            return ce
+
+        except:
+            print_debug_exception()
+            return []
+
+
     def run(self):
         self.cmdloop()
 
@@ -11804,7 +11941,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                         
     do_v = do_eval
 
-    
+  
     def execute_job(self, sync_event, suite):
         try:
             (warning, error) = self.m_session_manager.execute(suite)
@@ -11850,6 +11987,18 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         
     do_x = do_exec
 
+
+    def do_complete(self, arg):
+        if arg == '':
+            self.printer(STR_BAD_ARGUMENT)
+            return
+            
+        _print(STR_OUTPUT_WARNING, self.m_stdout)
+
+        completions = self.m_session_manager.complete_expression(arg)
+
+        _print(repr(completions), self.m_stdout)
+    
             
     def do_encoding(self, arg):
         if arg == '':
