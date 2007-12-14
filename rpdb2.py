@@ -1401,6 +1401,12 @@ class CConsole:
         return self.m_ci.complete(text, state)
 
 
+    def printer(self, text):
+        text = as_unicode(text)
+
+        return self.m_ci.printer(text)
+        
+
 
 #
 # ---------------------------- Exceptions ----------------------------------
@@ -11081,6 +11087,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         self.m_filename = as_unicode('')
         
+        self.m_completion_thread = None
+        
         self.use_rawinput = [1, 0][fSplit]
         self.m_fSplit = fSplit
         self.prompt = [[CONSOLE_PROMPT, CONSOLE_PROMPT_ANALYZE][self.fAnalyzeMode], ""][fSplit]
@@ -11211,17 +11219,36 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
 
     def complete_eval(self, text, *ignored):
+        t = self.m_completion_thread
+        if t != None and t.isAlive():
+            return []
+
+        self.m_completion_thread = None
+        result = [('', [])]
+
+        t = threading.Thread(target = self.complete_expression_job, args = (text, result))
+        t.start()
+        t.join(PING_TIMEOUT)
+
+        if t.isAlive():
+            self.m_completion_thread = t
+            return []
+
+        (prefix, completions) = result[-1]
+        ce = [prefix + c for c in completions]
+
+        return ce
+
+
+    def complete_expression_job(self, text, result):
         try:
             (prefix, completions) = self.m_session_manager.complete_expression(text)
-            ce = [prefix + c for c in completions]
-
-            return ce
+            result.append((prefix, completions))
 
         except:
             print_debug_exception()
-            return []
 
-
+        
     def run(self):
         self.cmdloop()
 
@@ -11988,18 +12015,6 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
     do_x = do_exec
 
 
-    def do_complete(self, arg):
-        if arg == '':
-            self.printer(STR_BAD_ARGUMENT)
-            return
-            
-        _print(STR_OUTPUT_WARNING, self.m_stdout)
-
-        completions = self.m_session_manager.complete_expression(arg)
-
-        _print(repr(completions), self.m_stdout)
-    
-            
     def do_encoding(self, arg):
         if arg == '':
             encoding, fraw = self.m_session_manager.get_encoding()

@@ -372,9 +372,9 @@ CAPTION_STACK = "Stack"
 CAPTION_NAMESPACE = "Namespace"
 
 CONSOLE_PROMPT = "\n> "
-CONSOLE_COMPLETIONS = "\nAvailable completions:\n%s"
-
-COMPLETIONS_WARNING = "\nDisplay all %d possibilities? (y or n)"
+CONSOLE_COMPLETIONS = '\nAvailable completions:\n%s'
+COMPLETIONS_NOTICE = 'NEW: Use CTRL-N for auto completion in the eval and exec commands.'
+COMPLETIONS_WARNING = '\nDisplay all %d possibilities? (y or n)'
 COMPLETIONS_WARNING_CONFIRM_CHARS = ['y', 'Y']
 COMPLETIONS_WARNING_THRESHOLD = 32
 
@@ -2851,6 +2851,7 @@ class CConsole(wx.Panel, CCaptionManager):
         
     def start(self):
         self.m_console.start()
+        self.m_console.printer(COMPLETIONS_NOTICE)
 
         
     def stop(self):
@@ -2954,7 +2955,6 @@ class CConsole(wx.Panel, CCaptionManager):
         text = '\n'.join(lines) + '\n'
 
         self.m_console_out.write(CONSOLE_COMPLETIONS % text)
-        self.m_console_out.write(CONSOLE_PROMPT) 
 
         
     def OnSendText(self, event):
