@@ -6079,7 +6079,14 @@ class CDebuggerCoreThread:
         else:    
             f = base_frame
             
-        while (index > 0) and (f is not None):
+        while f is not None:
+            if not g_fDebug and f.f_code.co_name == 'rpdb2_import_wrapper':
+                f = f.f_back
+                continue
+
+            if index <= 0:
+                break
+
             f = f.f_back
             index -= 1
 
@@ -7743,6 +7750,7 @@ class CDebuggerEngine(CDebuggerCore):
             try:
                 g_traceback_lock.acquire()
                 s = traceback.extract_stack(f)
+                s = [1 for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
                 
             finally:    
                 g_traceback_lock.release()
@@ -7755,6 +7763,7 @@ class CDebuggerEngine(CDebuggerCore):
                 try:
                     g_traceback_lock.acquire()
                     _s = traceback.extract_tb(f.f_exc_traceback)
+                    _s = [1 for (a, b, c, d) in _s if g_fDebug or c != 'rpdb2_import_wrapper']
                     
                 finally:    
                     g_traceback_lock.release()
