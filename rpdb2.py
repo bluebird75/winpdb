@@ -7895,7 +7895,7 @@ class CDebuggerEngine(CDebuggerCore):
         
             #print >> sys.__stderr__, path, path_dict[path]
                 
-        __s = [(path_dict[a], b, as_unicode(c), as_unicode([d, ''][d == None])) for (a, b, c, d) in s]
+        __s = [(path_dict[a], b, as_unicode(c), as_unicode([d, ''][d == None])) for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
 
         if (ctx.m_uef_lineno is not None) and (len(__s) > 0):
             (a, b, c, d) = __s[0]
@@ -11239,6 +11239,10 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         return ce
 
+    complete_v = complete_eval
+    complete_exec = complete_eval
+    complete_x = complete_exec
+
 
     def complete_expression_job(self, text, result):
         try:
@@ -12887,11 +12891,20 @@ def rpdb2_import_wrapper(*args, **kwargs):
     #
     m = g_import(*args, **kwargs)
 
-    if name == 'gtk':
-        try:
-            m.gdk.threads_init()
-        except:
-            m.threads_init()
+    if name != 'gtk':
+        return m
+
+    try:
+        m.gdk.threads_init()
+        return m
+    except:
+        pass
+    
+    try:
+        m.threads_init()
+        return m
+    except:
+        pass
 
     return m
 
