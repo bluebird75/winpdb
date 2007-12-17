@@ -10163,7 +10163,7 @@ class CSessionManagerInternal:
             raise BadArgument
 
         if self.m_rpdb2_pwd is None:
-            self.m_printer(STR_PASSWORD_MUST_BE_SET)
+            #self.m_printer(STR_PASSWORD_MUST_BE_SET)
             raise UnsetPassword
        
         if g_fFirewallTest and ffirewall_test:
@@ -11132,6 +11132,15 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         g_fDefaultStd = (stdin == None)
 
+        if self.use_rawinput:
+            try:
+                import readline
+                cd = readline.get_completer_delims()
+                if not '.' in cd:
+                    readline.set_completer_delims(cd + '.')
+            except:
+                pass
+
 
     def set_filename(self, filename):
         assert(is_unicode(filename))
@@ -11196,10 +11205,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         if self.use_rawinput:
             #
-            # Strange bug in Python?
+            # Import cmd to workaround a strange bug in Python.
             #
             import cmd
-
             return cmd.Cmd.complete(self, text, state)
 
         #
@@ -11228,13 +11236,16 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             return None
 
 
-    def complete_eval(self, text, *ignored):
+    def complete_eval(self, text, line = None, begidx = None, endidx = None):
         t = self.m_completion_thread
         if t != None and t.isAlive():
             return []
 
         self.m_completion_thread = None
         result = [('', [])]
+
+        if line != None and endidx != None:
+            text = line[:endidx]
 
         t = threading.Thread(target = self.complete_expression_job, args = (text, result))
         t.start()
@@ -11245,6 +11256,10 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             return []
 
         (prefix, completions) = result[-1]
+
+        if begidx != None:
+            prefix = prefix[begidx:]
+
         ce = [prefix + c for c in completions]
 
         return ce
