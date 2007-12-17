@@ -10871,6 +10871,7 @@ class CSessionManagerInternal:
             self.m_completions[_scope] = list(set(eval(v)))
 
         completions = [attr for attr in self.m_completions[_scope] if attr.startswith(complete)]
+        completions.sort()
 
         if complete == '':
             prefix = expr
@@ -12446,12 +12447,13 @@ Debuggee will pause on unhandled exceptions for inspection.""", self.m_stdout)
 Get or set the synchronicity mode.
 
 Synchronicity allows the debugger to query and modify the script 
-namespace even if its threads are still running or blocked in 
-some C library code. In some rare cases querying or modifying 
-data in synchronicity can crash the script. For example in some
-Linux builds of wxPython querying the state of wx data structures 
-from a non GUI thread can crash the script. If this happens try
-to debug with synchronicity disabled.
+name-space even if its threads are still running or blocked in 
+C library code by using special worker threads. In some rare 
+cases querying or modifying data in synchronicity can crash the 
+script. For example in some Linux builds of wxPython querying 
+the state of objects from a non GUI thread can crash the script. 
+If you want the active thread to perform these operations turn 
+synchronicity off.
 
 Default is True.""", self.m_stdout)
 

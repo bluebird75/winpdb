@@ -431,17 +431,19 @@ If 'auto' is specified, the source encoding of
 the active scope will be used, which is utf-8 
 by default."""
 CHECKBOX_SYNCHRONICITY = "Use synchronicity."
-STATIC_SYNCHRONICITY = """Synchronicity allows the debugger to query and modify the script namespace even if its threads are still running or blocked in some C library code. In some rare cases querying or modifying data in synchronicity can crash the script. For example in some Linux builds of wxPython querying the state of wx data structures from a non GUI thread can crash the script. If this happens try to debug with synchronicity disabled."""
+STATIC_SYNCHRONICITY = """Synchronicity allows the debugger to query and modify the script name-space even if its threads are still running or blocked in C library code by using special worker threads. In some rare cases querying or modifying data in synchronicity can crash the script. For example in some Linux builds of wxPython querying the state of wx objects from a thread other than the GUI thread can crash the script. If this happens or if you want to restrict these operations to the active thread, turn synchronicity off."""
 STATIC_SYNCHRONICITY_SPLIT = """Synchronicity allows the debugger to query
-and modify the script namespace even if its
-threads are still running or blocked in some
-C library code. In some rare cases 
-querying or modifying data in synchronicity
-can crash the script. For example in some
-Linux builds of wxPython querying the state
-of wx data structures from a non GUI thread
-can crash the script. If this happens try
-to debug with synchronicity disabled."""
+and modify the script name-space even if its
+threads are still running or blocked in C 
+library code by using special worker threads. 
+In some rare cases querying or modifying 
+data in synchronicity can crash the script. 
+For example in some Linux builds of wxPython 
+querying the state of wx objects from a 
+thread other than the GUI thread can crash 
+the script. If this happens or if you want 
+to restrict these operations to the active 
+thread, turn synchronicity off."""
 STATIC_PWD = """The password is used to secure communication between the debugger console and the debuggee. Debuggees with un-matching passwords will not appear in the attach query list."""
 STATIC_PWD_SPLIT = """The password is used to secure communication 
 between the debugger console and the debuggee. 
@@ -2774,7 +2776,9 @@ class CConsole(wx.Panel, CCaptionManager):
         self.m_completions = None
 
         self.m_history = ['']
-        self.m_history_index = 0
+        self.m_history_index_up = 0
+        self.m_history_index_down = 0
+        self.m_history_index_errors = 0
         
         self.m_console = rpdb2.CConsole(self.m_session_manager, stdin = self, stdout = self, fSplit = True)
 
@@ -2976,20 +2980,92 @@ class CConsole(wx.Panel, CCaptionManager):
 
             
     def get_history(self, fBack, value = None):
-        if (value is not None) and (value != self.m_history[self.m_history_index]):
+        if fBack:
+            index = self.m_history_index_up
+        else:
+            index = self.m_history_index_down
+
+        if (value is not None) and (value != self.m_history[index]):
             self.m_history[0] = value
-            self.m_history_index = 0
-            
-        self.m_history_index = (self.m_history_index + [-1, 1][fBack]) % len(self.m_history)
-        return self.m_history[self.m_history_index]
+            self.m_history_index_up = 0
+            self.m_history_index_errors = 0
+        
+        try:
+            if fBack:
+                self.m_history_index_up = self.find_next_up() 
+                self.m_history_index_down = self.m_history_index_up
+            else:
+                self.m_history_index_down = self.find_next_down()
+                self.m_history_index_up = self.m_history_index_down
+
+        except KeyError:
+            if self.m_history_index_errors == 3:
+                self.m_history_index_errors += 1
+                return self.get_history(fBack, value)
+
+        return self.m_history[self.m_history_index_up]
+
+    
+    def find_next_up(self):
+        if self.m_history_index_up >= len(self.m_history) - 1:
+            raise KeyError
+
+        if self.m_history_index_errors >= 3:
+            prefix = ''
+        else:
+            prefix = self.m_history[0]
+
+        index = self.m_history_index_up
+        current = self.m_history[index]
+
+        while True:
+            index += 1
+            if index >= len(self.m_history):
+                self.m_history_index_errors += 1
+                raise KeyError
+
+            next = self.m_history[index]
+            if next != current and next.startswith(prefix):
+                break
+
+        if self.m_history_index_errors < 3:
+            self.m_history_index_errors = 0
+
+        return index
+
+
+    def find_next_down(self):
+        if self.m_history_index_errors < 3:
+            self.m_history_index_errors = 0
+
+        if self.m_history_index_errors >= 3:
+            prefix = ''
+        else:
+            prefix = self.m_history[0]
+
+        index = self.m_history_index_down
+        current = self.m_history[index]
+
+        while True:
+            index -= 1
+            if index < 0:
+                raise KeyError
+
+            next = self.m_history[index]
+            if next != current and next.startswith(prefix):
+                return index
 
         
     def set_history(self, value):
         self.m_history[0] = ''
-        self.m_history.insert(1, value)
-        self.m_history = self.m_history[:50]
+        self.m_history_index_up = 0
+
+        if value != '' and (len(self.m_history) <= 1 or value != self.m_history[1]):
+            self.m_history.insert(1, value)
+            self.m_history = self.m_history[:50]
         
-        self.m_history_index = 0
+            if self.m_history_index_down != 0:
+                self.m_history_index_down = min(self.m_history_index_down + 1, len(self.m_history) - 1)
 
 
 
