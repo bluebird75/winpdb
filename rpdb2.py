@@ -8676,7 +8676,7 @@ class CDebuggerEngine(CDebuggerCore):
                 else:
                     _suite = as_string(ENCODING_SOURCE % encoding + suite, encoding, fstrict = True)
 
-                print_debug('suite is %s' % repr(_suite))
+                #print_debug('suite is %s' % repr(_suite))
 
                 try:
                     redirect_exc_info = True
@@ -10913,9 +10913,9 @@ class CSessionManagerInternal:
             raise BadArgument
 
         if scope == None:
-            _scope = as_unicode('globals().keys() + locals().keys()')
+            _scope = as_unicode('list(globals().keys()) + list(locals().keys())')
         else:
-            _scope = 'dir(%s)' % scope
+            _scope = as_unicode('dir(%s)' % scope)
 
         if not _scope in self.m_completions:
             (v, w, e) = self.evaluate(_scope, fclear_completions = False)
