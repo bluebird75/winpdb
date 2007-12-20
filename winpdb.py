@@ -3545,13 +3545,13 @@ class CNamespacePanel(wx.Panel, CJobs):
 
 class CLocals(CNamespacePanel):
     def get_root_expr(self):
-        return 'locals()'
+        return rpdb2.as_unicode('locals()')
         
 
     
 class CGlobals(CNamespacePanel):
     def get_root_expr(self):
-        return 'globals()'
+        return rpdb2.as_unicode('globals()')
         
         
         

@@ -1963,16 +1963,16 @@ DICT_KEY_SUBNODES = 'subnodes'
 DICT_KEY_N_SUBNODES = 'n_subnodes'
 DICT_KEY_ERROR = 'error'
 
-RPDB_EXEC_INFO = 'rpdb_exception_info'
+RPDB_EXEC_INFO = as_unicode('rpdb_exception_info')
 
 MODE_ON = 'ON'
 MODE_OFF = 'OFF'
 
 ENCODING_UTF8_PREFIX_1 = '\xef\xbb\xbf'
 ENCODING_SOURCE = '# -*- coding: %s -*-\n'
-ENCODING_AUTO = 'auto'
-ENCODING_RAW = 'raw'
-ENCODING_RAW_I = '__raw'
+ENCODING_AUTO = as_unicode('auto')
+ENCODING_RAW = as_unicode('raw')
+ENCODING_RAW_I = as_unicode('__raw')
 
 MAX_EVALUATE_LENGTH = 256 * 1024
 MAX_NAMESPACE_ITEMS = 1024
@@ -1997,7 +1997,7 @@ INDEX_TABLE_SIZE = 100
 
 DISPACHER_METHOD = 'dispatcher_method'
 
-BASIC_TYPES_LIST = ['bytes', 'str', 'str8', 'unicode', 'int', 'long', 'float', 'bool', 'NoneType']
+BASIC_TYPES_LIST = ['bytearray', 'bytes', 'str', 'str8', 'unicode', 'int', 'long', 'float', 'bool', 'NoneType']
 
 CONFLICTING_MODULES = ['psyco', 'pdb', 'bdb', 'doctest']
 
@@ -2121,6 +2121,10 @@ g_alertable_waiters = {}
 
 
 
+g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
+
+
+
 #
 # ---------------------------- General Utils ------------------------------
 #
@@ -2207,23 +2211,35 @@ class _stub_type:
 
 
 
-if is_py3k():
+def foo(s, e):
+    return s.encode(e)
+   
+
+
+if not hasattr(g_builtins_module, 'unicode'):
     unicode = _stub_type
+
+if not hasattr(g_builtins_module, 'long'):
     long = _stub_type
 
+if not hasattr(g_builtins_module, 'str8'):
+    str8 = _stub_type
+
+if not hasattr(g_builtins_module, 'bytearray'):
+    bytearray = _stub_type
+
+if not hasattr(g_builtins_module, 'bytes'):
+    bytes = _stub_type
+    g_builtins_module.bytes = foo
+
+
+if is_py3k():
     class sets:
         Set = _stub_type
         BaseSet = _stub_type
         ImmutableSet = _stub_type
 
-else:
-    bytes = _stub_type
-    str8 = _stub_type
 
-    def foo(s, e):
-        return s.encode(e)
-
-    sys.modules['__builtin__'].bytes = foo
 
 if sys.version_info[:2] <= (2, 3):
     set = sets.Set
@@ -2426,6 +2442,21 @@ def repr_dict(pattern, d, length, encoding, is_valid):
 
 
 
+def repr_bytearray(s, length, encoding, is_valid):
+    try:
+        s = s.decode(encoding)
+        r = repr_unicode(s, length, is_valid)
+        return 'bytearray(b' + r[1:] + ')'
+
+    except:
+        #
+        # If a string is not encoded as utf-8 its repr() will be done with
+        # the regular repr() function.
+        #
+        return repr_str_raw(s, length, is_valid)
+
+
+
 def repr_bytes(s, length, encoding, is_valid):
     try:
         s = s.decode(encoding)
@@ -2551,11 +2582,14 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
         if isinstance(x, dict):
             return repr_dict('{%s}', x, length, encoding, is_valid)
 
-        if encoding == ENCODING_RAW_I and type(x) in [str, unicode, bytes, str8]:
+        if encoding == ENCODING_RAW_I and type(x) in [str, unicode, bytearray, bytes, str8]:
             return repr_str_raw(x, length, is_valid)
 
         if type(x) == unicode:
             return repr_unicode(x, length, is_valid)
+
+        if type(x) == bytearray:
+            return repr_bytearray(x, length, encoding, is_valid)
 
         if type(x) == bytes:
             return repr_bytes(x, length, encoding, is_valid)
@@ -3918,7 +3952,7 @@ class CFirewallTest:
         if fremote:
             self.m_loopback = ''
         else:
-            self.m_loopback = '127.0.0.1'
+            self.m_loopback = LOOPBACK
 
         self.m_timeout = timeout
 
@@ -3992,9 +4026,9 @@ class CFirewallTest:
 
         try:
             try:
-                s.connect((self.m_loopback, CFirewallTest.m_port))
+                s.connect((LOOPBACK, CFirewallTest.m_port))
 
-                s.send('Hello, world')
+                s.send(as_bytes('Hello, world'))
                 data = self.__recv(s, 1024)
                 self.m_result = True
 
@@ -5191,12 +5225,20 @@ class CStateManager:
 
 
 
+def myord(c):
+    try:
+        return ord(c)
+    except:
+        return c
+
+
+
 def CalcValidLines(code):
     l = code.co_firstlineno
     vl = [l]
 
-    bl = [ord(c) for c in code.co_lnotab[2::2]]
-    sl = [ord(c) for c in code.co_lnotab[1::2]]
+    bl = [myord(c) for c in code.co_lnotab[2::2]]
+    sl = [myord(c) for c in code.co_lnotab[1::2]]
 
     for (bi, si) in zip(bl, sl):
         l += si
@@ -6707,7 +6749,7 @@ class CDebuggerCore:
             if self.m_builtins_hack != None:
                 if calc_frame_path(frame) == self.m_builtins_hack:
                     self.m_builtins_hack = None
-                    frame.f_globals['__builtins__'] = sys.modules['__builtin__']
+                    frame.f_globals['__builtins__'] = g_builtins_module
 
             code_context = CCodeContext(frame, self.m_bp_manager)
             return self.m_code_contexts.setdefault(frame.f_code, code_context)
@@ -8555,7 +8597,10 @@ class CDebuggerEngine(CDebuggerCore):
                 r = '...Removed-password-from-output...'
             
             else:
-                _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
+                if is_py3k():
+                    _expr = expr
+                else:
+                    _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
 
                 try:                
                     redirect_exc_info = True
@@ -8626,8 +8671,13 @@ class CDebuggerEngine(CDebuggerCore):
                 _locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
 
             try:
-                _suite = as_string(ENCODING_SOURCE % encoding + suite, encoding, fstrict = True)
-                
+                if is_py3k():
+                    _suite = suite
+                else:
+                    _suite = as_string(ENCODING_SOURCE % encoding + suite, encoding, fstrict = True)
+
+                print_debug('suite is %s' % repr(_suite))
+
                 try:
                     redirect_exc_info = True
                     exec(_suite, _globals, _locals)
@@ -9025,7 +9075,7 @@ class CPwdServerProxy:
                 # Encrypt method and params.
                 #
                 fencrypt = self.get_encryption()
-                args = (name, params, self.m_target_rid)
+                args = (as_unicode(name), params, self.m_target_rid)
                 (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
 
                 rpdb_version = as_unicode(get_interface_compatibility_version())
@@ -9182,59 +9232,64 @@ class CIOServer:
             raise BadVersion(as_unicode(get_version()))
 
         try:
-            #
-            # Decrypt parameters.
-            #
-            ((name, __params, target_rid), client_id) = self.m_crypto.undo_crypto(fencrypt, fcompress, digest, msg)
-            
-        except AuthenticationBadIndex:
-            e = sys.exc_info()[1]
-            #print_debug_exception()
+            try:
+                #
+                # Decrypt parameters.
+                #
+                ((name, __params, target_rid), client_id) = self.m_crypto.undo_crypto(fencrypt, fcompress, digest, msg)
+                
+            except AuthenticationBadIndex:
+                e = sys.exc_info()[1]
+                #print_debug_exception()
+
+                #
+                # Notify the caller on the expected index.
+                #
+                max_index = self.m_crypto.get_max_index()
+                args = (max_index, None, e)
+                (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
+                return (fencrypt, fcompress, digest, msg)
+                
+            r = None
+            e = None
+
+            try:
+                #
+                # We are forcing the 'export_' prefix on methods that are
+                # callable through XML-RPC to prevent potential security
+                # problems
+                #
+                func = getattr(self, 'export_' + name)
+            except AttributeError:
+                raise Exception('method "%s" is not supported' % ('export_' + name))
+
+            try:
+                if (target_rid != 0) and (target_rid != self.m_rid):
+                    raise NotAttached
+                
+                #
+                # Record that client id is still attached. 
+                #
+                self.record_client_heartbeat(client_id, name, __params)
+
+                r = func(*__params)
+
+            except Exception:
+                _e = sys.exc_info()[1]
+                print_debug_exception()
+                e = _e            
 
             #
-            # Notify the caller on the expected index.
+            # Send the encrypted result.
             #
             max_index = self.m_crypto.get_max_index()
-            args = (max_index, None, e)
+            args = (max_index, r, e)
             (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
             return (fencrypt, fcompress, digest, msg)
-            
-        r = None
-        e = None
 
-        try:
-            #
-            # We are forcing the 'export_' prefix on methods that are
-            # callable through XML-RPC to prevent potential security
-            # problems
-            #
-            func = getattr(self, 'export_' + name)
-        except AttributeError:
-            raise Exception('method "%s" is not supported' % ('export_' + name))
-
-        try:
-            if (target_rid != 0) and (target_rid != self.m_rid):
-                raise NotAttached
-            
-            #
-            # Record that client id is still attached. 
-            #
-            self.record_client_heartbeat(client_id, name, __params)
-
-            r = func(*__params)
-
-        except Exception:
-            _e = sys.exc_info()[1]
+        except:
             print_debug_exception()
-            e = _e            
-
-        #
-        # Send the encrypted result.
-        #
-        max_index = self.m_crypto.get_max_index()
-        args = (max_index, r, e)
-        (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
-        return (fencrypt, fcompress, digest, msg)
+            raise
 
 
     def __StartXMLRPCServer(self):
@@ -10531,7 +10586,7 @@ class CSessionManagerInternal:
             return
 
         path = calc_bpl_filename(module_name + filename)            
-        file = open(path, 'w')
+        file = open(path, 'wb')
 
         try:
             try:
@@ -10555,7 +10610,7 @@ class CSessionManagerInternal:
             return
 
         path = calc_bpl_filename(module_name + filename)                            
-        file = open(path, 'r')
+        file = open(path, 'rb')
 
         ferror = False
         
@@ -12938,9 +12993,9 @@ def rpdb2_import_wrapper(*args, **kwargs):
 
 g_import = None
 
-if __name__ == 'rpdb2' and sys.modules['__builtin__'].__import__ != rpdb2_import_wrapper:
-    g_import = sys.modules['__builtin__'].__import__
-    sys.modules['__builtin__'].__import__ = rpdb2_import_wrapper
+if __name__ == 'rpdb2' and g_builtins_module.__import__ != rpdb2_import_wrapper:
+    g_import = g_builtins_module.__import__
+    g_builtins_module.__import__ = rpdb2_import_wrapper
 
 
 
