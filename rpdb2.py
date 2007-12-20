@@ -8338,6 +8338,12 @@ class CDebuggerEngine(CDebuggerCore):
             return snl
 
         if isinstance(r, dict):
+            if filter_level == 2 and expr in ['locals()', 'globals()']:
+                r = copy.copy(r)
+                for k, v in list(r.items()):
+                    if self.__parse_type(type(v)) in ['function', 'classobj', 'type']:
+                        del r[k]
+
             if len(r) > MAX_SORTABLE_LENGTH:
                 kl = r
             else:

@@ -3534,6 +3534,8 @@ class CNamespacePanel(wx.Panel, CJobs):
             items = self.get_children(item)
             s = items + s
 
+        self.m_tree.Refresh()
+
 
     def get_root_expr(self):
         """
