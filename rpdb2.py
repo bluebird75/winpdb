@@ -2360,6 +2360,15 @@ def safe_repr(x):
 
 
 
+def parse_type(t):
+    rt = safe_repr(t)
+    if not "'" in rt:
+        return rt
+
+    st = rt.split("'")[1]
+    return st
+
+
 def repr_list(pattern, l, length, encoding, is_valid):
     length = max(0, length - len(pattern) + 2)
 
@@ -3767,9 +3776,9 @@ def IsFilteredProperty(a):
 def IsMethodProperty(r, a):
     try:
         o = getattr(r, a)
-        r = repr(type(o))
+        r = parse_type(type(o))
 
-        if 'function' in r or 'method' in r:
+        if 'function' in r or 'method' in r or r == 'type':
             return True
 
         return False
@@ -8217,7 +8226,7 @@ class CDebuggerEngine(CDebuggerCore):
 
     
     def __calc_number_of_subnodes(self, r):
-        if self.__parse_type(type(r)) in BASIC_TYPES_LIST:
+        if parse_type(type(r)) in BASIC_TYPES_LIST:
             return 0
        
         try:
@@ -8249,15 +8258,6 @@ class CDebuggerEngine(CDebuggerCore):
         return 0
 
 
-    def __parse_type(self, t):
-        rt = safe_repr(t)
-        if not "'" in rt:
-            return rt
-
-        st = rt.split("'")[1]
-        return st
-
-
     def __calc_subnodes(self, expr, r, fForceNames, filter_level, repr_limit, encoding):
         snl = []
         
@@ -8282,7 +8282,7 @@ class CDebuggerEngine(CDebuggerCore):
                     e[DICT_KEY_NAME] = repr_ltd(i, repr_limit, encoding)
                     e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, encoding, is_valid)
                     e[DICT_KEY_IS_VALID] = is_valid[0]
-                    e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(i)))
+                    e[DICT_KEY_TYPE] = as_unicode(parse_type(type(i)))
                     e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
                     snl.append(e)
@@ -8312,7 +8312,7 @@ class CDebuggerEngine(CDebuggerCore):
                 e[DICT_KEY_NAME] = repr_ltd(i, repr_limit, encoding)
                 e[DICT_KEY_REPR] = repr_ltd(i, repr_limit, encoding, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
-                e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(i)))
+                e[DICT_KEY_TYPE] = as_unicode(parse_type(type(i)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(i)
 
                 snl.append(e)
@@ -8327,7 +8327,7 @@ class CDebuggerEngine(CDebuggerCore):
                 e[DICT_KEY_NAME] = as_unicode(repr(i))
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, encoding, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
-                e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
+                e[DICT_KEY_TYPE] = as_unicode(parse_type(type(v)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
                 snl.append(e)
@@ -8341,7 +8341,7 @@ class CDebuggerEngine(CDebuggerCore):
             if filter_level == 2 and expr in ['locals()', 'globals()']:
                 r = copy.copy(r)
                 for k, v in list(r.items()):
-                    if self.__parse_type(type(v)) in ['function', 'classobj', 'type']:
+                    if parse_type(type(v)) in ['function', 'classobj', 'type']:
                         del r[k]
 
             if len(r) > MAX_SORTABLE_LENGTH:
@@ -8355,7 +8355,7 @@ class CDebuggerEngine(CDebuggerCore):
                 # Remove any trace of session password from data structures that 
                 # go over the network.
                 #
-                if k in ['_RPDB2_FindRepr', '_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
+                if k in ['_RPDB2_FindRepr', '_RPDB2_builtins', '_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
                     continue
 
                 v = r[k]
@@ -8384,7 +8384,7 @@ class CDebuggerEngine(CDebuggerCore):
                 e[DICT_KEY_NAME] = as_unicode([repr_ltd(k, repr_limit, encoding), k][fForceNames])
                 e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, encoding, is_valid)
                 e[DICT_KEY_IS_VALID] = is_valid[0]
-                e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
+                e[DICT_KEY_TYPE] = as_unicode(parse_type(type(v)))
                 e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
                 snl.append(e)
@@ -8413,7 +8413,7 @@ class CDebuggerEngine(CDebuggerCore):
             e[DICT_KEY_NAME] = as_unicode(a)
             e[DICT_KEY_REPR] = repr_ltd(v, repr_limit, encoding, is_valid)
             e[DICT_KEY_IS_VALID] = is_valid[0]
-            e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(v)))
+            e[DICT_KEY_TYPE] = as_unicode(parse_type(type(v)))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(v)
 
             snl.append(e)
@@ -8469,7 +8469,7 @@ class CDebuggerEngine(CDebuggerCore):
             e[DICT_KEY_EXPR] = as_unicode(expr)
             e[DICT_KEY_REPR] = repr_ltd(r, repr_limit, encoding, is_valid)
             e[DICT_KEY_IS_VALID] = is_valid[0]
-            e[DICT_KEY_TYPE] = as_unicode(self.__parse_type(type(r)))
+            e[DICT_KEY_TYPE] = as_unicode(parse_type(type(r)))
             e[DICT_KEY_N_SUBNODES] = self.__calc_number_of_subnodes(r)
             
             if fExpand and (e[DICT_KEY_N_SUBNODES] > 0):
@@ -8592,7 +8592,7 @@ class CDebuggerEngine(CDebuggerCore):
         
         encoding = self.__calc_encoding(encoding)
 
-        (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException)
+        (_globals, _locals, _original_locals_copy) = self.__get_locals_globals(frame_index, fException)
 
         v = ''
         w = ''
@@ -8608,12 +8608,20 @@ class CDebuggerEngine(CDebuggerCore):
                 else:
                     _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
 
+                if '_RPDB2_builtins' in _expr:
+                    print_debug(_expr)
+                    _locals['_RPDB2_builtins'] = vars(g_builtins_module)
+
                 try:                
                     redirect_exc_info = True
                     r = eval(_expr, _globals, _locals)
 
                 finally:
                     del redirect_exc_info
+                    
+                    if '_RPDB2_builtins' in _expr:
+                        del _locals['_RPDB2_builtins']
+
         
             if fraw:
                 encoding = ENCODING_RAW_I
@@ -10919,7 +10927,7 @@ class CSessionManagerInternal:
             raise BadArgument
 
         if scope == None:
-            _scope = as_unicode('list(globals().keys()) + list(locals().keys())')
+            _scope = as_unicode('list(globals().keys()) + list(locals().keys()) + list(_RPDB2_builtins.keys())')
         else:
             _scope = as_unicode('dir(%s)' % scope)
 
@@ -10929,7 +10937,9 @@ class CSessionManagerInternal:
                 print_debug('evaluate() returned the following warning/error: %s' % w + e)
                 return (expr, [])
 
-            self.m_completions[_scope] = list(set(eval(v)))
+            ev = eval(v)
+            ev.remove('_RPDB2_builtins')
+            self.m_completions[_scope] = list(set(ev))
 
         completions = [attr for attr in self.m_completions[_scope] if attr.startswith(complete)]
         completions.sort()
