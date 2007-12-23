@@ -527,12 +527,12 @@ class CSimpleSessionManager:
         self.__sm.register_callback(self.__termination_callback, event_type_dict, fSingleUse = False)
 
 
-    def launch(self, fchdir, command_line, encoding = 'utf-8'):
+    def launch(self, fchdir, command_line, encoding = 'utf-8', fload_breakpoints = False):
         command_line = as_unicode(command_line, encoding, fstrict = True)
 
         self.m_fRunning = False
 
-        self.__sm.launch(fchdir, command_line, fload_breakpoints = False)
+        self.__sm.launch(fchdir, command_line, fload_breakpoints)
 
 
     def request_go(self):
@@ -725,11 +725,12 @@ class CSessionManager:
         return self.__smi.refresh()
 
 
-    def launch(self, fchdir, command_line, encoding = 'utf-8'):
+    def launch(self, fchdir, command_line, encoding = 'utf-8', fload_breakpoints = True):
         """
         Launch debuggee in a new process and attach.
         fchdir - Change current directory to that of the debuggee.
         command_line - command line arguments pass to the script as a string.
+        fload_breakpoints - Load breakpoints of last session.
 
         if command line is not a unicode string it will be decoded into unicode
         with the given encoding
@@ -737,7 +738,7 @@ class CSessionManager:
         
         command_line = as_unicode(command_line, encoding, fstrict = True)
 
-        return self.__smi.launch(fchdir, command_line)
+        return self.__smi.launch(fchdir, command_line, fload_breakpoints)
 
         
     def restart(self):
