@@ -339,13 +339,13 @@ import threading
 import xmlrpclib
 import tempfile
 import textwrap
-import cPickle
 import keyword
 import weakref
 import base64
 import socket
 import string
 import codecs
+import pickle
 import Queue
 import time
 import os
@@ -782,13 +782,13 @@ class CSettings:
     def load_settings(self):
         try:
             path = self.calc_path()
-            f = open(path, 'r')
+            f = open(path, 'rb')
             
         except IOError:
             return 
             
         try:
-            d = cPickle.load(f)
+            d = pickle.load(f)
             self.m_dict.update(d)
             
         finally:
@@ -798,13 +798,13 @@ class CSettings:
     def save_settings(self):
         try:
             path = self.calc_path()
-            f = open(path, 'w')
+            f = open(path, 'wb')
             
         except IOError:
             return 
             
         try:
-            cPickle.dump(self.m_dict, f)
+            pickle.dump(self.m_dict, f)
             
         finally:
             f.close()
@@ -1470,6 +1470,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         event_type_dict = {rpdb2.CEventBreakpoint: {}}
         self.m_session_manager.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {rpdb2.CEventTabs: {}}
+        self.m_session_manager.register_callback(self.update_tabs, event_type_dict, fSingleUse = False)
+
         event_type_dict = {rpdb2.CEventTrap: {}}
         self.m_session_manager.register_callback(self.update_trap, event_type_dict, fSingleUse = False)
 
@@ -1665,6 +1668,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_async_sm.set_analyze(f)
 
 
+    def update_tabs(self, event):
+        wx.CallAfter(self.m_code_viewer.refresh)
+
+        
     def update_trap(self, event):
         wx.CallAfter(self.set_toggle, TB_TRAP, event.m_ftrap)
 
@@ -2237,7 +2244,7 @@ class CStyledViewer(stc.StyledTextCtrl):
             self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:Courier')
 
         self.StyleClearAll()
-        self.SetTabWidth(4)
+        #self.SetTabWidth(4)
         
         self.StyleSetSpec(stc.STC_STYLE_LINENUMBER, 'fore:#000000,back:#99A9C2')    
         self.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, 'fore:#00009D,back:#FFFF00')
@@ -2472,6 +2479,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         sizerv.Add(self.m_caption, 0, wx.EXPAND | wx.ALL, 0)
 
         self.m_viewer = CStyledViewer(self, style = wx.TAB_TRAVERSAL, margin_command = self.on_margin_clicked)
+        self.m_viewer.SetTabWidth(self.m_session_manager.get_tab_width())
         self.bind_caption(self.m_viewer)
         sizerv.Add(self.m_viewer, 1, wx.EXPAND | wx.ALL, 0)
 
@@ -2609,6 +2617,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
             return
 
         filename = self.m_cur_filename
+        self.m_files[self.m_cur_filename] = self.m_viewer.GetCurrentLine() + 1  
         self.m_cur_filename = None
 
         self.set_file(filename)
@@ -2642,9 +2651,9 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
             self.m_files[self.m_cur_filename] = self.m_viewer.GetCurrentLine() + 1  
 
         lineno = self.m_files.get(_filename, 1)
-        
+       
         self.m_viewer.load_source(source)
-    
+        self.m_viewer.SetTabWidth(self.m_session_manager.get_tab_width()) 
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
       
@@ -2687,6 +2696,8 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
                 self.m_files[self.m_cur_filename] = self.m_viewer.GetCurrentLine() + 1 
 
             self.m_viewer.load_source(source)
+            self.m_viewer.SetTabWidth(self.m_session_manager.get_tab_width()) 
+
 
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
