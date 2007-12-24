@@ -20,8 +20,14 @@ Requirements
     wxPython
     To use the Winpdb GUI you need wxPython 2.6.x or later 
     installed. You can still use rpdb2 which is the console version of the 
-    debugger without wxPython. (http://www.wxpython.org/)
+    debugger without wxPython.
 
+    Most Linux distributions include wxPython as a package called python-wxgtk. 
+    Use your distribution’s package manager (e.g. synaptic, aptitude or yum) 
+    to find and install it.
+
+    On Windows you need to install the wxPython runtime (The unicode version 
+    is preferred) http://www.wxpython.org/.
 
 	
 Installation
@@ -41,10 +47,6 @@ Installation
     Python binaries (scripts) folder:
 
     On Linux this folder is usually /usr/bin and is in the path by default. 
-
-    On OS X this folder might be
-    /System/Library/Frameworks/Python.framework/Versions/2.4/bin  and is not 
-    in the path by default.
 
     On Windows this folder is %PYTHONHOME%\Scripts and is not in the path by
     default.

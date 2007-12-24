@@ -349,6 +349,7 @@ import codecs
 import Queue
 import time
 import os
+import re
 
 
 
@@ -725,6 +726,9 @@ def calc_denominator(string_list):
             if d[i] != s[i]:
                 break
             i += 1
+
+        if i == 0:
+            return ''
 
         d = d[:i]
 
@@ -2947,7 +2951,7 @@ class CConsole(wx.Panel, CCaptionManager):
             return
 
         if ce != '' and ce.split()[0] in ['v', 'eval', 'x', 'exec']:
-            completions = [c.split()[-1].split('.')[-1] for c in completions]
+            completions = [re.split('\W+', c)[-1] for c in completions]
 
         if completions == self.m_completions:
             return

@@ -1057,7 +1057,7 @@ class CSessionManager:
              children e.g. lists, dictionaries, etc...
              
         filter_level - 0, 1, or 2. Filter out methods and functions from
-            classes and objects.
+            classes and objects. (0 - None, 1 - Medium, 2 - Maximum).
 
         repr_limit - Length limit (approximated) to be imposed repr() of 
              returned items.
@@ -1153,17 +1153,22 @@ class CSessionManager:
 
     def complete_expression(self, expr):
         """
-        Return a list with matching completions for expression.
+        Return matching completions for expression.
         Accepted expressions are of the form a.b.c
 
-        Dictionary lookups or functions call are not accepted. For 
+        Dictionary lookups or functions call are not evaluated. For 
         example: 'getobject().complete' or 'dict[item].complete' are
-        not allowed.
+        not processed.
 
         On the other hand partial expressions and statements are 
         accepted. For example: 'foo(arg1, arg2.member.complete' will
         be accepted and the completion for 'arg2.member.complete' will
         be calculated.
+
+        Completions are returned as a tuple of two items. The first item
+        is a prefix to expr and the second item is a list of completions.
+        For example if expr is 'foo(self.comp' the returned tuple can
+        be ('foo(self.', ['complete', 'completion', etc...])
         """
 
         expr = as_unicode(expr, fstrict = True)
@@ -2207,12 +2212,17 @@ def safe_wait(lock, timeout = None):
 
 
 
+#
+# The following code is related to the ability of the debugger
+# to work both on Python 2.5 and 3.0.
+#
+
 class _stub_type:
     pass
 
 
 
-def foo(s, e):
+def _rpdb2_bytes(s, e):
     return s.encode(e)
    
 
@@ -2231,7 +2241,12 @@ if not hasattr(g_builtins_module, 'bytearray'):
 
 if not hasattr(g_builtins_module, 'bytes'):
     bytes = _stub_type
-    g_builtins_module.bytes = foo
+
+    #
+    # Pickle on Python 2.5 should know how to handle byte strings
+    # that arrive from Python 3.0 over sockets.
+    #
+    g_builtins_module.bytes = _rpdb2_bytes
 
 
 if is_py3k():
@@ -3763,7 +3778,7 @@ def CalcUserShell():
 
 
 
-def IsFilteredProperty(a):
+def IsFilteredAttribute(a):
     if not (a.startswith('__') and a.endswith('__')):
         return False
 
@@ -3774,7 +3789,7 @@ def IsFilteredProperty(a):
 
 
 
-def IsMethodProperty(r, a):
+def IsFilteredAttribute2(r, a):
     try:
         o = getattr(r, a)
         r = parse_type(type(o))
@@ -3795,10 +3810,7 @@ def CalcFilteredDir(r, filter_level):
     if filter_level == 0:
         return d
 
-    fd = [a for a in d if not IsFilteredProperty(a)]
-
-    if filter_level == 2:
-        fd = [a for a in fd if not IsMethodProperty(r, a)]
+    fd = [a for a in d if not IsFilteredAttribute(a)]
 
     return fd
 
@@ -3828,7 +3840,7 @@ def getattr_nothrow(o, a):
 
 
 
-def CalcDictKeys(r, filter_level):
+def calc_attribute_list(r, filter_level):
     d = CalcFilteredDir(r, filter_level)
     rs = set(d)
 
@@ -3871,9 +3883,17 @@ def CalcDictKeys(r, filter_level):
                 except:
                     pass
       
-    l = [a for a in rs]
+    l = [a for a in rs if (filter_level < 2 or not IsFilteredAttribute2(r, a))]
 
-    return l
+    if hasattr(r, '__class__') and not '__class__' in l:
+        l = ['__class__'] + l
+
+    if hasattr(r, '__bases__') and not '__bases__' in l:
+        l = ['__bases__'] + l
+
+    al = [a for a in l if hasattr(r, a)]
+
+    return al
 
 
 
@@ -8211,21 +8231,7 @@ class CDebuggerEngine(CDebuggerCore):
 
         return (_globals, _locals, _original_locals_copy)
 
-
-    def __calc_attribute_list(self, r, filter_level):
-        al = CalcDictKeys(r, filter_level)    
-                
-        if hasattr(r, '__class__') and not '__class__' in al:
-            al = ['__class__'] + al
-
-        if hasattr(r, '__bases__') and not '__bases__' in al:
-            al = ['__bases__'] + al
-
-        _al = [a for a in al if hasattr(r, a)] 
-  
-        return _al
-
-    
+   
     def __calc_number_of_subnodes(self, r):
         if parse_type(type(r)) in BASIC_TYPES_LIST:
             return 0
@@ -8392,7 +8398,7 @@ class CDebuggerEngine(CDebuggerCore):
 
             return snl            
 
-        al = self.__calc_attribute_list(r, filter_level)
+        al = calc_attribute_list(r, filter_level)
         al.sort(SafeCmp)
 
         for a in al:
@@ -8593,7 +8599,7 @@ class CDebuggerEngine(CDebuggerCore):
         
         encoding = self.__calc_encoding(encoding)
 
-        (_globals, _locals, _original_locals_copy) = self.__get_locals_globals(frame_index, fException)
+        (_globals, _locals, x) = self.__get_locals_globals(frame_index, fException)
 
         v = ''
         w = ''
@@ -8607,10 +8613,9 @@ class CDebuggerEngine(CDebuggerCore):
                 if is_py3k():
                     _expr = expr
                 else:
-                    _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
+                    _expr = as_string(ENCODING_SOURCE % encoding + expr, encoding, fstrict = True)
 
                 if '_RPDB2_builtins' in _expr:
-                    print_debug(_expr)
                     _locals['_RPDB2_builtins'] = vars(g_builtins_module)
 
                 try:                
@@ -10814,8 +10819,9 @@ class CSessionManagerInternal:
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE) 
 
         (value, warning, error) = self.getSession().getProxy().evaluate(expr, frame_index, fAnalyzeMode, self.m_encoding, self.m_fraw)
-
-        self.m_completions.clear()
+        
+        if fclear_completions:
+            self.m_completions.clear()
 
         return (value, warning, error)
 
@@ -10938,9 +10944,10 @@ class CSessionManagerInternal:
                 print_debug('evaluate() returned the following warning/error: %s' % w + e)
                 return (expr, [])
 
-            ev = eval(v)
-            ev.remove('_RPDB2_builtins')
-            self.m_completions[_scope] = list(set(ev))
+            cl = list(set(eval(v)))
+            if '_RPDB2_builtins' in cl:
+                cl.remove('_RPDB2_builtins')
+            self.m_completions[_scope] = cl
 
         completions = [attr for attr in self.m_completions[_scope] if attr.startswith(complete)]
         completions.sort()
@@ -12538,9 +12545,9 @@ name-space even if its threads are still running or blocked in
 C library code by using special worker threads. In some rare 
 cases querying or modifying data in synchronicity can crash the 
 script. For example in some Linux builds of wxPython querying 
-the state of objects from a non GUI thread can crash the script. 
-If you want the active thread to perform these operations turn 
-synchronicity off.
+the state of wx objects from a thread other than the GUI thread 
+can crash the script. If this happens or if you want to restrict 
+these operations to the active thread, turn synchronicity off.
 
 Default is True.""", self.m_stdout)
 
