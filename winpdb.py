@@ -1470,9 +1470,6 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         event_type_dict = {rpdb2.CEventBreakpoint: {}}
         self.m_session_manager.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventTabs: {}}
-        self.m_session_manager.register_callback(self.update_tabs, event_type_dict, fSingleUse = False)
-
         event_type_dict = {rpdb2.CEventTrap: {}}
         self.m_session_manager.register_callback(self.update_trap, event_type_dict, fSingleUse = False)
 
@@ -1666,10 +1663,6 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         f = event.IsChecked()
 
         self.m_async_sm.set_analyze(f)
-
-
-    def update_tabs(self, event):
-        wx.CallAfter(self.m_code_viewer.refresh)
 
         
     def update_trap(self, event):
@@ -2244,7 +2237,7 @@ class CStyledViewer(stc.StyledTextCtrl):
             self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:Courier')
 
         self.StyleClearAll()
-        #self.SetTabWidth(4)
+        self.SetTabWidth(rpdb2.PYTHON_TAB_WIDTH)
         
         self.StyleSetSpec(stc.STC_STYLE_LINENUMBER, 'fore:#000000,back:#99A9C2')    
         self.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, 'fore:#00009D,back:#FFFF00')
@@ -2479,7 +2472,6 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         sizerv.Add(self.m_caption, 0, wx.EXPAND | wx.ALL, 0)
 
         self.m_viewer = CStyledViewer(self, style = wx.TAB_TRAVERSAL, margin_command = self.on_margin_clicked)
-        self.m_viewer.SetTabWidth(self.m_session_manager.get_tab_width())
         self.bind_caption(self.m_viewer)
         sizerv.Add(self.m_viewer, 1, wx.EXPAND | wx.ALL, 0)
 
@@ -2653,7 +2645,6 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         lineno = self.m_files.get(_filename, 1)
        
         self.m_viewer.load_source(source)
-        self.m_viewer.SetTabWidth(self.m_session_manager.get_tab_width()) 
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
       
@@ -2696,8 +2687,6 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
                 self.m_files[self.m_cur_filename] = self.m_viewer.GetCurrentLine() + 1 
 
             self.m_viewer.load_source(source)
-            self.m_viewer.SetTabWidth(self.m_session_manager.get_tab_width()) 
-
 
         self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
         self.m_viewer.GotoLine(lineno - 1)
@@ -4561,6 +4550,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
         dlg.Destroy()
     
     app.MainLoop()
+
+    sm.shutdown()
 
 
 

@@ -527,6 +527,10 @@ class CSimpleSessionManager:
         self.__sm.register_callback(self.__termination_callback, event_type_dict, fSingleUse = False)
 
 
+    def shutdown(self):
+        self.__sm.shutdown()
+
+
     def launch(self, fchdir, command_line, encoding = 'utf-8', fload_breakpoints = False):
         command_line = as_unicode(command_line, encoding, fstrict = True)
 
@@ -678,6 +682,10 @@ class CSessionManager:
                             fAllowRemote, 
                             host
                             )
+
+
+    def shutdown(self):
+        return self.__smi.shutdown()
 
 
     def set_printer(self, printer):
@@ -1340,14 +1348,6 @@ class CSessionManager:
         return self.__smi.stop_debuggee()
 
 
-    def set_tab_width(self, nspaces):
-        return self.__smi.set_tab_width(nspaces)
-
-
-    def get_tab_width(self):
-        return self.__smi.get_tab_width()
-
-
 
 class CConsole:
     """
@@ -1693,6 +1693,11 @@ def as_bytes(s, encoding = 'utf-8', fstrict = True):
 
 
 
+#
+# According to PEP-8: "Use 4 spaces per indentation level." 
+#
+PYTHON_TAB_WIDTH = 4
+
 GNOME_DEFAULT_TERM = 'gnome-terminal'
 NT_DEBUG = 'nt_debug'
 SCREEN = 'screen'
@@ -1731,18 +1736,10 @@ XTERM = 'xterm'
 RXVT = 'rxvt'
 
 RPDB_SETTINGS_FOLDER = '.rpdb2_settings'
-RPDB_SETTINGS_FILENAME = 'rpdb2_settings.cfg'
-RPDB_SETTINGS_PATH = os.path.join(RPDB_SETTINGS_FOLDER, RPDB_SETTINGS_FILENAME)
 RPDB_PWD_FOLDER = os.path.join(RPDB_SETTINGS_FOLDER, 'passwords')
 RPDB_BPL_FOLDER = os.path.join(RPDB_SETTINGS_FOLDER, 'breakpoints')
 RPDB_BPL_FOLDER_NT = 'rpdb2_breakpoints'
 MAX_BPL_FILES = 100
-
-TABS = 'tabs'
-
-RPDB_SETTINGS_DEFAULT = {
-    TABS: 4
-}
 
 EMBEDDED_SYNC_THRESHOLD = 1.0
 EMBEDDED_SYNC_TIMEOUT = 5.0
@@ -1901,7 +1898,6 @@ STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_PASSWORD_BAD = 'The password should begin with a letter and continue with any combination of digits, letters or underscores (\'_\'). Only English characters are accepted for letters.'
 STR_ENCRYPT_MODE = 'Force encryption mode: %s'
-STR_TAB_WIDTH = 'Tab width is set to %d spaces.'
 STR_REMOTE_MODE = 'Allow remote machines mode: %s'
 STR_ENCODING_MODE = 'Encoding is set to: %s'
 STR_ENCODING_MODE_SET = 'Encoding was set to: %s'
@@ -4167,74 +4163,6 @@ class CFirewallTest:
             return -1
 
         return e.args[0]
-
-
-
-class CSettings:
-    def __init__(self, default_settings):
-        self.m_dict = default_settings
-        self.m_fDirty = False
-
-
-    def load_settings(self):
-        try:
-            path = self.__calc_path()
-            f = open(path, 'rb')
-            
-        except IOError:
-            return 
-            
-        try:
-            d = pickle.load(f)
-            self.m_dict.update(d)
-            
-        finally:
-            f.close()
-
-            
-    def save_settings(self):
-        if not self.m_fDirty:
-            return
-
-        try:
-            path = self.__calc_path()
-            f = open(path, 'wb')
-            
-        except IOError:
-            return 
-            
-        try:
-            pickle.dump(self.m_dict, f)
-            
-        finally:
-            f.close()
-
-
-    def __calc_path(self):
-        if os.name == POSIX:
-            home = os.path.expanduser('~')
-            path = os.path.join(home, RPDB_SETTINGS_PATH)
-            return path
-
-        #
-        # gettempdir() is used since it works with unicode user names on 
-        # Windows.
-        #
-        
-        tmpdir = tempfile.gettempdir()
-        path = os.path.join(tmpdir, RPDB_SETTINGS_FILENAME)
-        return path
-
-        
-    def __getitem__(self, key):
-        return self.m_dict[key]
-
-
-    def __setitem__(self, key, value):
-        if not key in self.m_dict or value != self.m_dict[key]:
-            self.m_fDirty = True
-
-        self.m_dict[key] = value
         
 
 
@@ -4797,20 +4725,6 @@ class CEventSynchronicity(CEvent):
 
     def is_match(self, arg):
         return self.m_fsynchronicity == arg
-
-
-
-class CEventTabs(CEvent):
-    """
-    Sent when tab width changes.
-    """
-    
-    def __init__(self, tab_width):
-        self.m_tab_width = tab_width
-
-
-    def is_match(self, arg):
-        return self.m_tab_width == arg
 
 
 
@@ -10104,16 +10018,12 @@ class CSessionManagerInternal:
 
         self.m_encoding = ENCODING_AUTO
         self.m_fraw = False
-
-        self.m_settings = CSettings(RPDB_SETTINGS_DEFAULT)
-        self.m_settings.load_settings()
         
     
-    def __del__(self):
+    def shutdown(self):
         self.m_event_dispatcher_proxy.shutdown()
         self.m_event_dispatcher.shutdown()
         self.m_state_manager.shutdown()
-        self.m_settings.save_settings()
 
         
     def __nul_printer(self, _str):
@@ -11266,19 +11176,6 @@ class CSessionManagerInternal:
             self.m_printer(STR_DETACH_SUCCEEDED)
 
 
-    def set_tab_width(self, nspaces):
-        ffire = self.m_settings[TABS] != nspaces
-        self.m_settings[TABS] = nspaces
-
-        if ffire:
-            event = CEventTabs(nspaces)
-            self.m_event_dispatcher.fire_event(event)
-
-
-    def get_tab_width(self):
-        return self.m_settings[TABS]
-
-
 
 class CConsoleInternal(cmd.Cmd, threading.Thread):
     def __init__(self, session_manager, stdin = None, stdout = None, fSplit = False):
@@ -12063,8 +11960,6 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                 self.printer(STR_NO_THREADS_FOUND)
                 return
 
-            tabs = self.m_session_manager.get_tab_width()
-
             m = None    
             for d in r:
                 tid = d.get(DICT_KEY_TID, 0)
@@ -12106,7 +12001,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
                     else:
                         b = ''
                         
-                    line = line.replace('\t', ' ' * tabs)
+                    line = line.replace('\t', ' ' * PYTHON_TAB_WIDTH)
 
                     _print(' %2s %1s %5d  %s' % (m, b, lineno, calc_prefix(line[:-1], 60)), self.m_stdout)
 
@@ -12387,22 +12282,6 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         self.m_session_manager.set_fork_mode(ffork_into_child, ffork_auto)
 
-    
-    def do_tabs(self, arg):
-        if arg == '':
-            tabs = self.m_session_manager.get_tab_width()
-            _print(STR_TAB_WIDTH % tabs, self.m_stdout)
-            return
-
-        try:
-            tabs = int(arg)
-        except ValueError:
-            _print(STR_BAD_ARGUMENT, self.m_stdout)
-            return
-
-        self.m_session_manager.set_tab_width(tabs)
-        _print(STR_TAB_WIDTH % tabs, self.m_stdout)
-
 
     def do_password(self, arg):
         if arg == '':
@@ -12563,7 +12442,6 @@ Misc:
 
 thread      - Display threads or switch to a particular thread.
 list        - List source code.
-tabs        - Set tab width.
 stack       - Display stack trace.
 up          - Go up one frame in stack.
 down        - Go down one frame in stack.
@@ -12906,19 +12784,8 @@ Type 'help break' for more information on breakpoints and threads.
 Type 'help up' or 'help down' for more information on focused frames.""", self.m_stdout)  
 
     help_k = help_stack
-    
-
-    def help_tabs(self):
-        _print("""tabs [<nspaces>]
-
-Without an argument, prints the current tab width. Otherwise sets the tabs
-width to the specified number of spaces. This value affects the output of 
-the 'list' command.
-
-Default is 4.""", self.m_stdout)  
 
     
-
     def help_list(self):
         _print("""list [<file_name>:][<line_no> | '+' | '-' | '^' | '*'] [',' <nlines>]
 
@@ -13742,6 +13609,7 @@ def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fA
         print_debug_exception(True)
         
     c.join()
+    sm.shutdown()
 
 
 
