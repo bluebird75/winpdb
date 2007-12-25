@@ -422,6 +422,7 @@ DLG_LAUNCH_TITLE = "Launch"
 DLG_ATTACH_TITLE = "Attach"
 STATIC_EXPR = """The new expression will be evaluated at the debuggee
 and its value will be set to the item."""
+
 CHECKBOX_ENCODING = "Output non ASCII characters as an escape sequence."
 STATIC_ENCODING = """The specified encoding is used as source encoding for the name-space viewer and for the exec and eval console commands. Valid values are either 'auto' or an encoding known by the codecs module. If 'auto' is specified, the source encoding of the active scope will be used, which is utf-8 by default."""
 STATIC_ENCODING_SPLIT = """The specified encoding is used as source encoding 
@@ -431,28 +432,36 @@ eval console commands. Valid values are either
 If 'auto' is specified, the source encoding of 
 the active scope will be used, which is utf-8 
 by default."""
+
 CHECKBOX_SYNCHRONICITY = "Use synchronicity."
-STATIC_SYNCHRONICITY = """Synchronicity allows the debugger to query and modify the script name-space even if its threads are still running or blocked in C library code by using special worker threads. In some rare cases querying or modifying data in synchronicity can crash the script. For example in some Linux builds of wxPython querying the state of wx objects from a thread other than the GUI thread can crash the script. If this happens or if you want to restrict these operations to the active thread, turn synchronicity off."""
-STATIC_SYNCHRONICITY_SPLIT = """Synchronicity allows the debugger to query
-and modify the script name-space even if its
+STATIC_SYNCHRONICITY = """Traditional Python debuggers that use the inspected thread (usually the main thread) to query or modify the script name-space have to wait until the script hits a break-point. Synchronicity allows the debugger to query and modify the script name-space even if its threads are still running or blocked in C library code by using special worker threads. In some rare cases querying or modifying data in synchronicity can crash the script. For example in some Linux builds of wxPython querying the state of wx objects from a thread other than the GUI thread can crash the script. If this happens or if you want to restrict these operations to the inspected thread, turn synchronicity off."""
+STATIC_SYNCHRONICITY_SPLIT = """Traditional Python debuggers that use the
+inspected thread (usually the main thread) to 
+query or modify the script name-space have to
+wait until the script hits a break-point.
+Synchronicity allows the debugger to query 
+and modify the script name-space even if its 
 threads are still running or blocked in C 
 library code by using special worker threads. 
-In some rare cases querying or modifying 
-data in synchronicity can crash the script. 
-For example in some Linux builds of wxPython 
-querying the state of wx objects from a 
-thread other than the GUI thread can crash 
-the script. If this happens or if you want 
-to restrict these operations to the active 
-thread, turn synchronicity off."""
+In some rare cases querying or modifying data 
+in synchronicity can crash the script. For 
+example in some Linux builds of wxPython 
+querying the state of wx objects from a thread 
+other than the GUI thread can crash the script. 
+If this happens or if you want to restrict 
+these operations to the inspected thread, 
+turn synchronicity off."""
+
 STATIC_PWD = """The password is used to secure communication between the debugger console and the debuggee. Debuggees with un-matching passwords will not appear in the attach query list."""
 STATIC_PWD_SPLIT = """The password is used to secure communication 
 between the debugger console and the debuggee. 
 Debuggees with un-matching passwords will not 
 appear in the attach query list."""
+
 STATIC_LAUNCH_ENV = """To set environment variables for the new script use the 'env' console command."""
 STATIC_LAUNCH_ENV_SPLIT = """To set environment variables for the new script use the 'env' 
 console command."""
+
 STATIC_OPEN = """The source file entered will be fetched from the debugee."""
 LABEL_EXPR = "New Expression:"
 LABEL_ENCODING = "Set encoding:"

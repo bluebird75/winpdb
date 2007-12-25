@@ -26,8 +26,8 @@ Requirements
     Use your distribution’s package manager (e.g. synaptic, aptitude or yum) 
     to find and install it.
 
-    On Windows you need to install the wxPython runtime (The unicode version 
-    is preferred) http://www.wxpython.org/.
+    On Windows you need to install the wxPython runtime from 
+    http://www.wxpython.org/ (The unicode version is preferred).
 
 	
 Installation
