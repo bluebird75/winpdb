@@ -800,8 +800,10 @@ class CSettings:
             d = pickle.load(f)
             self.m_dict.update(d)
             
-        finally:
-            f.close()
+        except:
+            rpdb2.print_debug_exception()
+        
+        f.close()
 
             
     def save_settings(self):

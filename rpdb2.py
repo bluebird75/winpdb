@@ -5495,7 +5495,7 @@ class CBreakPoint(object):
         if (expr is not None) and (expr != ''):
             _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
             print_debug('Breakpoint expression: %s' % repr(_expr))
-            self.m_code = compile(_expr, '', 'eval')
+            self.m_code = compile(_expr, '<string>', 'eval')
 
         
     def __reduce__(self):
@@ -7728,7 +7728,7 @@ class CDebuggerEngine(CDebuggerCore):
                 try:
                     encoding = self.__calc_encoding(encoding, filename = _filename)
                     _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
-                    compile(_expr, '', 'eval')
+                    compile(_expr, '<string>', 'eval')
                 except:
                     raise SyntaxError
 
@@ -8627,12 +8627,9 @@ class CDebuggerEngine(CDebuggerCore):
                 r = '...Removed-password-from-output...'
             
             else:
-                if is_py3k():
-                    _expr = expr
-                else:
-                    _expr = as_string(ENCODING_SOURCE % encoding + expr, encoding, fstrict = True)
+                _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding, fstrict = True)
 
-                if '_RPDB2_builtins' in _expr:
+                if '_RPDB2_builtins' in expr:
                     _locals['_RPDB2_builtins'] = vars(g_builtins_module)
 
                 try:                
@@ -8642,7 +8639,7 @@ class CDebuggerEngine(CDebuggerCore):
                 finally:
                     del redirect_exc_info
                     
-                    if '_RPDB2_builtins' in _expr:
+                    if '_RPDB2_builtins' in expr:
                         del _locals['_RPDB2_builtins']
 
         
@@ -8708,16 +8705,14 @@ class CDebuggerEngine(CDebuggerCore):
                 _locals['_RPDB2_FindRepr'] = _RPDB2_FindRepr
 
             try:
-                if is_py3k():
-                    _suite = suite
-                else:
-                    _suite = as_string(ENCODING_SOURCE % encoding + suite, encoding, fstrict = True)
-
+                _suite = as_bytes(ENCODING_SOURCE % encoding + suite, encoding, fstrict = True)
                 #print_debug('suite is %s' % repr(_suite))
+                
+                _code = compile(_suite, '<string>', 'exec')
 
                 try:
                     redirect_exc_info = True
-                    exec(_suite, _globals, _locals)
+                    exec(_code, _globals, _locals)
 
                 finally:
                     del redirect_exc_info
