@@ -5,7 +5,7 @@
 
     A remote Python debugger for CPython
 
-    Copyright (C) 2005-2007 Nir Aides
+    Copyright (C) 2005-2008 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
     under the terms of the GNU General Public License as published by the 
@@ -22,7 +22,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 
-COPYRIGHT_NOTICE = """Copyright (C) 2005-2007 Nir Aides"""
+COPYRIGHT_NOTICE = """Copyright (C) 2005-2008 Nir Aides"""
 
 CREDITS_NOTICE = """Jurjen N.E. Bos - Compatibility with OS X."""
 
@@ -1784,7 +1784,7 @@ CONSOLE_WRAP_INDEX = 78
 CONSOLE_PROMPT = '\n> '
 CONSOLE_PROMPT_ANALYZE = '\nAnalayze> '
 CONSOLE_INTRO = ("""RPDB - The Remote Python Debugger, version %s,
-Copyright (C) 2005-2007 Nir Aides.
+Copyright (C) 2005-2008 Nir Aides.
 Type "help", "copyright", "license", "credits" for more information.""" % (RPDB_VERSION))
 
 PRINT_NOTICE_PROMPT = "Hit Return for more, or q (and Return) to quit:"
