@@ -268,6 +268,7 @@ import SocketServer
 import xmlrpclib
 import threading
 import traceback
+import zipimport
 import commands
 import tempfile
 import __main__
@@ -276,6 +277,7 @@ import platform
 import weakref
 import httplib
 import os.path
+import zipfile
 import pickle
 import socket
 import getopt
@@ -2751,6 +2753,52 @@ def print_stack():
 
        
 
+def myisfile(path):
+    try:
+        mygetfile(path, False)
+        return True
+
+    except:
+        return False
+
+       
+
+def mygetfile(path, fread_file = True):
+    if os.path.isfile(path):
+        if not fread_file:
+            return
+
+        f = open(path, 'r')
+        data = f.read()
+        f.close()
+        return data
+
+    d = os.path.dirname(path)
+
+    while True:
+        if os.path.exists(d):
+            break
+
+        _d = os.path.dirname(d)
+        if _d in [d, '']:
+            raise IOError
+
+        d = _d
+
+    if not zipfile.is_zipfile(d):
+        raise IOError
+
+    z = zipimport.zipimporter(d)
+
+    try:
+        data = z.get_data(path[len(d) + 1:])
+        return data
+
+    except:
+        raise IOError
+
+
+
 def split_command_line_path_filename_args(command_line):
     """
     Split command line to a 3 elements tuple (path, filename, args)
@@ -2760,7 +2808,7 @@ def split_command_line_path_filename_args(command_line):
     if len(command_line) == 0:
         return ('', '', '')
 
-    if os.path.isfile(command_line):
+    if myisfile(command_line):
         (_path, _filename) = split_path(command_line)
         return (_path, _filename, '')
         
@@ -2818,24 +2866,37 @@ def my_os_path_join(dirname, basename):
 
 
 def calc_frame_path(frame):
+    globals_filename = frame.f_globals.get('__file__', None)
     filename = frame.f_code.co_filename
     
     if filename.startswith('<'):
-        return filename
+        if globals_filename == None:
+            return filename
+        else:
+            filename = CalcScriptName(os.path.basename(globals_filename))
 
     if filename in g_frames_path:
         return g_frames_path[filename]
-
-    globals_file = frame.f_globals.get('__file__', None)
     
-    if globals_file != None and os.path.isabs(globals_file):    
-        dirname = os.path.dirname(globals_file)
+    if globals_filename != None:
+        dirname = os.path.dirname(globals_filename)
         basename = os.path.basename(filename)
         path = my_os_path_join(dirname, basename)        
-        abspath = my_abspath(path)
-        lowered = winlower(abspath)        
-        g_frames_path[filename] = lowered
-        return lowered
+
+        if os.path.isabs(path):    
+            abspath = my_abspath(path)
+            lowered = winlower(abspath)        
+            g_frames_path[filename] = lowered
+            return lowered
+
+        try:
+            abspath = FindFile(path, fModules = True)
+            lowered = winlower(abspath)    
+            g_frames_path[filename] = lowered
+            return lowered
+
+        except IOError:
+            pass
 
     if os.path.isabs(filename):
         abspath = my_abspath(filename)
@@ -3039,14 +3100,14 @@ def FindFileAsModule(filename):
             path = my_os_path_join(module_dir, suffix.strip('\\')) + ext
         
         scriptname = CalcScriptName(path, fAllowAnyExt = False)
-        if os.path.isfile(scriptname):
+        if myisfile(scriptname):
             return scriptname
 
         #
         # Check .pyw files
         #
         scriptname += 'w'
-        if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
+        if scriptname.endswith(PYTHONW_FILE_EXTENSION) and myisfile(scriptname):
             return scriptname
         
     raise IOError
@@ -3090,7 +3151,7 @@ def FindFile(
 
     if fModules and not (os.path.isabs(filename) or filename.startswith('.')):
         try:    
-            return FindFileAsModule(filename)
+            return winlower(FindFileAsModule(filename))
         except IOError:
             pass
                 
@@ -3114,14 +3175,14 @@ def FindFile(
             lowered = winlower(abspath)
             scriptname = CalcScriptName(lowered, fAllowAnyExt)
             
-            if os.path.isfile(scriptname):
+            if myisfile(scriptname):
                 return scriptname
 
             #
             # Check .pyw files
             #
             scriptname += 'w'
-            if scriptname.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(scriptname):
+            if scriptname.endswith(PYTHONW_FILE_EXTENSION) and myisfile(scriptname):
                 return scriptname
             
             scriptname = None
@@ -3157,14 +3218,14 @@ def FindFile(
             abspath = my_abspath(f)
             lowered = winlower(abspath)
             
-            if os.path.isfile(lowered):
+            if myisfile(lowered):
                 return lowered
 
             #
             # Check .pyw files
             #
             lowered += 'w'
-            if lowered.endswith(PYTHONW_FILE_EXTENSION) and os.path.isfile(lowered):
+            if lowered.endswith(PYTHONW_FILE_EXTENSION) and myisfile(lowered):
                 return lowered
 
         lowered = None
@@ -3334,9 +3395,7 @@ def source_provider_blender(filename):
 
 
 def source_provider_filesystem(filename):
-    f = open(filename, 'r')
-    l = f.read()
-    f.close()
+    l = mygetfile(filename)
 
     if l[:3] == as_bytes(ENCODING_UTF8_PREFIX_1):
         l = l[3:]
@@ -3985,6 +4044,47 @@ def calc_signame(signum):
             return k
 
     return '?'
+
+
+
+def my_extract_stack(f):
+    _s = traceback.extract_stack(f)
+    _s.reverse()
+
+    s = []
+    for (p, ln, fn, text) in _s:
+        path = as_unicode(calc_frame_path(f), sys.getfilesystemencoding())
+        if text == None:
+            text = ''
+
+        s.append((path, ln, as_unicode(fn), as_unicode(text)))
+
+        f = f.f_back
+        if f == None:
+            break
+
+    s.reverse()
+    return s
+
+
+
+
+def my_extract_tb(tb):
+    _s = traceback.extract_tb(tb)
+
+    s = []
+    for (p, ln, fn, text) in _s:
+        path = as_unicode(calc_frame_path(tb.tb_frame), sys.getfilesystemencoding())
+        if text == None:
+            text = ''
+
+        s.append((path, ln, as_unicode(fn), as_unicode(text)))
+
+        tb = tb.tb_next
+        if tb == None:
+            break
+
+    return s
 
 
 
@@ -7919,7 +8019,7 @@ class CDebuggerEngine(CDebuggerCore):
         event = CEventNull()
         self.m_event_dispatcher.fire_event(event)
 
-        
+
     def __get_stack(self, ctx, ctid, fException):
         tid = ctx.m_thread_id    
 
@@ -7934,7 +8034,7 @@ class CDebuggerEngine(CDebuggerCore):
 
             try:
                 g_traceback_lock.acquire()
-                s = traceback.extract_stack(f)
+                s = my_extract_stack(f)
                 
             finally:    
                 g_traceback_lock.release()
@@ -7951,7 +8051,7 @@ class CDebuggerEngine(CDebuggerCore):
                     
                 try:
                     g_traceback_lock.acquire()
-                    _s = traceback.extract_tb(f.f_exc_traceback)
+                    _s = my_extract_tb(f.f_exc_traceback)
                     
                 finally:    
                     g_traceback_lock.release()
@@ -7971,29 +8071,8 @@ class CDebuggerEngine(CDebuggerCore):
             ctx.frame_release()
 
         #print code_list
-
-        path_dict = {}
-        for e in s:
-            path = e[0]
-            if path in path_dict:
-                continue
-
-            if path in g_frames_path:
-                expanded_path = g_frames_path[path]
-            else:
-                try:
-                    expanded_path = FindFile(path, fModules = True)
-                except IOError:
-                    expanded_path = path
-
-            lowered = winlower(expanded_path)
-            _unicode = as_unicode(lowered, sys.getfilesystemencoding())
-
-            path_dict[path] = _unicode                   
-        
-            #print >> sys.__stderr__, path, path_dict[path]
-                
-        __s = [(path_dict[a], b, as_unicode(c), as_unicode([d, ''][d == None])) for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
+               
+        __s = [(a, b, c, d) for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
 
         if (ctx.m_uef_lineno is not None) and (len(__s) > 0):
             (a, b, c, d) = __s[0]
@@ -9912,6 +9991,9 @@ class CServerList:
         if key != None:
             raise UnknownServer
 
+        sil.sort()
+        self.m_list = [s[1] for s in sil]
+        
         return self.m_list 
 
 

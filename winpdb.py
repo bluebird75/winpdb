@@ -724,6 +724,24 @@ assert(g_fUnicode or not rpdb2.is_py3k())
 
 
 
+def calc_title(path):
+    (dn, bn) = os.path.split(path)
+
+    if dn == '':
+        return '%s - %s' % (bn, WINPDB_TITLE)
+
+    if os.name != rpdb2.POSIX:
+        return '%s (%s) - %s' % (bn, rpdb2.calc_suffix(dn, 64), WINPDB_TITLE)
+
+    home = os.path.expanduser('~')
+    
+    if dn.startswith(home):
+        dn = '~' + dn[len(home):]
+
+    return '%s (%s) - %s' % (bn, rpdb2.calc_suffix(dn, 64), WINPDB_TITLE)
+
+
+
 def calc_denominator(string_list):
     if string_list in [[], None]:
         return ''
@@ -1877,9 +1895,15 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.m_stack_viewer._clear()
             self.m_threads_viewer._clear()
             self.m_console.set_focus()
+
+            self.SetTitle(WINPDB_TITLE)
             
         elif (old_state in [rpdb2.STATE_DETACHED, rpdb2.STATE_DETACHING, rpdb2.STATE_SPAWNING, rpdb2.STATE_ATTACHING]) and (self.m_state not in [rpdb2.STATE_DETACHED, rpdb2.STATE_DETACHING, rpdb2.STATE_SPAWNING, rpdb2.STATE_ATTACHING]):
             try:
+                serverinfo = self.m_session_manager.get_server_info()
+                title = calc_title(serverinfo.m_filename)
+                self.SetTitle(title)
+
                 f = self.m_session_manager.get_encryption()
             except rpdb2.NotAttached:
                 f = False
