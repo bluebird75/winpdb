@@ -374,7 +374,7 @@ CAPTION_NAMESPACE = "Namespace"
 
 CONSOLE_PROMPT = "\n> "
 CONSOLE_COMPLETIONS = '\nAvailable completions:\n%s'
-COMPLETIONS_NOTICE = 'NEW: Use CTRL-N for auto completion in the eval and exec commands.'
+COMPLETIONS_NOTICE = 'NEW: Use CTRL-N for auto completion in the following commands: launch, eval and exec.'
 COMPLETIONS_WARNING = '\nDisplay all %d possibilities? (y or n)'
 COMPLETIONS_WARNING_CONFIRM_CHARS = ['y', 'Y']
 COMPLETIONS_WARNING_THRESHOLD = 32
@@ -2984,6 +2984,16 @@ class CConsole(wx.Panel, CCaptionManager):
             self.m_console_out.write(COMPLETIONS_WARNING % len(completions))
             self.m_fcompletions_warning = True
             return
+
+        if ce != '' and ce.split()[0] == 'launch':
+            _completions = []
+            for c in completions:
+                p = c.split()[-1]
+                dn, bn = os.path.split(p)
+                if bn == '':
+                    bn = os.path.join(os.path.split(dn)[1], '')
+                _completions.append(bn)
+            completions = _completions
 
         if ce != '' and ce.split()[0] in ['v', 'eval', 'x', 'exec']:
             completions = [re.split('\W+', c)[-1] for c in completions]

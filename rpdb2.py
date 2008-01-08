@@ -11276,6 +11276,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_fSplit = fSplit
         self.prompt = [[CONSOLE_PROMPT, CONSOLE_PROMPT_ANALYZE][self.fAnalyzeMode], ""][fSplit]
         self.intro = CONSOLE_INTRO
+        if fSplit:
+            self.intro += '\n'
+        
         #self.setDaemon(True)
         
         self.m_session_manager = session_manager
@@ -11407,6 +11410,70 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
         except IndexError:
             return None
+
+
+    def complete_launch(self, text, line = None, begidx = None, endidx = None):
+        if line != None and endidx != None:
+            text = line[:endidx]
+
+        if text.endswith(' '):
+            dn, bn = '', ''
+        else:
+            path = text.split()[-1]
+            dn, bn = os.path.split(path)
+
+        prefix = text
+        if bn != '':
+            prefix = prefix[:-len(bn)]
+
+        if dn == '' and bn.startswith('~'):
+            if bn == os.path.expanduser(bn):
+                c = text
+            else:
+                c = os.path.join(text, '')
+
+            if begidx != None:
+                c = c[begidx:]
+
+            return [c]
+
+        pl = [dn]
+        if dn == '':
+            pl += os.environ['PATH'].split(os.pathsep)
+
+        fl = []
+        for p in pl:
+            if p == '':
+                p = '.'
+
+            try:
+                ep = os.path.expanduser(p)
+                l = os.listdir(ep)
+                for f in l:
+                    if not f.startswith(bn):
+                        continue
+
+                    root, ext = os.path.splitext(f)
+                    if not ext in ['.py', '.pyw', '']:
+                        continue
+
+                    if os.path.isdir(os.path.join(ep, f)):
+                        c = prefix + os.path.join(f, '')
+                    else:
+                        c = prefix + f
+
+                    if begidx != None:
+                        c = c[begidx:]
+
+                    fl.append(c)
+            except:
+                pass
+
+        fs = set(fl)
+        cl = list(fs)
+        cl.sort()
+
+        return cl
 
 
     def complete_eval(self, text, line = None, begidx = None, endidx = None):
