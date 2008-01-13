@@ -78,7 +78,7 @@ def InstallWinpdb():
     dest_dir = PrepareFolder()
 
     homepage_link = os.path.join(dest_dir, 'winpdb-homepage.lnk')
-    create_shortcut('http://www.digitalpeers.com/pythondebugger/','Winpdb Homepage', homepage_link)
+    create_shortcut('http://www.winpdb.org/','Winpdb Homepage', homepage_link)
     file_created(homepage_link)
 
     winpdb_target = os.path.join(distutils.sysconfig.PREFIX, 'Scripts', 'winpdb_.pyw')

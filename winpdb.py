@@ -22,9 +22,9 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 
-ABOUT_NOTICE = """winpdb.py
-
-A GUI for rpdb2.py
+ABOUT_NOTICE = """Winpdb is a platform independent GPL Python debugger with support for 
+multiple threads, namespace modification, embedded debugging, 
+encrypted communication and is up to 20 times faster than pdb.
 
 Copyright (C) 2005-2008 Nir Aides
 
@@ -697,11 +697,11 @@ ABOUT_HTML_SUFFIX = """
 </html>
 """
 
-WEBSITE_URL = "http://www.digitalpeers.com/pythondebugger/"
-SUPPORT_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=4"
-DOCS_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=5"
-EXT_DOCS_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=17"
-UPDATES_URL = "http://www.digitalpeers.com/pythondebugger/?page_id=3"
+WEBSITE_URL = "http://www.winpdb.org/"
+SUPPORT_URL = "http://www.winpdb.org/?page_id=4"
+DOCS_URL = "http://www.winpdb.org/?page_id=5"
+EXT_DOCS_URL = "http://www.winpdb.org/?page_id=17"
+UPDATES_URL = "http://www.winpdb.org/?page_id=3"
 
 STR_ERROR_INTERFACE_COMPATIBILITY = "The rpdb2 module which was found by Winpdb is of unexpected version (version expected: %s, version found: %s). Please upgrade to the latest versions of winpdb.py and rpdb2.py."
 STR_NAMESPACE_DEADLOCK = 'Data Retrieval Timeout'
@@ -2986,6 +2986,10 @@ class CConsole(wx.Panel, CCaptionManager):
             return
 
         if ce != '' and ce.split()[0] == 'launch':
+            #
+            # Go over launch completions and extract the basenames.
+            # Add a trailing path seperator '/' to dir names completions.
+            #
             _completions = []
             for c in completions:
                 p = c.split()[-1]

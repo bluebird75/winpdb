@@ -2753,6 +2753,10 @@ def print_stack():
 
        
 
+#
+# myisfile() is similar to os.path.isfile() but also works with
+# Python eggs.
+#
 def myisfile(path):
     try:
         mygetfile(path, False)
@@ -2763,6 +2767,9 @@ def myisfile(path):
 
        
 
+#
+# Read a file even if inside a Python egg.
+#
 def mygetfile(path, fread_file = True):
     if os.path.isfile(path):
         if not fread_file:
@@ -4047,6 +4054,9 @@ def calc_signame(signum):
 
 
 
+#
+# Similar to traceback.extract_stack() but fixes path with calc_frame_path()
+#
 def my_extract_stack(f):
     _s = traceback.extract_stack(f)
     _s.reverse()
@@ -4069,6 +4079,9 @@ def my_extract_stack(f):
 
 
 
+#
+# Similar to traceback.extract_tb() but fixes path with calc_frame_path()
+#
 def my_extract_tb(tb):
     _s = traceback.extract_tb(tb)
 

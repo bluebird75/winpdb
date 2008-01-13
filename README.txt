@@ -4,8 +4,8 @@
 Winpdb - A GPL Python Debugger
 
 Contact: Nir Aides
-Email:   nir@digitalpeers.com
-Website: http://www.digitalpeers.com/pythondebugger/
+Email:   nir@winpdb.org
+Website: http://www.winpdb.org/
          http://sourceforge.net/projects/winpdb/
 Version: 1.3.3
 
@@ -82,7 +82,7 @@ Documentation
     commands.
 
     Online documentation is available at:
-    http://www.digitalpeers.com/pythondebugger/
+    http://www.winpdb.org
 
 
 
