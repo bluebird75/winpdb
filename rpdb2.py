@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.3.4
+    rpdb2.py - version 2.3.5
 
     A remote Python debugger for CPython
 
@@ -485,9 +485,9 @@ def setbreak():
 
 
 
-VERSION = (2, 3, 4, 0, '')
-RPDB_VERSION = "RPDB_2_3_4"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_4"
+VERSION = (2, 3, 5, 0, '')
+RPDB_VERSION = "RPDB_2_3_5"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_5"
 
 
 
@@ -2022,8 +2022,6 @@ INDEX_TABLE_SIZE = 100
 
 DISPACHER_METHOD = 'dispatcher_method'
 
-BASIC_TYPES_LIST = ['bytearray', 'bytes', 'str', 'str8', 'unicode', 'int', 'long', 'float', 'bool', 'NoneType']
-
 CONFLICTING_MODULES = ['psyco', 'pdb', 'bdb', 'doctest']
 
 XML_DATA = """<?xml version='1.0'?>
@@ -2626,25 +2624,25 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
         if isinstance(x, dict):
             return repr_dict('{%s}', x, length, encoding, is_valid)
 
-        if encoding == ENCODING_RAW_I and type(x) in [str, unicode, bytearray, bytes, str8]:
+        if encoding == ENCODING_RAW_I and [True for t in [str, unicode, bytearray, bytes, str8] if t is type(x)]:
             return repr_str_raw(x, length, is_valid)
 
-        if type(x) == unicode:
+        if type(x) is unicode:
             return repr_unicode(x, length, is_valid)
 
-        if type(x) == bytearray:
+        if type(x) is bytearray:
             return repr_bytearray(x, length, encoding, is_valid)
 
-        if type(x) == bytes:
+        if type(x) is bytes:
             return repr_bytes(x, length, encoding, is_valid)
 
-        if type(x) == str8:
+        if type(x) is str8:
             return repr_str8(x, length, encoding, is_valid)
 
-        if type(x) == str:
+        if type(x) is str:
             return repr_str(x, length, encoding, is_valid)
 
-        if type(x) in [bool, int, float, long, type(None)]:
+        if [True for t in [bool, int, float, long, type(None)] if t is type(x)]:
             return repr_base(x, length, is_valid)
 
         is_valid[0] = False
@@ -8342,8 +8340,9 @@ class CDebuggerEngine(CDebuggerCore):
 
    
     def __calc_number_of_subnodes(self, r):
-        if parse_type(type(r)) in BASIC_TYPES_LIST:
-            return 0
+        for t in [bytearray, bytes, str, str8, unicode, int, long, float, bool, type(None)]:
+            if t is type(r):
+                return 0
        
         try:
             try:
@@ -8483,12 +8482,12 @@ class CDebuggerEngine(CDebuggerCore):
                 is_valid = [True]
                 e = {}
 
-                if type(k) in [bool, int, float, bytes, str, unicode, type(None)]:
+                if [True for t in [bool, int, float, bytes, str, unicode, type(None)] if t is type(k)]:
                     rk = repr(k)
                     if len(rk) < REPR_ID_LENGTH:
                         e[DICT_KEY_EXPR] = as_unicode('(%s)[%s]' % (expr, rk))
 
-                if type(k) == str8:
+                if type(k) is str8:
                     rk = repr(k)
                     if len(rk) < REPR_ID_LENGTH:
                         e[DICT_KEY_EXPR] = as_unicode('(%s)[str8(%s)]' % (expr, rk[1:]))
