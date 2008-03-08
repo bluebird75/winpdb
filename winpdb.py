@@ -3462,7 +3462,15 @@ class CNamespacePanel(wx.Panel, CJobs):
         item = self.find_item(expr)
         if item == None:
             return
-        
+      
+        #
+        # When expanding a tree item with arrow-keys on wxPython 2.6, the 
+        # temporary "loading" child is automatically selected. After 
+        # replacement with real children we need to reselect the first child.
+        #
+        cl = self.get_children(item)
+        freselect_child = len(cl) != 0 and cl[0] == self.m_tree.GetSelection()
+            
         self.m_tree.DeleteChildren(item)
     
         if t != None or r is None or len(r) == 0:
@@ -3471,9 +3479,17 @@ class CNamespacePanel(wx.Panel, CJobs):
             self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 1)
             self.m_tree.SetItemPyData(child, (STR_NAMESPACE_DEADLOCK, False))
             self.m_tree.Expand(item)
+
+            if freselect_child:
+                self.m_tree.SelectItem(child)
+
             return
             
         self.expand_item(item, r, False, True)  
+
+        if freselect_child:
+            cl = self.get_children(item)
+            self.m_tree.SelectItem(cl[0])
 
         self.m_tree.Refresh()
         

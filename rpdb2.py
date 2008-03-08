@@ -274,6 +274,7 @@ import tempfile
 import __main__
 import copy_reg
 import platform
+import operator
 import weakref
 import httplib
 import os.path
@@ -4014,14 +4015,37 @@ class _RPDB2_FindRepr:
 
 
 
-def SafeCmp(x, y):
-    try:
-        return cmp(x, y)
+#
+# Since on Python 3000 the comparison of different types raises exceptions and 
+# the __cmp__ method was removed, sorting of namespace items is based on 
+# lexicographic order except for numbers which are sorted normally and appear 
+# before all other types.
+#
+def sort(s):
+    if sys.version_info[:2] == (2, 3):
+        #
+        # On Python 2.3 the key parameter is not supported.
+        #
+        s.sort(sort_cmp)
+        return
 
-    except:
-        pass
+    s.sort(key = sort_key)
 
-    return cmp(repr_ltd(x, 256, encoding = ENCODING_RAW_I), repr_ltd(y, 256, encoding = ENCODING_RAW_I))
+
+
+def sort_key(e):
+    if operator.isNumberType(e):
+        return (0, e)
+
+    return (1, repr_ltd(e, 256, encoding = ENCODING_RAW_I))
+
+
+
+def sort_cmp(x, y):
+    skx = sort_key(x)
+    sky = sort_key(y)
+
+    return cmp(skx, sky)
 
 
 
@@ -8382,7 +8406,7 @@ class CDebuggerEngine(CDebuggerCore):
                     g = r
                 else:
                     g = [i for i in r]
-                    g.sort(SafeCmp)
+                    sort(g)
 
                 for i in g:
                     if len(snl) >= MAX_NAMESPACE_ITEMS:
@@ -8412,7 +8436,7 @@ class CDebuggerEngine(CDebuggerCore):
                 g = r
             else:
                 g = [i for i in r]
-                g.sort(SafeCmp)
+                sort(g)
 
             for i in g:
                 if len(snl) >= MAX_NAMESPACE_ITEMS:
@@ -8463,7 +8487,7 @@ class CDebuggerEngine(CDebuggerCore):
                 kl = r
             else:
                 kl = list(r.keys())
-                kl.sort(SafeCmp)
+                sort(kl)
 
             for k in kl:
                 #
@@ -8507,7 +8531,7 @@ class CDebuggerEngine(CDebuggerCore):
             return snl            
 
         al = calc_attribute_list(r, filter_level)
-        al.sort(SafeCmp)
+        sort(al)
 
         for a in al:
             if a == 'm_rpdb2_pwd':
