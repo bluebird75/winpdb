@@ -3889,6 +3889,13 @@ def IsFilteredAttribute2(r, a):
 def CalcFilteredDir(r, filter_level):
     d = dir(r)
 
+    if 'finfo' in d and parse_type(type(r)) == 'mp_request':
+        #
+        # Workaround mod_python segfault with type(req.finfo) by
+        # removing this attribute from the namespace.
+        #
+        d.remove('finfo')
+
     if filter_level == 0:
         return d
 
