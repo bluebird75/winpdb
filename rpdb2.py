@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.3.6
+    rpdb2.py - version 2.3.7
 
     A remote Python debugger for CPython
 
@@ -384,13 +384,17 @@ def start_embedded_debugger(
 
     This will cause the script to freeze until a debugger console attaches.
 
-    _rpdb2_pwd - The password that governs security of client/server communication
+    _rpdb2_pwd - The password that governs security of client/server communication.
+
     fAllowUnencrypted - Allow unencrypted communications. Communication will
         be authenticated but encrypted only if possible.
+
     fAllowRemote - Allow debugger consoles from remote machines to connect.
-    timeout - Seconds to wait for attachment before giving up. If None, 
-        never give up. Once the timeout period expires, the debuggee will
-        resume execution.
+
+    timeout - Seconds to wait for attachment before giving up. Once the 
+        timeout period expires, the debuggee will resume execution. 
+        If None, never give up. If 0, do not wait at all.
+
     source_provider - When script source is not available on file system it is
         possible to specify a function that receives a "filename" and returns
         its source. If filename specifies a file that does not fall under
@@ -399,7 +403,8 @@ def start_embedded_debugger(
         not available it should raise IOError(SOURCE_NOT_AVAILABLE). You can
         study the way source_provider_blender() works. Note that a misbehaving 
         function can break the debugger.
-    fDebug  - debug output.
+
+    fDebug - debug output.
 
     IMPORTNAT SECURITY NOTE:
     USING A HARDCODED PASSWORD MAY BE UNSECURE SINCE ANYONE WITH READ
@@ -478,17 +483,37 @@ def setbreak():
 
     return __setbreak()
 
-    
-    
+
+
+def set_temp_breakpoint(path, scopename = '', lineno = 1):
+    """
+    Set a temporary breakpoint in a file. path must be an absolute path.
+    scopename can either be an empty string or a fully qualified scope name
+    (For example u'g_debugger.m_bp_manager.set_temp_breakpoint'). lineno is 
+    either relative to file start or to scope start.
+
+    To set a temporary breakpoint to hit when a file is first
+    imported or exec-uted call set_temp_breakpoint(path)
+
+    This function may throw a varaiety of exceptions.
+    """
+
+    path = as_unicode(path, fstrict = True)
+    scopename = as_unicode(scopename, fstrict = True)
+
+    return __set_temp_breakpoint(path, scopename, lineno)
+
+
+
 #
 #----------------------------------- Interfaces ------------------------------
 #
 
 
 
-VERSION = (2, 3, 6, 0, '')
-RPDB_VERSION = "RPDB_2_3_6"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_6"
+VERSION = (2, 3, 7, 0, '')
+RPDB_VERSION = "RPDB_2_3_7"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_7"
 
 
 
@@ -13592,6 +13617,11 @@ def __setbreak():
 
     return thread.get_ident()
 
+
+
+def __set_temp_breakpoint(path, scopename, lineno):
+    return g_debugger.m_bp_manager.set_temp_breakpoint(path, scopename, lineno)
+
     
 
 def _atexit(fabort = False):
@@ -13658,6 +13688,11 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
     try:
         g_server_lock.acquire()
         
+        if g_debugger is not None and timeout == 0:
+            f = sys._getframe(2)
+            g_debugger.settrace(f, f_break_on_init = False)
+            return
+
         if g_debugger is not None:
             f = sys._getframe(2)
             g_debugger.record_client_heartbeat(0, True, False)
@@ -13699,6 +13734,10 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
 
         g_server = CDebuggeeServer(filename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote)
         g_server.start()
+
+        if timeout == 0:
+            g_debugger.settrace(f, f_break_on_init = False)
+            return
 
         g_debugger.settrace(f, timeout = timeout)
 
@@ -13823,16 +13862,15 @@ def PrintUsage(fExtended = False):
 
     Options can be a combination of the following:
     -h, --help      Print this help.
-    -d, --debuggee  Start the debugged script (server) paused and wait for a 
+    -d, --debuggee  Start the debugged script (server) and wait for a 
                     debugger console (client) to attach. 
     -a, --attach    Start the debugger console (client) and attach to the 
-                    specified debugged script (server) which is assumed to 
-                    be running already.
+                    specified debugged script (server).
     -o, --host=     Specify host (or IP address) for remote connections.
     -r, --remote    Allow debuggees to accept connections from remote machines.
     -e, --encrypt   Force encrypted socket communication.
     -p, --pwd=      Specify password for socket communication. 
-                    This flag is available only on NT systems. On other 
+                    This flag is available only on Windows. On other 
                     systems the password will be queried interactively 
                     if it is needed.
     -s, --screen    Use the Unix screen utility when starting the debuggee.
