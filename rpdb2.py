@@ -1855,6 +1855,7 @@ STR_ILEGAL_ANALYZE_MODE_ARG = "Argument is not allowed in analyze mode. Type 'he
 STR_ILEGAL_ANALYZE_MODE_CMD = "Command is not allowed in analyze mode. Type 'help analyze' for more info."
 STR_ANALYZE_MODE_TOGGLE = "Analyze mode was set to: %s."
 STR_BAD_ARGUMENT = "Bad Argument."
+STR_BAD_SYNTAX = 'Unknown syntax: %s\nDid you forget to use the exec or eval console commands?'
 STR_PSYCO_WARNING = "The psyco module was detected. The debugger is incompatible with the psyco module and will not function correctly as long as the psyco module is imported and used."
 STR_CONFLICTING_MODULES = "The modules: %s, which are incompatible with the debugger were detected and can possibly cause the debugger to fail."
 STR_SIGNAL_INTERCEPT = "The signal %s(%d) was intercepted inside debugger tracing logic. It will be held pending until the debugger continues. Any exceptions raised by the handler will be ignored!"
@@ -11434,7 +11435,16 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
             print_debug_exception(True)
 
         return False
-        
+
+
+    def default(self, line):
+        """
+        Called on an input line when the command prefix is not recognized.
+        Over-rides base method at cmd.py.
+        """
+
+        self.printer(STR_BAD_SYNTAX % line)
+       
         
     def emptyline(self):
         pass
