@@ -4113,7 +4113,16 @@ def calc_signame(signum):
 # Similar to traceback.extract_stack() but fixes path with calc_frame_path()
 #
 def my_extract_stack(f):
-    _s = traceback.extract_stack(f)
+    if f == None:
+        return []
+
+    try:
+        g_traceback_lock.acquire()
+        _s = traceback.extract_stack(f)
+
+    finally:    
+        g_traceback_lock.release()
+    
     _s.reverse()
 
     s = []
@@ -4138,7 +4147,12 @@ def my_extract_stack(f):
 # Similar to traceback.extract_tb() but fixes path with calc_frame_path()
 #
 def my_extract_tb(tb):
-    _s = traceback.extract_tb(tb)
+    try:
+        g_traceback_lock.acquire()
+        _s = traceback.extract_tb(tb)
+
+    finally:    
+        g_traceback_lock.release()
 
     s = []
     for (p, ln, fn, text) in _s:
@@ -4153,6 +4167,20 @@ def my_extract_tb(tb):
             break
 
     return s
+
+
+
+def get_traceback(frame):
+    if frame.f_exc_traceback != None:
+        return frame.f_exc_traceback
+
+    locals = copy.copy(frame.f_locals)
+    if not 'traceback' in locals:
+        return None
+
+    tb = locals['traceback']
+    if dir(tb) == ['tb_frame', 'tb_lasti', 'tb_lineno', 'tb_next']:
+        return tb
 
 
 
@@ -6233,7 +6261,10 @@ class CDebuggerCoreThread:
         life time of the frame structure.
         """
         #print_debug('profile: %s, %s, %s, %s, %s' % (repr(frame), event, frame.f_code.co_name, frame.f_code.co_filename, repr(arg)[:40])) 
-        if event == 'return':            
+        if event == 'return':  
+            if sys.excepthook != g_excepthook:
+                set_excepthook()
+
             self.m_frame = frame.f_back
 
             try:
@@ -6325,7 +6356,7 @@ class CDebuggerCoreThread:
         """
         
         if fException:
-            tb = base_frame.f_exc_traceback
+            tb = get_traceback(base_frame)
             if tb is None:
                 raise NoExceptionFound
                 
@@ -6356,7 +6387,7 @@ class CDebuggerCoreThread:
             lineno = f.f_lineno
             
         if fException:
-            tb = base_frame.f_exc_traceback
+            tb = get_traceback(base_frame)
             while tb is not None:
                 if tb.tb_frame == f:
                     lineno = tb.tb_lineno
@@ -7995,43 +8026,38 @@ class CDebuggerEngine(CDebuggerCore):
         Send event with stack depth and exception stack depth.
         """
         
+        f = None
+        tb = None
         ctx = self.get_current_ctx()
         
         try:
             try:
-                f = None
                 f = ctx.frame_acquire()
             except ThreadDone:
                 return
 
-            try:
-                g_traceback_lock.acquire()
-                s = traceback.extract_stack(f)
-                s = [1 for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
+            s = my_extract_stack(f)
+            s = [1 for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
                 
-            finally:    
-                g_traceback_lock.release()
-
             stack_depth = len(s)
 
-            if f.f_exc_traceback is None:
+            tb = get_traceback(f)
+            if tb == None:
                 stack_depth_exception = None
-            else:    
-                try:
-                    g_traceback_lock.acquire()
-                    _s = traceback.extract_tb(f.f_exc_traceback)
-                    _s = [1 for (a, b, c, d) in _s if g_fDebug or c != 'rpdb2_import_wrapper']
-                    
-                finally:    
-                    g_traceback_lock.release()
 
-                stack_depth_exception = stack_depth + len(_s) - 1
+            else:    
+                s = my_extract_stack(tb.tb_frame.f_back)
+                s += my_extract_tb(tb)
+                s = [1 for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
+                    
+                stack_depth_exception = len(s)
 
             event = CEventStackDepth(stack_depth, stack_depth_exception)
             self.m_event_dispatcher.fire_event(event)
             
         finally:
             f = None
+            tb = None
             ctx.frame_release()
 
             
@@ -8091,41 +8117,34 @@ class CDebuggerEngine(CDebuggerCore):
     def __get_stack(self, ctx, ctid, fException):
         tid = ctx.m_thread_id    
 
+        f = None
+        _f = None
+        tb = None
+        _tb = None
+
         try:
             try:
-                f = None
                 f = ctx.frame_acquire()
             except ThreadDone:
                 return None
 
-            _f = f
-
-            try:
-                g_traceback_lock.acquire()
-                s = my_extract_stack(f)
-                
-            finally:    
-                g_traceback_lock.release()
-
             if fException: 
-                if f.f_exc_traceback is None:
+                tb = get_traceback(f)
+                if tb == None:
                     raise NoExceptionFound
 
-                _tb = f.f_exc_traceback
+                _tb = tb
                 while _tb.tb_next is not None:
                     _tb = _tb.tb_next
 
                 _f = _tb.tb_frame    
-                    
-                try:
-                    g_traceback_lock.acquire()
-                    _s = my_extract_tb(f.f_exc_traceback)
-                    
-                finally:    
-                    g_traceback_lock.release()
+                s = my_extract_stack(tb.tb_frame.f_back)
+                s += my_extract_tb(tb)
 
-                s = s[:-1] + _s
-
+            else:
+                _f = f
+                s = my_extract_stack(f)
+                    
             code_list = []
             while _f is not None:
                 rc = repr(_f.f_code).split(',')[0].split()[-1]
@@ -8136,6 +8155,9 @@ class CDebuggerEngine(CDebuggerCore):
         finally:
             f = None
             _f = None
+            tb = None
+            _tb = None
+
             ctx.frame_release()
 
         #print code_list
@@ -8421,9 +8443,8 @@ class CDebuggerEngine(CDebuggerCore):
             if isinstance(r, tuple):
                 return len(r)
 
-            if hasattr(r, '__class__') or hasattr(r, '__bases__'):
-                return 1
-
+            return len(dir(r))
+            
         except AttributeError:
             return 0
 
@@ -13574,6 +13595,52 @@ g_os_execve = None
 if __name__ == 'rpdb2' and 'execve' in dir(os) and os.execve != __execve:
     g_os_execve = os.execve
     os.execve = __execve
+
+
+
+def __excepthook(type, value, traceback, next_excepthook, index):
+    if index + 1 < len(g_excepthooks):
+        return next_excepthook(type, value, traceback)
+
+    if traceback.tb_frame.f_back == None:
+        return next_excepthook(type, value, traceback)
+
+    if not g_debugger.m_ftrap:
+        return next_excepthook(type, value, traceback)
+
+    settrace()
+    ctx = g_debugger.get_ctx(thread.get_ident())
+    ctx.m_fUnhandledException = True
+    setbreak()
+
+    #
+    # Debuggee breaks (pauses) here
+    # on unhandled exceptions.
+    # Use analyze mode for post mortem.
+    # type 'help analyze' for more information.
+    #
+    return next_excepthook(type, value, traceback)
+
+
+
+g_excepthooks = []
+
+g_excepthook = None
+
+def set_excepthook():
+    global g_excepthook
+
+    if len(g_excepthooks) >= 4:
+        return
+
+    next_excepthook = sys.excepthook
+    index = len(g_excepthooks)
+
+    eh = lambda type, value, traceback: __excepthook(type, value, traceback, next_excepthook, index)
+
+    g_excepthooks.append(eh)
+    g_excepthook = eh
+    sys.excepthook = eh
 
 
 
