@@ -8173,7 +8173,7 @@ class CDebuggerEngine(CDebuggerCore):
         r[DICT_KEY_CODE_LIST] = code_list
         r[DICT_KEY_TID] = tid
         r[DICT_KEY_BROKEN] = ctx.m_fBroken
-        r[DICT_KEY_EVENT] = as_unicode(ctx.m_event)
+        r[DICT_KEY_EVENT] = as_unicode([ctx.m_event, 'exception'][fException])
         
         if tid == ctid:
             r[DICT_KEY_CURRENT_TID] = True
