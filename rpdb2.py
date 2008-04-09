@@ -2799,8 +2799,16 @@ def mygetfile(path, fread_file = True):
     if os.path.isfile(path):
         if not fread_file:
             return
+        
+        if sys.platform == 'OpenVMS':
+            #
+            # OpenVMS filesystem does not support byte stream.
+            #
+            mode = 'r'
+        else:
+            mode = 'rb'
 
-        f = open(path, 'r')
+        f = open(path, mode)
         data = f.read()
         f.close()
         return data
@@ -10789,8 +10797,16 @@ class CSessionManagerInternal:
         if module_name[:1] == '<':
             return
 
+        if sys.platform == 'OpenVMS':
+            #
+            # OpenVMS filesystem does not support byte stream.
+            #
+            mode = 'w'
+        else:
+            mode = 'wb'
+
         path = calc_bpl_filename(module_name + filename)            
-        file = open(path, 'wb')
+        file = open(path, mode)
 
         try:
             try:
@@ -10813,8 +10829,16 @@ class CSessionManagerInternal:
         if module_name[:1] == '<':
             return
 
+        if sys.platform == 'OpenVMS':
+            #
+            # OpenVMS filesystem does not support byte stream.
+            #
+            mode = 'r'
+        else:
+            mode = 'rb'
+
         path = calc_bpl_filename(module_name + filename)                            
-        file = open(path, 'rb')
+        file = open(path, mode)
 
         ferror = False
         
