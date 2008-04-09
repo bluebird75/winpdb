@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.3.7
+    rpdb2.py - version 2.3.8
 
     A remote Python debugger for CPython
 
@@ -511,9 +511,9 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 3, 7, 0, '')
-RPDB_VERSION = "RPDB_2_3_7"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_7"
+VERSION = (2, 3, 8, 0, '')
+RPDB_VERSION = "RPDB_2_3_8"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_8"
 
 
 
@@ -1811,7 +1811,7 @@ CONSOLE_PRINTER = '*** '
 CONSOLE_WRAP_INDEX = 78
 CONSOLE_PROMPT = '\n> '
 CONSOLE_PROMPT_ANALYZE = '\nAnalayze> '
-CONSOLE_INTRO = ("""RPDB - The Remote Python Debugger, version %s,
+CONSOLE_INTRO = ("""RPDB2 - The Remote Python Debugger, version %s,
 Copyright (C) 2005-2008 Nir Aides.
 Type "help", "copyright", "license", "credits" for more information.""" % (RPDB_VERSION))
 
@@ -3925,8 +3925,8 @@ def CalcFilteredDir(r, filter_level):
 
     if 'finfo' in d and parse_type(type(r)) == 'mp_request':
         #
-        # Workaround mod_python segfault with type(req.finfo) by
-        # removing this attribute from the namespace.
+        # Workaround mod_python segfault in type(req.finfo) by
+        # removing this attribute from the namespace viewer.
         #
         d.remove('finfo')
 
@@ -13651,10 +13651,22 @@ g_excepthooks = []
 
 g_excepthook = None
 
+#
+# Set the debugger hook for unhandled exceptions. It only kicks in on 
+# unhandled exceptions that are declared unhandled in the middle of the
+# stack as in wxPython. Normally unhandled exceptions are trapped at the 
+# last stack frame by another mechanism.
+#
+# This mechaism is designed to work even if the excepthook is over-written.
+# by the debugged script.
+#
 def set_excepthook():
     global g_excepthook
 
     if len(g_excepthooks) >= 4:
+        #
+        # Give up. We have been over-written 4 times already.
+        #
         return
 
     next_excepthook = sys.excepthook
