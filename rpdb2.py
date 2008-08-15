@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.3.9
+    rpdb2.py - version 2.4.0
 
     A remote Python debugger for CPython
 
@@ -525,9 +525,10 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 3, 9, 0, '')
-RPDB_VERSION = "RPDB_2_3_9"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_3_9"
+VERSION = (2, 4, 0, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.0 - Tychod"
+RPDB_VERSION = "RPDB_2_4_0"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_0"
 
 
 
@@ -14138,6 +14139,7 @@ def PrintUsage(fExtended = False):
                     screen rpdb2 -s [options] [<script-name> [<script-args>...]]
     -c, --chdir     Change the working directory to that of the launched 
                     script.
+    -v, --version   Print version information.
     --debug         Debug prints.
 
     Note that each option is available in short form (example -e) and in a 
@@ -14158,7 +14160,7 @@ def PrintUsage(fExtended = False):
 
 
 
-def main(StartClient_func = StartClient):
+def main(StartClient_func = StartClient, version = RPDB_TITLE):
     global g_fScreen
     global g_fDebug
     global g_fFirewallTest
@@ -14171,13 +14173,12 @@ def main(StartClient_func = StartClient):
     try:
         options, _rpdb2_args = getopt.getopt(
                             argv[1:], 
-                            'hdao:rtep:sc', 
-                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'nofwtest', 'debug']
+                            'hdao:rtep:scv', 
+                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'nofwtest', 'version', 'debug']
                             )
 
     except getopt.GetoptError:
-        e = sys.exc_info()[1]
-        _print(e)
+        PrintUsage()
         return 2
         
     fWrap = False
@@ -14196,6 +14197,9 @@ def main(StartClient_func = StartClient):
     for o, a in options:
         if o in ['-h', '--help']:
             PrintUsage()
+            return 0
+        if o in ['-v', '--version']:
+            _print(version)
             return 0
         if o in ['--debug']:
             g_fDebug = True 

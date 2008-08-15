@@ -458,6 +458,11 @@ between the debugger console and the debuggee.
 Debuggees with un-matching passwords will not 
 appear in the attach query list."""
 
+STATIC_ATTACH_DESC = """Attach to a script (that has the debugger engine running) on local or remote machine:"""
+STATIC_ATTACH_DESC_SPLIT = """Attach to a script (that has the debugger engine 
+running) on local or remote machine:"""
+
+STATIC_LAUNCH_DESC = """Start a new debugging session:"""
 STATIC_LAUNCH_ENV = """To set environment variables for the new script use the 'env' console command."""
 STATIC_LAUNCH_ENV_SPLIT = """To set environment variables for the new script use the 'env' 
 console command."""
@@ -490,9 +495,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-WINPDB_TITLE = "Winpdb 1.3.9 - Tychod"
-WINPDB_VERSION = "WINPDB_1_3.9"
-VERSION = (1, 3, 9, 0, '')
+VERSION = (1, 4, 0, 0, 'Tychod')
+WINPDB_TITLE = "Winpdb 1.4.0 - Tychod"
+WINPDB_VERSION = "WINPDB_1_4_0"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -3924,6 +3929,15 @@ class CAttachDialog(wx.Dialog, CJobs):
         self.m_index = None
                         
         sizerv = wx.BoxSizer(wx.VERTICAL)
+
+        label = wx.StaticText(self, -1, STATIC_ATTACH_DESC)
+        try:
+            label.Wrap(350)
+        except:
+            label.SetLabel(STATIC_ATTACH_DESC_SPLIT)
+
+        sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
@@ -4003,7 +4017,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
     def OnCloseWindow(self, event):
         self.shutdown_jobs()
-        self.Destroy()
+        event.Skip()
 
 
     def get_server(self):
@@ -4470,6 +4484,10 @@ class CLaunchDialog(wx.Dialog):
         wx.Dialog.__init__(self, parent, -1, DLG_LAUNCH_TITLE)
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
+
+        label = wx.StaticText(self, -1, STATIC_LAUNCH_DESC)
+        sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
@@ -4621,11 +4639,11 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_3_9":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_3_9", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_2_4_0":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_0", rpdb2.get_version()))
         return
         
-    return rpdb2.main(StartClient)
+    return rpdb2.main(StartClient, WINPDB_TITLE)
 
 
 
