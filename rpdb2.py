@@ -24,7 +24,7 @@
 
 COPYRIGHT_NOTICE = """Copyright (C) 2005-2008 Nir Aides"""
 
-CREDITS_NOTICE = """Jurjen N.E. Bos - Compatibility with OS X."""
+CREDITS_NOTICE = """This project is waiting for your contribution and support."""
 
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it 

@@ -40,7 +40,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU General Public License for more details.
 
 Credits:
-Jurjen N.E. Bos - Compatibility with OS X."""
+This project is waiting for your contribution and support."""
 
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it 
@@ -3930,7 +3930,7 @@ class CAttachDialog(wx.Dialog, CJobs):
                         
         sizerv = wx.BoxSizer(wx.VERTICAL)
 
-        label = wx.StaticText(self, -1, STATIC_ATTACH_DESC)
+        label = wx.StaticText(self, -1, STATIC_ATTACH_DESC, size = (350, -1))
         try:
             label.Wrap(350)
         except:
