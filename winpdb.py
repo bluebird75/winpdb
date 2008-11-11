@@ -866,8 +866,6 @@ class CMenuBar:
 
         self.m_menubar = wx.MenuBar()
 
-        self.SetMenuBar(self.m_menubar)
-
         self.m_cascades = {ML_ROOT: self.m_menubar}
         
         k = resource.keys()
@@ -908,6 +906,13 @@ class CMenuBar:
             self.Bind(wx.EVT_MENU, command, item)
 
             self.m_encapsulating_menu_items[item_label] = parent 
+
+        #
+        # Must be done after menu is added to menu bar.
+        #
+        self.SetMenuBar(self.m_menubar)
+        if 'wxMac' in wx.PlatformInfo:
+             wx.GetApp().SetMacHelpMenuTitleName("&Help")
 
     def set_menu_items_state(self, state_label_dict):
         for state, label_list in state_label_dict.items():
