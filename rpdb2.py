@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.4.0
+    rpdb2.py - version 2.4.2
 
     A remote Python debugger for CPython
 
@@ -525,9 +525,9 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 4, 0, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.4.0 - Tychod"
-RPDB_VERSION = "RPDB_2_4_0"
+VERSION = (2, 4, 2, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.2 - Tychod"
+RPDB_VERSION = "RPDB_2_4_2"
 RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_0"
 
 
@@ -3090,13 +3090,13 @@ def my_abspath1(path):
             pass
     else:
         try:
-            path = os.getcwd()
+            path = getcwd()
 
         except UnicodeDecodeError:
             #
             # This exception can be raised in py3k (alpha) on nt.
             #
-            path = os.getcwdu()
+            path = getcwdu()
         
     np = os.path.normpath(path)
 
@@ -3253,6 +3253,24 @@ def FindFileAsModule(filename):
 
 
 
+def getcwd():
+    try:
+        return os.getcwd()
+
+    except UnicodeDecodeError:
+        print_debug_exception(True)
+        raise
+
+
+
+def getcwdu():
+    if hasattr(os, 'getcwdu'):
+        return os.getcwdu()
+
+    return getcwd()
+
+
+
 def FindFile(
         filename, 
         sources_paths = [], 
@@ -3336,15 +3354,15 @@ def FindFile(
                 return _l
 
     scriptname = CalcScriptName(filename, fAllowAnyExt)
-    
+       
     try:
-        cwd = [os.getcwd(), os.getcwdu()]
+        cwd = [getcwd(), getcwdu()]
     
     except UnicodeDecodeError:
         #
         # This exception can be raised in py3k (alpha) on nt.
         #
-        cwd = [os.getcwdu()]
+        cwd = [getcwdu()]
 
     env_path = os.environ['PATH']
     paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep)
@@ -4872,7 +4890,7 @@ class CEvent(object):
     """
     Base class for events.
     """
-   
+  
     def __reduce__(self):
         rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
         return rv
@@ -10493,7 +10511,7 @@ class CSessionManagerInternal:
             command = osSpawn[name] % {'exec': python_exec, 'options': options}
 
         if name == DARWIN:
-            s = 'cd "%s" ; %s' % (os.getcwdu(), command)
+            s = 'cd "%s" ; %s' % (getcwdu(), command)
             command = CalcMacTerminalCommand(s)
 
         print_debug('Terminal open string: %s' % repr(command))
@@ -13914,14 +13932,18 @@ def _atexit(fabort = False):
 
 
 def my_pickle_import(*args, **kwargs):
-    if len(args) != 1 or len(kwargs) != 0:
-        return __import__(*args, **kwargs)
+    name = ''
+    
+    if len(args) > 0:
+        name = args[0]
 
-    name = args[0]
-    if name in sys.modules:
+    if 'name' in kwargs:
+        name = kwargs['name']
+
+    if name == 'rpdb2':
         return
 
-    return __import__(name)
+    return __import__(*args, **kwargs)
 
 
 
@@ -13929,6 +13951,9 @@ def my_pickle_import(*args, **kwargs):
 # MOD
 #
 def workaround_import_deadlock():
+    if is_py3k() and hasattr(pickle, '_Pickler'):
+        pickle.Pickler = pickle._Pickler
+
     xmlrpclib.loads(XML_DATA)
     s = as_bytes("(S'hello'\np0\nS'world'\np1\ntp2\n.")
     #s = as_bytes('(S\'\\xb3\\x95\\xf9\\x1d\\x105c\\xc6\\xe2t\\x9a\\xa5_`\\xa59\'\np0\nS"(I0\\nI1\\nS\'5657827\'\\np0\\n(S\'server_info\'\\np1\\n(tI0\\ntp2\\ntp3\\n."\np1\ntp2\n.0000000')
@@ -13980,13 +14005,13 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         #
         if sys.path[0] == '':
             try:
-                g_initial_cwd = [os.getcwd(), os.getcwdu()]
+                g_initial_cwd = [getcwd(), getcwdu()]
     
             except UnicodeDecodeError:
                 #
                 # This exception can be raised in py3k (alpha) on nt.
                 #
-                g_initial_cwd = [os.getcwdu()]
+                g_initial_cwd = [getcwdu()]
 
             
         atexit.register(_atexit)
@@ -14022,7 +14047,7 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
             os.chdir(os.path.dirname(_path))
 
         if ExpandedFilename in g_found_unicode_files:
-            prefix = os.path.join(os.getcwdu(), '')
+            prefix = os.path.join(getcwdu(), '')
             _path = _path.replace(winlower(prefix), '')
         
     except IOError:

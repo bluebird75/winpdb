@@ -495,9 +495,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-VERSION = (1, 4, 0, 0, 'Tychod')
-WINPDB_TITLE = "Winpdb 1.4.0 - Tychod"
-WINPDB_VERSION = "WINPDB_1_4_0"
+VERSION = (1, 4, 2, 0, 'Tychod')
+WINPDB_TITLE = "Winpdb 1.4.2 - Tychod"
+WINPDB_VERSION = "WINPDB_1_4_2"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -4552,7 +4552,7 @@ class CLaunchDialog(wx.Dialog):
         (_path, filename, args) = rpdb2.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
-        cwd = os.getcwdu()
+        cwd = rpdb2.getcwdu()
             
         dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WINPDB_WILDCARD, style = wx.OPEN | wx.CHANGE_DIR)
         r = dlg.ShowModal()
@@ -4639,7 +4639,7 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_4_0":
+    if rpdb2.get_version() != "RPDB_2_4_2":
         rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_0", rpdb2.get_version()))
         return
         

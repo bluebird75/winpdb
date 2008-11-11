@@ -7,7 +7,7 @@ Contact: Nir Aides
 Email:   nir@winpdb.org
 Website: http://www.winpdb.org/
          http://sourceforge.net/projects/winpdb/
-Version: 1.4.0
+Version: 1.4.2
 
 
 
