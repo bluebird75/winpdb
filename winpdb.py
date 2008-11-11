@@ -2229,13 +2229,19 @@ class CCaptionManager:
         self.m_n_focus -= 1
         if self.m_n_focus > 0:
             return
-            
-        self.m_caption.SetBackgroundColour(wx.SystemSettings_GetColour(wx.SYS_COLOUR_INACTIVECAPTION))
-        self.m_caption.Refresh()
+
+        #
+        # Event may get sent after the object has been deleted.
+        #
+        try:
+            self.m_caption.SetBackgroundColour(wx.SystemSettings_GetColour(wx.SYS_COLOUR_INACTIVECAPTION))
+            self.m_caption.Refresh()
+        except wx.PyDeadObjectError:
+            pass
+
         event.Skip()
 
-        
-    
+
 class CStyledViewer(stc.StyledTextCtrl):
     def __init__(self, *args, **kwargs):
         self.m_margin_command = kwargs.pop('margin_command', None)
