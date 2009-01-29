@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.4.2
+    rpdb2.py - version 2.4.3
 
     A remote Python debugger for CPython
 
@@ -263,6 +263,7 @@ if '.' in __name__:
 
 
 
+import subprocess
 import threading
 import traceback
 import zipimport
@@ -525,9 +526,9 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 4, 2, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.4.2 - Tychod"
-RPDB_VERSION = "RPDB_2_4_2"
+VERSION = (2, 4, 3, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.3 - Tychod"
+RPDB_VERSION = "RPDB_2_4_3"
 RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_0"
 
 
@@ -1110,7 +1111,7 @@ class CSessionManager:
         filter_level - 0, 1, or 2. Filter out methods and functions from
             classes and objects. (0 - None, 1 - Medium, 2 - Maximum).
 
-        repr_limit - Length limit (approximated) to be imposed repr() of 
+        repr_limit - Length limit (approximated) to be imposed on repr() of 
              returned items.
         
         examples of expression lists: 
@@ -2463,6 +2464,7 @@ def detect_locale():
     try:
         codecs.lookup(encoding)
         return encoding
+
 
     except:
         pass
@@ -4296,8 +4298,12 @@ def my_extract_tb(tb):
 
 
 def get_traceback(frame, ctx):
-    if ctx.get_exc_info() != None:
-        return ctx.get_exc_info()[2]
+    if is_py3k():
+        if ctx.get_exc_info() != None:
+            return ctx.get_exc_info()[2]
+    else:
+        if frame.f_exc_traceback != None:
+            return frame.f_exc_traceback
 
     locals = copy.copy(frame.f_locals)
     if not 'traceback' in locals:
@@ -6700,6 +6706,9 @@ class CDebuggerCoreThread:
         if event not in ['line', 'return', 'exception']:
             return frame.f_trace
 
+        if event == 'exception':
+            self.set_exc_info(arg)
+
         self.m_event = event
 
         if frame in self.m_locals_copy:
@@ -6791,6 +6800,9 @@ class CDebuggerCoreThread:
                 self.update_locals()
                 self.set_local_trace(frame)
 
+            if not is_py3k() and not frame.f_exc_traceback is arg[2]:
+                (frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback) = arg
+
             return frame.f_trace     
 
         return frame.f_trace     
@@ -6840,6 +6852,8 @@ class CDebuggerCoreThread:
             self.m_event = event
 
             if self.m_code_context.m_fExceptionTrap and self.m_core.m_ftrap:                
+                self.set_exc_info(arg)
+                
                 self.m_fUnhandledException = True
                 self.m_core._break(self, frame, event, arg)
 
@@ -6854,7 +6868,10 @@ class CDebuggerCoreThread:
                 self.update_locals()
                 self.set_local_trace(frame)
 
-            self.set_exc_info(arg)
+            if is_py3k():
+                self.set_exc_info(arg)
+            elif not frame.f_exc_traceback is arg[2]:
+                (frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback) = arg
 
             return frame.f_trace     
 
@@ -6863,6 +6880,7 @@ class CDebuggerCoreThread:
 
     def trace_dispatch_signal(self, frame, event, arg):
         #print_debug('*** trace_dispatch_signal %s, %s, %s' % (frame.f_lineno, event, repr(arg)))
+        self.set_exc_info(arg)
         self.set_tracers()
         sys.setprofile(self.profile)
 
@@ -6874,7 +6892,19 @@ class CDebuggerCoreThread:
         Set exception information.
         """
        
-        self.m_exc_info = arg
+        if is_py3k():
+            self.m_exc_info = arg
+            return
+
+        (t, v, tb) = arg
+
+        while tb is not None:
+            f = tb.tb_frame            
+            f.f_exc_type = t
+            f.f_exc_value = v 
+            f.f_exc_traceback = tb
+
+            tb = tb.tb_next
 
 
     def get_exc_info(self):
@@ -7427,7 +7457,10 @@ class CDebuggerCore:
                 except:
                     g_module_main = None
 
-            if ctx.get_exc_info() == None and sys.exc_info()[2] != None:
+            if not is_py3k() and not frame.f_exc_traceback is None:
+                ctx.set_exc_info((frame.f_exc_type, frame.f_exc_value, frame.f_exc_traceback))
+
+            if is_py3k() and ctx.get_exc_info() == None and sys.exc_info()[2] != None:
                 ctx.set_exc_info(sys.exc_info())
 
             try:
@@ -8735,14 +8768,31 @@ class CDebuggerEngine(CDebuggerCore):
     def get_exception(self, frame_index, fException):
         ctx = self.get_current_ctx()
         
-        exc_info = ctx.get_exc_info()
-        if exc_info == None:
-            return {'type': None, 'value': None, 'traceback': None}
+        if is_py3k():
+            exc_info = ctx.get_exc_info()
+            if exc_info == None:
+                return {'type': None, 'value': None, 'traceback': None}
 
-        type, value, traceback = exc_info
-        e = {'type': type, 'value': value, 'traceback': traceback}
+            type, value, traceback = exc_info
+            e = {'type': type, 'value': value, 'traceback': traceback}
         
-        return e
+            return e
+
+        try:
+            f = None
+            base_frame = None
+            
+            base_frame = ctx.frame_acquire()
+            (f, frame_lineno) = ctx.get_frame(base_frame, frame_index, fException)
+
+            e = {'type': f.f_exc_type, 'value': f.f_exc_value, 'traceback': f.f_exc_traceback}
+
+            return e
+            
+        finally:
+            f = None
+            base_frame = None            
+            ctx.frame_release()
 
 
     def is_child_of_failure(self, failed_expr_list, expr):
@@ -10521,7 +10571,7 @@ class CSessionManagerInternal:
         if name == MAC:
             terminalcommand.run(command)
         else:
-            os.popen(command)
+            subprocess.Popen(command, shell=True)
 
     
     def attach(self, key, name = None, fsupress_pwd_warning = False, fsetenv = False, ffirewall_test = True, server = None, fload_breakpoints = True):
