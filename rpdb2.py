@@ -388,7 +388,8 @@ def start_embedded_debugger(
             fAllowRemote = False, 
             timeout = TIMEOUT_FIVE_MINUTES, 
             source_provider = None, 
-            fDebug = False
+            fDebug = False,
+            depth = 0
             ):
 
     """
@@ -421,6 +422,10 @@ def start_embedded_debugger(
 
     fDebug - debug output.
 
+    depth - Depth of the frame in which the debugger should be started. This
+        defaults to '0' so the top of stack will be in the code where
+        start_embedded_debugger is called.
+    
     IMPORTNAT SECURITY NOTE:
     USING A HARDCODED PASSWORD MAY BE UNSECURE SINCE ANYONE WITH READ
     PERMISSION TO THE SCRIPT WILL BE ABLE TO READ THE PASSWORD AND CONNECT TO 
@@ -435,7 +440,8 @@ def start_embedded_debugger(
                         fAllowRemote, 
                         timeout, 
                         source_provider,
-                        fDebug
+                        fDebug,
+                        depth + 2
                         )
     
 
@@ -447,7 +453,8 @@ def start_embedded_debugger_interactive_password(
                 source_provider = None,
                 fDebug = False, 
                 stdin = sys.stdin, 
-                stdout = sys.stdout
+                stdout = sys.stdout,
+                depth = 0
                 ):
                 
     if g_server is not None:
@@ -467,7 +474,8 @@ def start_embedded_debugger_interactive_password(
                                 fAllowRemote, 
                                 timeout, 
                                 source_provider,
-                                fDebug
+                                fDebug,
+                                depth + 2
                                 )
 
         except BadArgument:
@@ -491,12 +499,12 @@ def settrace():
 
 
 
-def setbreak():
+def setbreak(depth = 0):
     """
     Pause the script for inspection at next script statement.
     """
 
-    return __setbreak()
+    return __setbreak(depth + 2)
 
 
 
@@ -13936,11 +13944,11 @@ def __settrace(depth = 2):
 
     
 
-def __setbreak():
+def __setbreak(depth = 2):
     if g_debugger is None:
         return
         
-    f = sys._getframe(2)
+    f = sys._getframe(depth)
     g_debugger.setbreak(f)
 
     return thread.get_ident()
@@ -14012,7 +14020,7 @@ def workaround_import_deadlock():
 
 
 
-def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, source_provider, fDebug):
+def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, source_provider, fDebug, depth):
     global g_server
     global g_debugger
     global g_fDebug
@@ -14025,12 +14033,12 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         g_server_lock.acquire()
         
         if g_debugger is not None and timeout == 0:
-            f = sys._getframe(2)
+            f = sys._getframe(depth)
             g_debugger.settrace(f, f_break_on_init = False)
             return
 
         if g_debugger is not None:
-            f = sys._getframe(2)
+            f = sys._getframe(depth)
             g_debugger.record_client_heartbeat(0, True, False)
             g_debugger.setbreak(f)
             return
@@ -14046,7 +14054,7 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         if (not fAllowUnencrypted) and not is_encryption_supported():
             raise EncryptionNotSupported
         
-        f = sys._getframe(2)
+        f = sys._getframe(depth)
         filename = calc_frame_path(f)
 
         #
