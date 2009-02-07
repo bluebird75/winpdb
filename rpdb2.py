@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.4.3
+    rpdb2.py - version 2.4.4
 
     A remote Python debugger for CPython
 
-    Copyright (C) 2005-2008 Nir Aides
+    Copyright (C) 2005-2009 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
     under the terms of the GNU General Public License as published by the 
@@ -22,7 +22,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 
-COPYRIGHT_NOTICE = """Copyright (C) 2005-2008 Nir Aides"""
+COPYRIGHT_NOTICE = """Copyright (C) 2005-2009 Nir Aides"""
 
 CREDITS_NOTICE = """This project is waiting for your contribution and support."""
 
@@ -534,9 +534,9 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 4, 3, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.4.3 - Tychod"
-RPDB_VERSION = "RPDB_2_4_3"
+VERSION = (2, 4, 4, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.4 - Tychod"
+RPDB_VERSION = "RPDB_2_4_4"
 RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_0"
 
 
@@ -1836,7 +1836,7 @@ CONSOLE_WRAP_INDEX = 78
 CONSOLE_PROMPT = '\n> '
 CONSOLE_PROMPT_ANALYZE = '\nAnalayze> '
 CONSOLE_INTRO = ("""RPDB2 - The Remote Python Debugger, version %s,
-Copyright (C) 2005-2008 Nir Aides.
+Copyright (C) 2005-2009 Nir Aides.
 Type "help", "copyright", "license", "credits" for more information.""" % (RPDB_VERSION))
 
 PRINT_NOTICE_PROMPT = "Hit Return for more, or q (and Return) to quit:"
