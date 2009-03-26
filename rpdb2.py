@@ -6393,7 +6393,12 @@ class CDebuggerCoreThread:
 
         self.m_exc_info = None
 
+        self.m_depth = 0
+        while frame is not None:
+            self.m_depth += 1
+            frame = frame.f_back
         
+
     def profile(self, frame, event, arg): 
         """
         Profiler method.
@@ -6402,7 +6407,30 @@ class CDebuggerCoreThread:
         life time of the frame structure.
         """
         #print_debug('profile: %s, %s, %s, %s, %s' % (repr(frame), event, frame.f_code.co_name, frame.f_code.co_filename, repr(arg)[:40])) 
-        if event == 'return':  
+
+        if event == 'call':
+            self.m_depth += 1
+            if self.m_depth > g_recursionlimit:
+                print_debug('Exceeded recursion limit and caught in profile function.')
+
+                try:
+                    #
+                    # The allowed recursion limit was exceeded. 
+                    # To view the offending script frame, go one frame 
+                    # down the stack with the 'down' console command.
+                    #
+                    raise RuntimeError('maximum recursion depth exceeded')
+
+                except:
+                    #
+                    # Schedule the debugger to re-enable the profile hook.
+                    #
+                    self.set_tracers(fsignal_exception = True)
+                    raise
+
+        elif event == 'return':
+            self.m_depth -= 1
+
             if sys.excepthook != g_excepthook:
                 set_excepthook()
 
@@ -6422,7 +6450,7 @@ class CDebuggerCoreThread:
                     
                     self.m_uef_lineno = self.m_ue_lineno
                     
-                    self.m_fUnhandledException = True                    
+                    self.m_fUnhandledException = True 
                     self.m_core._break(self, frame, event, arg)
                     
                     self.m_uef_lineno = None 
@@ -6899,7 +6927,7 @@ class CDebuggerCoreThread:
         """
         Set exception information.
         """
-       
+
         if is_py3k():
             self.m_exc_info = arg
             return
@@ -13514,6 +13542,24 @@ g_sys_exc_info = None
 if __name__ == 'rpdb2' and 'exc_info' in dir(sys) and sys.exc_info != __exc_info:
     g_sys_exc_info = sys.exc_info
     sys.exc_info = __exc_info
+
+
+
+def __setrecursionlimit(rl):
+    global g_recursionlimit
+
+    g_recursionlimit = rl
+
+    return g_sys_setrecursionlimit(rl + 64)
+
+
+
+g_sys_setrecursionlimit = None
+
+if __name__ == 'rpdb2' and 'setrecursionlimit' in dir(sys) and sys.setrecursionlimit != __setrecursionlimit:
+    g_sys_setrecursionlimit = sys.setrecursionlimit
+    sys.setrecursionlimit = __setrecursionlimit
+    __setrecursionlimit(sys.getrecursionlimit())
 
 
 
