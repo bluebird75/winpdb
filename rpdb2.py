@@ -6416,7 +6416,7 @@ class CDebuggerCoreThread:
                 try:
                     #
                     # The allowed recursion limit was exceeded. 
-                    # To view the offending script frame, go one frame 
+                    # To view the offending script frame, go two frames 
                     # down the stack with the 'down' console command.
                     #
                     raise RuntimeError('maximum recursion depth exceeded')
@@ -6927,6 +6927,9 @@ class CDebuggerCoreThread:
         """
         Set exception information.
         """
+
+        if arg == None:
+            return
 
         if is_py3k():
             self.m_exc_info = arg
