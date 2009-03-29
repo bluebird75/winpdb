@@ -6399,17 +6399,8 @@ class CDebuggerCoreThread:
             frame = frame.f_back
         
 
-    def profile(self, frame, event, arg): 
-        """
-        Profiler method.
-        The Python profiling mechanism is used by the debugger
-        mainly to handle synchronization issues related to the 
-        life time of the frame structure.
-        """
-        #print_debug('profile: %s, %s, %s, %s, %s' % (repr(frame), event, frame.f_code.co_name, frame.f_code.co_filename, repr(arg)[:40])) 
-
+    def profile_recursion(self, frame, event, arg):
         if event == 'call':
-            self.m_depth += 1
             if self.m_depth > g_recursionlimit:
                 print_debug('Exceeded recursion limit and caught in profile function.')
 
@@ -6429,6 +6420,23 @@ class CDebuggerCoreThread:
                     raise
 
         elif event == 'return':
+            if self.m_depth < g_recursionlimit - 10:
+                sys.setprofile(self.profile) 
+
+            return self.profile(frame, event, arg)
+
+
+ 
+    def profile(self, frame, event, arg): 
+        """
+        Profiler method.
+        The Python profiling mechanism is used by the debugger
+        mainly to handle synchronization issues related to the 
+        life time of the frame structure.
+        """
+        #print_debug('profile: %s, %s, %s, %s, %s' % (repr(frame), event, frame.f_code.co_name, frame.f_code.co_filename, repr(arg)[:40])) 
+
+        if event == 'return':
             self.m_depth -= 1
 
             if sys.excepthook != g_excepthook:
@@ -6766,6 +6774,10 @@ class CDebuggerCoreThread:
         
         if not self.m_core.m_ftrace:
             return self.trace_dispatch_stop(frame, event, arg)
+       
+        self.m_depth += 1
+        if self.m_depth > g_recursionlimit:
+            sys.setprofile(self.profile_recursion)
         
         self.m_frame = frame
 
@@ -13551,7 +13563,7 @@ if __name__ == 'rpdb2' and 'exc_info' in dir(sys) and sys.exc_info != __exc_info
 def __setrecursionlimit(rl):
     global g_recursionlimit
 
-    g_recursionlimit = rl
+    g_recursionlimit = max(rl, 64)
 
     return g_sys_setrecursionlimit(rl + 64)
 
