@@ -51,7 +51,7 @@ else:
 
 setup(
     name = 'winpdb',
-    version = '1.4.4',
+    version = '1.4.6',
     description = 'A platform independent GPL Python debugger.',
     long_description = LONG_DESC,
     author = 'Nir Aides',

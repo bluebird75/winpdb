@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.4.4
+    rpdb2.py - version 2.4.6
 
     A remote Python debugger for CPython
 
@@ -534,9 +534,9 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 4, 4, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.4.4 - Tychod"
-RPDB_VERSION = "RPDB_2_4_4"
+VERSION = (2, 4, 6, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.6 - Tychod"
+RPDB_VERSION = "RPDB_2_4_6"
 RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_0"
 
 
