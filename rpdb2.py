@@ -6394,6 +6394,11 @@ class CDebuggerCoreThread:
         self.m_exc_info = None
 
         self.m_depth = 0
+        self.set_depth(frame) 
+       
+
+    def set_depth(self, frame):
+        self.m_depth = 0
         while frame is not None:
             self.m_depth += 1
             frame = frame.f_back
@@ -6420,9 +6425,6 @@ class CDebuggerCoreThread:
                     raise
 
         elif event == 'return':
-            if self.m_depth < g_recursionlimit - 10:
-                sys.setprofile(self.profile) 
-
             return self.profile(frame, event, arg)
 
 
@@ -6930,6 +6932,7 @@ class CDebuggerCoreThread:
         #print_debug('*** trace_dispatch_signal %s, %s, %s' % (frame.f_lineno, event, repr(arg)))
         self.set_exc_info(arg)
         self.set_tracers()
+        self.set_depth(frame)
         sys.setprofile(self.profile)
 
         return self.trace_dispatch_trap(frame, event, arg)
@@ -13563,7 +13566,13 @@ if __name__ == 'rpdb2' and 'exc_info' in dir(sys) and sys.exc_info != __exc_info
 def __setrecursionlimit(rl):
     global g_recursionlimit
 
+    print_debug('rl = %d' % rl)
+
     g_recursionlimit = max(rl, 64)
+
+    rl = g_recursionlimit
+    if sys.version_info[:2] == (2, 6):
+        rl *= 3
 
     return g_sys_setrecursionlimit(rl + 64)
 
