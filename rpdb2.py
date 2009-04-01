@@ -348,6 +348,11 @@ except:
     import http.client as httplib
     import _thread as thread
 
+    #
+    # Needed in py3k path.
+    #
+    import numbers
+
 
 
 #
@@ -4202,7 +4207,10 @@ def sort(s):
 
 
 def sort_key(e):
-    if operator.isNumberType(e):
+    if is_py3k() and isinstance(e, numbers.Number):
+        return (0, e)
+
+    if not is_py3k() and operator.isNumberType(e):
         return (0, e)
 
     return (1, repr_ltd(e, 256, encoding = ENCODING_RAW_I))
