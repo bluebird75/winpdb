@@ -40,7 +40,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU General Public License for more details.
 
 Credits:
-This project is waiting for your contribution and support."""
+Work on version 1.4.8 was sponsored by Investortools, Inc."""
 
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it 
@@ -495,9 +495,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-VERSION = (1, 4, 6, 0, 'Tychod')
-WINPDB_TITLE = "Winpdb 1.4.6 - Tychod"
-WINPDB_VERSION = "WINPDB_1_4_6"
+VERSION = (1, 4, 8, 0, 'Tychod')
+WINPDB_TITLE = "Winpdb 1.4.8 - Tychod"
+WINPDB_VERSION = "WINPDB_1_4_8"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -4650,8 +4650,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_4_6":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_6", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_2_4_8":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_8", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient, WINPDB_TITLE)

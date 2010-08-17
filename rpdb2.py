@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-    rpdb2.py - version 2.4.6
+    rpdb2.py - version 2.4.8
 
     A remote Python debugger for CPython
 
@@ -24,7 +24,7 @@
 
 COPYRIGHT_NOTICE = """Copyright (C) 2005-2009 Nir Aides"""
 
-CREDITS_NOTICE = """This project is waiting for your contribution and support."""
+CREDITS_NOTICE = """Work on version 2.4.8 was sponsored by Investortools, Inc."""
 
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it 
@@ -539,9 +539,9 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 4, 6, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.4.6 - Tychod"
-RPDB_VERSION = "RPDB_2_4_6"
+VERSION = (2, 4, 8, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.8 - Tychod"
+RPDB_VERSION = "RPDB_2_4_8"
 RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_0"
 
 
@@ -2191,8 +2191,12 @@ g_fFirewallTest = True
 
 
 
-g_safe_base64_to = string.maketrans(as_bytes('/+='), as_bytes('_-#'))
-g_safe_base64_from = string.maketrans(as_bytes('_-#'), as_bytes('/+='))
+if is_py3k():
+    g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
+    g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
+else:
+    g_safe_base64_to = string.maketrans(as_bytes('/+='), as_bytes('_-#'))
+    g_safe_base64_from = string.maketrans(as_bytes('_-#'), as_bytes('/+='))
 
 
 
@@ -3962,7 +3966,7 @@ def create_pwd_file(rid, _rpdb2_pwd):
 
     fd = os.open(path, os.O_WRONLY | os.O_CREAT, int('0600', 8))
     
-    os.write(fd, _rpdb2_pwd)
+    os.write(fd, as_bytes(_rpdb2_pwd))
     os.close(fd)
     
         
@@ -9967,156 +9971,93 @@ class CDebuggeeServer(CIOServer):
 
 
 
-if not is_py3k():
-    #
-    # MOD
-    #
-    class CTimeoutHTTPConnection(httplib.HTTPConnection):
-        """
-        Modification of httplib.HTTPConnection with timeout for sockets.
-        """
+#
+# MOD
+#
+class CTimeoutHTTPConnection(httplib.HTTPConnection):
+    """
+    Modification of httplib.HTTPConnection with timeout for sockets.
+    """
 
-        _rpdb2_timeout = PING_TIMEOUT
-        
-        def connect(self):
-            """Connect to the host and port specified in __init__."""
-            msg = "getaddrinfo returns an empty list"
-            for res in socket.getaddrinfo(self.host, self.port, 0,
-                                          socket.SOCK_STREAM):
-                af, socktype, proto, canonname, sa = res
-                try:
-                    self.sock = socket.socket(af, socktype, proto)
-                    self.sock.settimeout(self._rpdb2_timeout)
-                    if self.debuglevel > 0:
-                        print_debug("connect: (%s, %s)" % (self.host, self.port))
-                    self.sock.connect(sa)
-                except socket.error:
-                    msg = sys.exc_info()[1]
-                    if self.debuglevel > 0:
-                        print_debug('connect fail: ' + repr((self.host, self.port)))
-                    if self.sock:
-                        self.sock.close()
-                    self.sock = None
-                    continue
-                break
-            if not self.sock:
-                raise socket.error(msg)
-
-
-
-    #
-    # MOD
-    #
-    class CLocalTimeoutHTTPConnection(CTimeoutHTTPConnection):
-        """
-        Modification of httplib.HTTPConnection with timeout for sockets.
-        """
-
-        _rpdb2_timeout = LOCAL_TIMEOUT
-
-
-
-    #
-    # MOD
-    #
-    class CTimeoutHTTP(httplib.HTTP):
-        """
-        Modification of httplib.HTTP with timeout for sockets.
-        """
-        
-        _connection_class = CTimeoutHTTPConnection
-
-        
-            
-    #
-    # MOD
-    #
-    class CLocalTimeoutHTTP(httplib.HTTP):
-        """
-        Modification of httplib.HTTP with timeout for sockets.
-        """
-        
-        _connection_class = CLocalTimeoutHTTPConnection
-
+    _rpdb2_timeout = PING_TIMEOUT
     
-        
-    #
-    # MOD
-    #
-    class CTimeoutTransport(xmlrpclib.Transport):
-        """
-        Modification of xmlrpclib.Transport with timeout for sockets.
-        """
-        
-        def make_connection(self, host):
-            # create a HTTP connection object from a host descriptor
-            host, extra_headers, x509 = self.get_host_info(host)
-            return CTimeoutHTTP(host)
+    def connect(self):
+        """Connect to the host and port specified in __init__."""
 
-        
-        
-    #
-    # MOD
-    #
-    class CLocalTimeoutTransport(xmlrpclib.Transport):
-        """
-        Modification of xmlrpclib.Transport with timeout for sockets.
-        """
-        
-        def make_connection(self, host):
-            # create a HTTP connection object from a host descriptor
-            host, extra_headers, x509 = self.get_host_info(host)
-            return CLocalTimeoutHTTP(host)
+        # New Python version of connect().
+        if hasattr(self, 'timeout'):
+            self.timeout = self._rpdb2_timeout
+            return httplib.HTTPConnection.connect(self)
 
+        # Old Python version of connect().
+        msg = "getaddrinfo returns an empty list"
+        for res in socket.getaddrinfo(self.host, self.port, 0,
+                                      socket.SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            try:
+                self.sock = socket.socket(af, socktype, proto)
+                self.sock.settimeout(self._rpdb2_timeout)
+                if self.debuglevel > 0:
+                    print_debug("connect: (%s, %s)" % (self.host, self.port))
+                self.sock.connect(sa)
+            except socket.error:
+                msg = sys.exc_info()[1]
+                if self.debuglevel > 0:
+                    print_debug('connect fail: ' + repr((self.host, self.port)))
+                if self.sock:
+                    self.sock.close()
+                self.sock = None
+                continue
+            break
+        if not self.sock:
+            raise socket.error(msg)
+
+
+
+#
+# MOD
+#
+class CLocalTimeoutHTTPConnection(CTimeoutHTTPConnection):
+    """
+    Modification of httplib.HTTPConnection with timeout for sockets.
+    """
+
+    _rpdb2_timeout = LOCAL_TIMEOUT
+
+
+
+if is_py3k():
+    class httplib_HTTP(object):
+        pass
 else:
-    #
-    # MOD
-    #
-    class CTimeoutTransport(xmlrpclib.Transport):
-        """
-        Modification of xmlrpclib.Transport with timeout for sockets.
-        """
-        
-        def send_request(self, host, handler, request_body, debug):
-            host, extra_headers, x509 = self.get_host_info(host)
-            connection = httplib.HTTPConnection(host, timeout = PING_TIMEOUT)
-            if debug:
-                connection.set_debuglevel(1)
-            headers = {}
-            if extra_headers:
-                for key, val in extra_headers:
-                    header[key] = val
-            headers["Content-Type"] = "text/xml"
-            headers["User-Agent"] = self.user_agent
-            connection.request("POST", handler, request_body, headers)
-            return connection
+    httplib_HTTP = httplib.HTTP
 
-        
-        
-    #
-    # MOD
-    #
-    class CLocalTimeoutTransport(xmlrpclib.Transport):
-        """
-        Modification of xmlrpclib.Transport with timeout for sockets.
-        """
-        
-        def send_request(self, host, handler, request_body, debug):
-            host, extra_headers, x509 = self.get_host_info(host)
-            connection = httplib.HTTPConnection(host, timeout = LOCAL_TIMEOUT)
-            if debug:
-                connection.set_debuglevel(1)
-            headers = {}
-            if extra_headers:
-                for key, val in extra_headers:
-                    header[key] = val
-            headers["Content-Type"] = "text/xml"
-            headers["User-Agent"] = self.user_agent
-            connection.request("POST", handler, request_body, headers)
-            return connection
 
+
+#
+# MOD
+#
+class CTimeoutHTTP(httplib_HTTP):
+    """
+    Modification of httplib.HTTP with timeout for sockets.
+    """
+    
+    _connection_class = CTimeoutHTTPConnection
 
     
+        
+#
+# MOD
+#
+class CLocalTimeoutHTTP(httplib_HTTP):
+    """
+    Modification of httplib.HTTP with timeout for sockets.
+    """
+    
+    _connection_class = CLocalTimeoutHTTPConnection
+
+    
+
 #
 # MOD
 #
@@ -10126,6 +10067,24 @@ class CLocalTransport(xmlrpclib.Transport):
     bug.
     """
     
+    _connection_class = httplib.HTTPConnection
+    _connection_class_old = httplib_HTTP
+
+
+    def make_connection(self, host):
+        # New Python version of connect().
+        # However, make_connection is hacked to always create a new connection
+        # Otherwise all threads use single connection and crash.
+        if hasattr(self, '_connection'):
+            chost, self._extra_headers, x509 = self.get_host_info(host)
+            return self._connection_class(chost)
+ 
+        # Old Python version of connect().
+        # create a HTTP connection object from a host descriptor
+        host, extra_headers, x509 = self.get_host_info(host)
+        return self._connection_class_old(host)
+
+
     def __parse_response(self, file, sock):
         # read response from input file/socket, and parse it
 
@@ -10151,6 +10110,32 @@ class CLocalTransport(xmlrpclib.Transport):
     if os.name == 'nt':
         _parse_response = __parse_response
 
+
+    
+#
+# MOD
+#
+class CTimeoutTransport(CLocalTransport):
+    """
+    Modification of xmlrpclib.Transport with timeout for sockets.
+    """
+   
+    _connection_class = CTimeoutHTTPConnection
+    _connection_class_old = CTimeoutHTTP
+
+    
+    
+#
+# MOD
+#
+class CLocalTimeoutTransport(CLocalTransport):
+    """
+    Modification of xmlrpclib.Transport with timeout for sockets.
+    """
+    
+    _connection_class = CLocalTimeoutHTTPConnection
+    _connection_class_old = CLocalTimeoutHTTP
+   
 
     
 class CSession:
