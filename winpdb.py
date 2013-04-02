@@ -2480,7 +2480,25 @@ class CSourceManager:
         callback(*_args)
 
 
-        
+
+class CFileDropTarget( wx.FileDropTarget ):
+    def __init__(self, code_viewer):
+        wx.FileDropTarget.__init__(self)
+        self.m_code_viewer = code_viewer
+
+    def OnDropFiles( self, x, y, filenames):
+        # Check of app authorize to open source files
+        # by checking if menubar Open Source is enabled
+        # if not, reject the drop
+        menubar = wx.GetApp().GetTopWindow().m_menubar
+        if not menubar.IsEnabled( menubar.GetMenu(0).FindItem( ML_OPEN ) ):
+            print 'Not enabled'
+            return False
+
+        for fname in filenames:
+            self.m_code_viewer.set_file( fname, fComplain=True)
+        return True
+
 class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
     def __init__(self, *args, **kwargs):
         self.m_session_manager = kwargs.pop('session_manager')
@@ -2534,6 +2552,9 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeyPressed)
         self.Bind(wx.EVT_KEY_UP, self.OnKeyReleased)
         self.Bind(wx.EVT_WINDOW_DESTROY, self.OnDestroyWindow)
+
+        _file_drop_target = CFileDropTarget( self )
+        self.m_viewer.SetDropTarget( _file_drop_target )
 
 
     def OnDestroyWindow(self, event):
