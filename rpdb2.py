@@ -295,6 +295,7 @@ import cmd
 import imp
 import os
 import re
+import types
 
 try:
     import hashlib
@@ -13468,6 +13469,13 @@ last set, last evaluated.""", self.m_stdout)
 
 
 def rpdb2_import_wrapper(*args, **kwargs):
+    # Workaround for logging library of Python 2.7
+    # See issue http://bugs.python.org/issue12718
+    if (sys.version_info[:2] == (2,7) and len(args) 
+        and hasattr(args[0], '__class__')
+        and args[0].__class__.__name__ == 'DictConfigurator' ):
+        args = args[1:]
+
     if len(args) > 0:
         name = args[0]
     elif 'name' in kwargs:
