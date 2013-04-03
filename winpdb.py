@@ -676,6 +676,10 @@ STATE_ATTACHING_TOOLBAR = {ENABLED: [], DISABLED: [TB_EXCEPTION, TB_FILTER, TB_B
 STATE_DETACHED_TOOLBAR = {ENABLED: [], DISABLED: [TB_EXCEPTION, TB_FILTER, TB_BREAK, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO]}
 STATE_DETACHING_TOOLBAR = {ENABLED: [], DISABLED: [TB_EXCEPTION, TB_FILTER, TB_BREAK, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO]}
 
+STATE_DRAGDROP_INACTIVE    = [ rpdb2.STATE_DETACHING, rpdb2.STATE_SPAWNING, rpdb2.STATE_ATTACHING ]
+STATE_DRAGDROP_OPEN_TARGET = [ rpdb2.STATE_DETACHED ]
+STATE_DRAGDROP_OPEN_SOURCE = [ rpdb2.STATE_BROKEN, rpdb2.STATE_RUNNING, rpdb2.STATE_ANALYZE, ]
+
 STATE_MAP = {
     rpdb2.STATE_SPAWNING: (STATE_SPAWNING_MENU, STATE_SPAWNING_TOOLBAR),
     rpdb2.STATE_ATTACHING: (STATE_ATTACHING_MENU, STATE_ATTACHING_TOOLBAR),
@@ -2037,6 +2041,20 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         open_dialog.Destroy()
 
 
+    def drop_files(self, filenames):
+        if self.m_state in STATE_DRAGDROP_INACTIVE:
+            return False
+
+        if self.m_state in STATE_DRAGDROP_OPEN_SOURCE:
+            for fname in filenames:
+                self.m_code_viewer.set_file( fname, fComplain=True)
+            return True
+
+        if self.m_state in STATE_DRAGDROP_OPEN_TARGET:
+            (fchdir, command_line) = (True, filenames[0])            
+            self.m_async_sm.launch(fchdir, command_line)
+            return True
+
     def do_attach(self, event):
         attach_dialog = CAttachDialog(self, self.m_session_manager)
         r = attach_dialog.ShowModal()
@@ -2487,17 +2505,7 @@ class CFileDropTarget( wx.FileDropTarget ):
         self.m_code_viewer = code_viewer
 
     def OnDropFiles( self, x, y, filenames):
-        # Check of app authorize to open source files
-        # by checking if menubar Open Source is enabled
-        # if not, reject the drop
-        menubar = wx.GetApp().GetTopWindow().m_menubar
-        if not menubar.IsEnabled( menubar.GetMenu(0).FindItem( ML_OPEN ) ):
-            print 'Not enabled'
-            return False
-
-        for fname in filenames:
-            self.m_code_viewer.set_file( fname, fComplain=True)
-        return True
+        return wx.GetApp().GetTopWindow().drop_files( filenames )
 
 class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
     def __init__(self, *args, **kwargs):
