@@ -9,6 +9,8 @@ DEBUGME=u'debugme.py'
 RPDB2 = 'rpdb2.py'
 PWD=u'toto'
 
+STEPS = [ 'f1', 'f2', 'f3', 'done' ]
+
 class FakeStdin:
     def __init__(self):
         self.please_stop = False
@@ -56,6 +58,7 @@ class TestRpdb2Stdout( unittest.TestCase ):
 class TestRpdb2( unittest.TestCase ):
 
     def setUp(self):
+        self.cleanStepFiles()
         self.console = None
         self.sm = None
         self.fakeStdin = FakeStdin()
@@ -63,11 +66,15 @@ class TestRpdb2( unittest.TestCase ):
         self.script = subprocess.Popen( [ PYTHON, RPDB2, '-d', '--pwd=%s' % PWD, os.path.join( 'tests', DEBUGME ) ], 
                         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
 
+    def cleanStepFiles(self):
+        for fname in STEPS:
+            if os.path.exists( fname ):
+                os.unlink( fname )
+
     def tearDown(self):
-
         dbg( 'Teardown' )
+        self.cleanStepFiles()
         if self.console:
-
             if self.rpdb2Stdout.attached:
                 dbg( 'Teardown: Stopping...' )
                 self.fakeStdin.appendCmd('stop\n')
@@ -88,7 +95,6 @@ class TestRpdb2( unittest.TestCase ):
             # dbg( 'sm shutdown ok' )
             time.sleep(1.0)
             dbg( 'Teardown: Console done' )
-
 
         dbg( 'Teardown.Script: check if finished')
         if self.script.poll() != None: return
@@ -138,7 +144,9 @@ class TestRpdb2( unittest.TestCase ):
 
         self.fakeStdin.appendCmd( "go" )
         time.sleep(1.0)
-        # print self.script.stdout.read()
+
+        assert os.path.exists( 'f1' )
+        assert os.path.exists( 'done' )
 
 if __name__ == '__main__':
     unittest.main()
