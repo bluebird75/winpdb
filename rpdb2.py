@@ -311,11 +311,6 @@ except:
     pass
 
 try:
-    import popen2
-except:
-    pass
-
-try:
     from Crypto.Cipher import DES
 except ImportError:
     pass
