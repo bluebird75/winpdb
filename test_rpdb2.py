@@ -1,7 +1,19 @@
 
-import unittest, subprocess, io, threading
+# Python
+import unittest, subprocess, threading
 import os, time, socket, sys, re
 
+if sys.version_info[:2] < (2,6):
+    from StringIO import StringIO
+else:
+    from io import StringIO
+
+if sys.version_info[:2] < (2,7):
+    CREATE_NEW_PROCESS_GROUP=0x200
+else:
+    CREATE_NEW_PROCESS_GROUP=subprocess.CREATE_NEW_PROCESS_GROUP
+
+# RPDB2
 import rpdb2
 
 PYTHON='C:/Python27/python.exe'
@@ -31,11 +43,11 @@ class FakeStdin:
         time.sleep(0.1)
 
 def dbg( t ):
-    print '>>>>>>', t, '<<<<<<'
+    print( '>>>>>> %s <<<<<<' % t )
 
-class Rpdb2Stdout(io.StringIO):
+class Rpdb2Stdout(StringIO):
     def __init__(self, *args):
-        io.StringIO.__init__(self, *args)
+        StringIO.__init__(self, *args)
         self.attached = False
 
     reAttached = re.compile(r'\*\*\* Successfully attached to.*')
@@ -52,8 +64,7 @@ class Rpdb2Stdout(io.StringIO):
 
 class TestRpdb2Stdout( unittest.TestCase ):
     def testReAttached( self ):
-        self.assertNotEquals( Rpdb2Stdout.reAttached.match( '*** Successfully attached to\n' ), None )
-
+        self.assertNotEqual( Rpdb2Stdout.reAttached.match( '*** Successfully attached to\n' ), None )
 
 class TestRpdb2( unittest.TestCase ):
 
@@ -64,7 +75,7 @@ class TestRpdb2( unittest.TestCase ):
         self.fakeStdin = FakeStdin()
         self.rpdb2Stdout = Rpdb2Stdout()
         self.script = subprocess.Popen( [ PYTHON, RPDB2, '-d', '--pwd=%s' % PWD, os.path.join( 'tests', DEBUGME ) ], 
-                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
+                        creationflags=CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
 
     def cleanStepFiles(self):
         for fname in STEPS:
@@ -140,7 +151,7 @@ class TestRpdb2( unittest.TestCase ):
             time.sleep(1.0)
             if self.rpdb2Stdout.attached: 
                 break
-        self.assertEquals( self.rpdb2Stdout.attached, True )
+        self.assertEqual( self.rpdb2Stdout.attached, True )
 
         self.fakeStdin.appendCmd( "go" )
         time.sleep(1.0)
