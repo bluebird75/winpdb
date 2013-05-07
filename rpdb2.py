@@ -296,6 +296,7 @@ import imp
 import os
 import re
 import types
+import warnings
 
 try:
     import hashlib
@@ -303,6 +304,10 @@ try:
 except:
     import md5
     _md5 = md5
+
+if sys.version_info[:2] == (2,6):
+    # disable warning about sets being deprecated for Python 2.6
+    warnings.filterwarnings( 'ignore', 'the sets module.*', DeprecationWarning, 'rpdb2' )
 
 try:
     import compiler
@@ -3069,6 +3074,12 @@ def calc_frame_path(frame):
         return lowered
 
 
+if is_py3k():
+    base64_encodestring = base64.encodebytes
+    base64_decodestring = base64.decodebytes
+else:
+    base64_encodestring = base64.encodestring
+    base64_decodestring = base64.decodestring
 
 def my_abspath(path):
     """
@@ -4737,7 +4748,7 @@ class CCrypto:
         if fencrypt:
             s = self.__encrypt(s)
 
-        s = base64.encodestring(s)
+        s = base64_encodestring(s)
         u = as_unicode(s)
 
         return (fcompress, digest, u)
@@ -4756,7 +4767,7 @@ class CCrypto:
             raise EncryptionNotSupported
 
         s = as_bytes(msg)
-        s = base64.decodestring(s)
+        s = base64_decodestring(s)
 
         if fencrypt:
             s = self.__decrypt(s)
@@ -10568,7 +10579,7 @@ class CSessionManagerInternal:
 
         if as_bytes('?') in as_bytes(ExpandedFilename, encoding, fstrict = False):
             _u = as_bytes(ExpandedFilename)
-            _b = base64.encodestring(_u)
+            _b = base64_encodestring(_u)
             _b = _b.strip(as_bytes('\n')).translate(g_safe_base64_to)
             _b = as_string(_b, fstrict = True)
             b = ' --base64=%s' % _b
@@ -14456,7 +14467,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
         try:
             if encoded_path != None:
                 _b = as_bytes(encoded_path).translate(g_safe_base64_from)
-                _u = base64.decodestring(_b)
+                _u = base64_decodestring(_b)
                 _path = as_unicode(_u)
                 _rpdb2_args[0] = _path
 
