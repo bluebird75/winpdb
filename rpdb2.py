@@ -2192,7 +2192,7 @@ g_fFirewallTest = True
 
 
 
-if is_py3k():
+if is_py3k() and sys.version_info[:2] > (3,0):
     g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
     g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
 else:
@@ -3074,7 +3074,7 @@ def calc_frame_path(frame):
         return lowered
 
 
-if is_py3k():
+if is_py3k() and sys.version_info[:2] > (3,0):
     base64_encodestring = base64.encodebytes
     base64_decodestring = base64.decodebytes
 else:

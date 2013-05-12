@@ -8,18 +8,23 @@ if sys.version_info[:2] < (2,6):
 else:
     from io import StringIO
 
-if sys.version_info[:2] < (2,7):
+if sys.version_info[:2] < (2,7) or ((3,0) <= sys.version_info[:2] <= (3,1)):
     CREATE_NEW_PROCESS_GROUP=0x200
 else:
     CREATE_NEW_PROCESS_GROUP=subprocess.CREATE_NEW_PROCESS_GROUP
+
+if sys.version_info[:2] < (3,0):
+    def u(s): return unicode(s)
+else:
+    def u(s): return s
 
 # RPDB2
 import rpdb2
 
 PYTHON='C:/Python27/python.exe'
-DEBUGME=u'debugme.py'
+DEBUGME=u('debugme.py')
 RPDB2 = 'rpdb2.py'
-PWD=u'toto'
+PWD=u('toto')
 
 STEPS = [ 'start', 'f1', 'f2', 'f3', 'done' ]
 LINE_IN_F2=16
