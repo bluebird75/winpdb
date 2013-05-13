@@ -12,7 +12,7 @@ python:
 # install: "pip install -r requirements.txt --use-mirrors"
 
 # command to run tests
-script: test_rpdb2.py
+script: python test_rpdb2.py
 
 branches:
   only:
