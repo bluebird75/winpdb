@@ -1,9 +1,16 @@
 
 # Python
 import unittest, subprocess, threading
-import os, time, socket, sys, re
+import os, time, socket, sys, re, signal
 
-if sys.version_info[:2] < (2,6):
+# RPDB2
+import rpdb2
+
+# Compatibility support
+def isPythonLessThan26():
+    return sys.version_info[:2] < (2,6)
+
+if isPythonLt26():
     from StringIO import StringIO
 else:
     from io import StringIO
@@ -18,8 +25,12 @@ if sys.version_info[:2] < (3,0):
 else:
     def u(s): return s
 
-# RPDB2
-import rpdb2
+
+# Some stuff is available only on Philipps's computer
+PHIL_COMPUTER=('Windows', 'pc-philippe', 'XP', '5.1.2600', '', '')
+def isPhilComputer():
+    return ( platform.uname() == PHIL_COMPUTER=('Windows', 'pc-philippe', 'XP', '5.1.2600', '', '') )
+
 
 PYTHON='C:/Python27/python.exe'
 DEBUGME=u('debugme.py')
@@ -94,6 +105,50 @@ class TestRpdb2( unittest.TestCase ):
         for fname in os.listdir( bpldir ):
             os.unlink( os.path.join( bpldir, fname ) )
 
+    def terminateScript( self ):
+        dbg( 'Teardown.Script: check if finished')
+        if self.script.poll() != None: return
+
+        dbg( 'Teardown.Script: check if finished after 1 sec')
+        time.sleep(1.0)
+        if self.script.poll() != None: return
+
+        if not isPythonLt26():
+            dbg( 'Teardown.Script: terminate()')
+            self.script.terminate()
+            if self.script.poll() != None: return
+            time.sleep(1.0)
+            if self.script.poll() != None: return
+
+            dbg( 'Teardown.Script: kill()')
+            self.script.kill()
+            if self.script.poll() != None: return
+            time.sleep(1.0)
+            if self.script.poll() != None: return
+        elif sys.platform == 'win32':
+            # windows, Python < 2.6
+            dbg( 'Teardown.Script: pskill')
+            subprocess.call( ['pskill', '%s' % self.script.pid] )
+            if self.script.poll() != None: return
+            time.sleep(1.0)
+            if self.script.poll() != None: return
+
+        else:
+            # unix, Python < 2.6
+            dbg( 'Teardown.Script: SIGTERM')
+            os.kill( self.script.pid, signal.SIGTERM )
+            if self.script.poll() != None: return
+            time.sleep(1.0)
+            if self.script.poll() != None: return
+
+            dbg( 'Teardown.Script: SIGKILL')
+            os.kill( self.script.pid, signal.SIGKILL )
+            if self.script.poll() != None: return
+            time.sleep(1.0)
+            if self.script.poll() != None: return
+
+        raise OSError( 'Error, can not terminate or kill a python process. Process is still running  with pid: %d' % self.script.pid )
+
     def tearDown(self):
         dbg( 'Teardown' )
         self.cleanStepFiles()
@@ -119,26 +174,8 @@ class TestRpdb2( unittest.TestCase ):
             time.sleep(1.0)
             dbg( 'Teardown: Console and SM done' )
 
-        dbg( 'Teardown.Script: check if finished')
-        if self.script.poll() != None: return
+        self.terminateScript()
 
-        dbg( 'Teardown.Script: check if finished after 1 sec')
-        time.sleep(1.0)
-        if self.script.poll() != None: return
-
-        dbg( 'Teardown.Script: terminate()')
-        self.script.terminate()
-        if self.script.poll() != None: return
-        time.sleep(1.0)
-        if self.script.poll() != None: return
-
-        dbg( 'Teardown.Script: kill()')
-        self.script.kill()
-        if self.script.poll() != None: return
-        time.sleep(1.0)
-        if self.script.poll() != None: return
-
-        raise ValueError( 'Error, script not terminated: pid=%d' % self.script.pid )
 
 
     #############[ debugger control ]##################
