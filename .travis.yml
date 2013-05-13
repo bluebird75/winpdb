@@ -13,3 +13,7 @@ python:
 
 # command to run tests
 script: test_rpdb2.py
+
+branches:
+  only:
+    - experiment_test
