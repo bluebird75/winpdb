@@ -1,16 +1,14 @@
 
 # Python
-import unittest, subprocess, threading
+import unittest, subprocess, threading, platform
 import os, time, socket, sys, re, signal
 
 # RPDB2
 import rpdb2
 
 # Compatibility support
-def isPythonLessThan26():
-    return sys.version_info[:2] < (2,6)
-
-if isPythonLt26():
+IS_PYTHON_LESS_THAN_26 = sys.version_info[:2] < (2,6)
+if IS_PYTHON_LESS_THAN_26:
     from StringIO import StringIO
 else:
     from io import StringIO
@@ -25,12 +23,12 @@ if sys.version_info[:2] < (3,0):
 else:
     def u(s): return s
 
-
-# Some stuff is available only on Philipps's computer
-PHIL_COMPUTER=('Windows', 'pc-philippe', 'XP', '5.1.2600', '', '')
-def isPhilComputer():
-    return ( platform.uname() == PHIL_COMPUTER=('Windows', 'pc-philippe', 'XP', '5.1.2600', '', '') )
-
+HAS_PSKILL=False
+try:
+    subprocess.call('pskill')
+    HAS_PSKILL=True
+except WindowsError:
+    pass
 
 PYTHON='C:/Python27/python.exe'
 DEBUGME=u('debugme.py')
@@ -113,7 +111,7 @@ class TestRpdb2( unittest.TestCase ):
         time.sleep(1.0)
         if self.script.poll() != None: return
 
-        if not isPythonLt26():
+        if not IS_PYTHON_LESS_THAN_26:
             dbg( 'Teardown.Script: terminate()')
             self.script.terminate()
             if self.script.poll() != None: return
@@ -177,7 +175,6 @@ class TestRpdb2( unittest.TestCase ):
         self.terminateScript()
 
 
-
     #############[ debugger control ]##################
 
     def startPdb2(self):
@@ -204,9 +201,14 @@ class TestRpdb2( unittest.TestCase ):
     def breakp( self, arg ):
         self.fakeStdin.appendCmd( "bp %s" % arg)
 
+    def failIfCanNotKillTheProcess( self ):
+        if sys.platform == 'win32' and IS_PYTHON_LESS_THAN_26 and not HAS_PSKILL:
+            self.fail("On Python 2.4 and 2.5 on Windows this work only if you have pstools installed: http://technet.microsoft.com/fr-fr/sysinternals/bb896649.aspx" )
+
     #############[ tests ]##################
 
     def testGo( self ):
+        self.failIfCanNotKillTheProcess()
         self.startPdb2()
         self.attach()
         self.go()
@@ -215,6 +217,7 @@ class TestRpdb2( unittest.TestCase ):
         assert os.path.exists( 'done' )
 
     def testBp( self ):
+        self.failIfCanNotKillTheProcess()
         self.startPdb2()
         self.attach()
         self.breakp( 'f1' )
