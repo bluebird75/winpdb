@@ -13,7 +13,7 @@ if IS_PYTHON_LESS_THAN_26:
 else:
     from io import StringIO
 
-if sys.version_info[:2] < (2,7) or ((3,0) <= sys.version_info[:2] <= (3,1)):
+if sys.platform != 'win32' or sys.version_info[:2] < (2,7) or ((3,0) <= sys.version_info[:2] <= (3,1)):
     CREATE_NEW_PROCESS_GROUP=0x200
 else:
     CREATE_NEW_PROCESS_GROUP=subprocess.CREATE_NEW_PROCESS_GROUP
