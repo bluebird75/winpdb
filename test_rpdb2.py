@@ -27,7 +27,7 @@ HAS_PSKILL=False
 try:
     subprocess.call('pskill')
     HAS_PSKILL=True
-except WindowsError:
+except OsError:
     pass
 
 PYTHON='C:/Python27/python.exe'
