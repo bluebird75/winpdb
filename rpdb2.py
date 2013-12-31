@@ -7287,7 +7287,8 @@ class CDebuggerCore:
         Set rpdb2 to wrap all signal handlers.
         """
         for key, value in list(vars(signal).items()):
-            if not key.startswith('SIG') or key in ['SIG_IGN', 'SIG_DFL', 'SIGRTMIN', 'SIGRTMAX']:
+            if not key.startswith('SIG') or key in ['SIG_IGN', 'SIG_DFL', 
+                'SIGRTMIN', 'SIGRTMAX', 'SIG_BLOCK', 'SIG_UNBLOCK', 'SIG_SETMASK' ]:
                 continue
 
             handler = signal.getsignal(value)
