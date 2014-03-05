@@ -589,12 +589,13 @@ class CSimpleSessionManager:
         self.__sm.shutdown()
 
 
-    def launch(self, fchdir, command_line, encoding = 'utf-8', fload_breakpoints = False):
+    def launch(self, fchdir, command_line, interpreter=u'', encoding = 'utf-8', fload_breakpoints = False):
         command_line = as_unicode(command_line, encoding, fstrict = True)
+        interpreter = as_unicode(interpreter, encoding, fstrict = True)
 
         self.m_fRunning = False
 
-        self.__sm.launch(fchdir, command_line, fload_breakpoints)
+        self.__sm.launch(fchdir, command_line, interpreter, fload_breakpoints)
 
 
     def request_go(self):
@@ -791,7 +792,7 @@ class CSessionManager:
         return self.__smi.refresh()
 
 
-    def launch(self, fchdir, command_line, encoding = 'utf-8', fload_breakpoints = True):
+    def launch(self, fchdir, command_line, interpreter, encoding = 'utf-8', fload_breakpoints = True):
         """
         Launch debuggee in a new process and attach.
         fchdir - Change current directory to that of the debuggee.
@@ -803,8 +804,9 @@ class CSessionManager:
         """
 
         command_line = as_unicode(command_line, encoding, fstrict = True)
+        interpreter = as_unicode(interpreter, encoding, fstrict = True)
 
-        return self.__smi.launch(fchdir, command_line, fload_breakpoints)
+        return self.__smi.launch(fchdir, command_line, interpreter, fload_breakpoints)
 
 
     def restart(self):
@@ -1700,6 +1702,7 @@ def is_unicode(s):
 
 
 def as_unicode(s, encoding = 'utf-8', fstrict = False):
+    '''Return an unicode string, corresponding to s, encoding it if necessary'''
     if is_unicode(s):
         return s
 
@@ -10394,6 +10397,7 @@ class CSessionManagerInternal:
 
         self.m_last_command_line = None
         self.m_last_fchdir = None
+        self.m_last_interpreter = None
 
         self.m_fsynchronicity = True
         self.m_ftrap = True
@@ -10458,8 +10462,9 @@ class CSessionManagerInternal:
         return self.getSession().get_encryption()
 
 
-    def launch(self, fchdir, command_line, fload_breakpoints = True):
+    def launch(self, fchdir, command_line, interpreter, fload_breakpoints = True ):
         assert(is_unicode(command_line))
+        assert(is_unicode(interpreter))
 
         self.__verify_unattached()
 
@@ -10500,12 +10505,13 @@ class CSessionManagerInternal:
 
         try:
             try:
-                self._spawn_server(fchdir, ExpandedFilename, args, rid)
+                self._spawn_server(fchdir, ExpandedFilename, args, rid, interpreter)
                 server = self.__wait_for_debuggee(rid)
                 self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True, ffirewall_test = False, server = server, fload_breakpoints = fload_breakpoints)
 
                 self.m_last_command_line = command_line
                 self.m_last_fchdir = fchdir
+                self.m_last_interpreter = interpreter
 
             except:
                 if self.m_state_manager.get_state() != STATE_DETACHED:
@@ -10523,29 +10529,29 @@ class CSessionManagerInternal:
         which were used in last launch.
         """
 
-        if None in (self.m_last_fchdir, self.m_last_command_line):
+        if None in (self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter):
             return
 
         if self.m_state_manager.get_state() != STATE_DETACHED:
             self.stop_debuggee()
 
-        self.launch(self.m_last_fchdir, self.m_last_command_line)
+        self.launch(self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter)
 
 
     def get_launch_args(self):
         """
         Return command_line and fchdir arguments which were used in last
-        launch as (last_fchdir, last_command_line).
+        launch as (last_fchdir, last_command_line, last_interpreter).
         Returns None if there is no info.
         """
 
-        if None in (self.m_last_fchdir, self.m_last_command_line):
-            return (None, None)
+        if None in (self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter):
+            return (None, None, None)
 
-        return (self.m_last_fchdir, self.m_last_command_line)
+        return (self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter)
 
 
-    def _spawn_server(self, fchdir, ExpandedFilename, args, rid):
+    def _spawn_server(self, fchdir, ExpandedFilename, args, rid, interpreter):
         """
         Start an OS console to act as server.
         What it does is to start rpdb again in a new console in server only mode.
@@ -10570,6 +10576,7 @@ class CSessionManagerInternal:
         c = ['', ' --chdir'][fchdir]
         p = ['', ' --pwd="%s"' % self.m_rpdb2_pwd][os.name == 'nt']
 
+        # Adjust filename to base64 to circumvent encoding problems
         b = ''
 
         encoding = detect_locale()
@@ -10585,6 +10592,7 @@ class CSessionManagerInternal:
             _b = as_string(_b, fstrict = True)
             b = ' --base64=%s' % _b
 
+        # for .pyc files, strip the c
         debugger = os.path.abspath(__file__)
         if debugger[-1:] == 'c':
             debugger = debugger[:-1]
@@ -10593,9 +10601,14 @@ class CSessionManagerInternal:
 
         debug_prints = ['', ' --debug'][g_fDebug]
 
-        options = '"%s"%s --debugee%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, b, rid, ExpandedFilename, args)
+        options = '"%s"%s --debugee%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, b, rid, 
+            ExpandedFilename, args)
 
-        python_exec = sys.executable
+        # XXX Should probably adjust path of interpreter if any
+        if interpreter:
+            python_exec = interpreter
+        else:
+            python_exec = sys.executable
         if python_exec.endswith('w.exe'):
             python_exec = python_exec[:-5] + '.exe'
 
@@ -11953,7 +11966,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.fPrintBroken = True
 
         try:
-            self.m_session_manager.launch(fchdir, _arg)
+            self.m_session_manager.launch(fchdir, _arg, interpreter)
             return
 
         except BadArgument:
@@ -14236,8 +14249,9 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
 
 
-def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host):
+def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter):
     assert(is_unicode(command_line))
+    assert(is_unicode(interpreter))
     assert(_rpdb2_pwd == None or is_unicode(_rpdb2_pwd))
 
     if (not fAllowUnencrypted) and not is_encryption_supported():
@@ -14254,7 +14268,7 @@ def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fA
         if fAttach:
             sm.attach(command_line)
         elif command_line != '':
-            sm.launch(fchdir, command_line)
+            sm.launch(fchdir, command_line, interpreter)
 
     except (socket.error, CConnectionException):
         sm.report_exception(*sys.exc_info())
@@ -14300,6 +14314,7 @@ def PrintUsage(fExtended = False):
                     screen rpdb2 -s [options] [<script-name> [<script-args>...]]
     -c, --chdir     Change the working directory to that of the launched
                     script.
+    -i, --interpreter= Launch debuggee with the given interpreter executable
     -v, --version   Print version information.
     --debug         Debug prints.
 
@@ -14334,8 +14349,10 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     try:
         options, _rpdb2_args = getopt.getopt(
                             argv[1:],
-                            'hdao:rtep:scv',
-                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'nofwtest', 'version', 'debug']
+                            'hdao:rtep:scvi:',
+                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 
+                             'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 
+                             'base64=', 'nofwtest', 'version', 'debug', 'interpreter=']
                             )
 
     except getopt.GetoptError:
@@ -14354,6 +14371,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     fchdir = False
     fAllowRemote = False
     fAllowUnencrypted = True
+    interpreter = as_unicode('')
 
     for o, a in options:
         if o in ['-h', '--help']:
@@ -14388,6 +14406,8 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
             encoded_path = a
         if o in ['--nofwtest']:
             g_fFirewallTest = False
+        if o in ['-i', '--interpreter']:
+            interpreter = a
 
     arg = None
     argv = None
@@ -14421,6 +14441,14 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
 
     if fAttach and fAllowRemote:
         _print("--attach and --remote can not be used together.")
+        return 2
+
+    if fAttach and interpreter:
+        _print("--attach and --interpreter can not be used together")
+        return 2
+
+    if fWrap and interpreter:
+        _print("--debuggee and --interpreter can not be used together")
         return 2
 
     if (host is not None) and not fAttach:
@@ -14477,6 +14505,8 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
             _print(STR_FILE_NOT_FOUND % _rpdb2_args[0])
             return 2
 
+    # XXX Make sure interpreter is correctly encoded
+
     if fWrap:
         if (not fAllowUnencrypted) and not is_encryption_supported():
             _print(STR_ENCRYPTION_SUPPORT_ERROR)
@@ -14485,10 +14515,10 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
         StartServer(_rpdb2_args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, secret)
 
     elif fAttach:
-        StartClient_func(_rpdb2_args[0], fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(_rpdb2_args[0], fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter)
 
     elif fStart:
-        StartClient_func(as_unicode(''), fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(as_unicode(''), fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter)
 
     else:
         if len(_rpdb2_args) == 0:
@@ -14496,7 +14526,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
         else:
             _rpdb2_args = '"' + '" "'.join(_rpdb2_args) + '"'
 
-        StartClient_func(_rpdb2_args, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(_rpdb2_args, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter)
 
     return 0
 
