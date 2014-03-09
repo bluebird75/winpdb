@@ -1528,14 +1528,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         wx.CallAfter(self.__init2)
 
 
-    def start(self, fchdir, command_line, fAttach):
+    def start(self, fchdir, command_line, fAttach, interpreter):
         self.m_console.start()
 
         if fAttach:
             self.m_async_sm.attach(command_line, encoding = rpdb2.detect_locale())
             
         elif command_line != '':
-            self.m_async_sm.launch(fchdir, command_line, encoding = rpdb2.detect_locale())
+            self.m_async_sm.launch(fchdir, command_line, interpreter, encoding = rpdb2.detect_locale())
 
         
     #
@@ -2014,16 +2014,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def do_launch(self, event):
-        (fchdir, command_line) = self.m_session_manager.get_launch_args()
+        (fchdir, command_line, interpreter) = self.m_session_manager.get_launch_args()
 
-        if None in (fchdir, command_line):
-            (fchdir, command_line) = (True, '')
+        if None in (fchdir, command_line, interpreter):
+            (fchdir, command_line, interpreter) = (True, '', rpdb2.get_python_executable())
             
-        launch_dialog = CLaunchDialog(self, fchdir, command_line)
+        launch_dialog = CLaunchDialog(self, fchdir, command_line, interpreter)
         r = launch_dialog.ShowModal()
         if r == wx.ID_OK:
-            (command_line, fchdir) = launch_dialog.get_command_line()
-            self.m_async_sm.launch(fchdir, command_line)
+            (command_line, fchdir, interpreter) = launch_dialog.get_command_line()
+            self.m_async_sm.launch(fchdir, command_line, interpreter)
             
         launch_dialog.Destroy()
 
@@ -2051,8 +2051,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             return True
 
         if self.m_state in STATE_DRAGDROP_OPEN_TARGET:
-            (fchdir, command_line) = (True, filenames[0])            
-            self.m_async_sm.launch(fchdir, command_line)
+            (fchdir, command_line, interpreter) = (True, filenames[0], u'')
+            self.m_async_sm.launch(fchdir, command_line, interpreter)
             return True
 
     def do_attach(self, event):
@@ -2168,13 +2168,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
 class CWinpdbApp(wx.App):
-    def __init__(self, session_manager, fchdir, command_line, fAttach, fAllowUnencrypted):
+    def __init__(self, session_manager, fchdir, command_line, fAttach, fAllowUnencrypted, interpreter):
         self.m_frame = None
         self.m_session_manager = session_manager
         self.m_fchdir = fchdir
         self.m_command_line = command_line
         self.m_fAttach = fAttach
         self.m_fAllowUnencrypted = fAllowUnencrypted
+        self.m_interpreter = interpreter
         
         self.m_settings = CSettings(WINPDB_SETTINGS_DEFAULT)
 
@@ -2194,7 +2195,7 @@ class CWinpdbApp(wx.App):
         
         self.m_frame = CWinpdbWindow(self.m_session_manager, self.m_settings)
         self.m_frame.Show()
-        self.m_frame.start(self.m_fchdir, self.m_command_line, self.m_fAttach)
+        self.m_frame.start(self.m_fchdir, self.m_command_line, self.m_fAttach, self.m_interpreter)
 
         self.SetTopWindow(self.m_frame)
 
@@ -4520,7 +4521,7 @@ class COpenDialog(wx.Dialog):
 
 
 class CLaunchDialog(wx.Dialog):
-    def __init__(self, parent, fchdir = True, command_line = ''):
+    def __init__(self, parent, fchdir = True, command_line = '', interpreter=u''):
         wx.Dialog.__init__(self, parent, -1, DLG_LAUNCH_TITLE)
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
@@ -4649,16 +4650,18 @@ class CLaunchDialog(wx.Dialog):
     def get_command_line(self):
         command_line = self.m_entry_commandline.GetValue()
         command_line = rpdb2.as_unicode(command_line, wx.GetDefaultPyEncoding())
+        # XXX Fetch value of interpreter
+        interpreter = u''
 
-        return (command_line, self.m_cb.GetValue())
+        return (command_line, self.m_cb.GetValue(), interpreter)
 
 
 
-def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, host):
+def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, host, interpreter):
     sm = rpdb2.CSessionManager(pwd, fAllowUnencrypted, fRemote, host)
 
     try:
-        app = CWinpdbApp(sm, fchdir, command_line, fAttach, fAllowUnencrypted)
+        app = CWinpdbApp(sm, fchdir, command_line, fAttach, fAllowUnencrypted, interpreter)
 
     except SystemError:
         if os.name == rpdb2.POSIX:
