@@ -589,7 +589,7 @@ class CSimpleSessionManager:
         self.__sm.shutdown()
 
 
-    def launch(self, fchdir, command_line, interpreter=u'', encoding = 'utf-8', fload_breakpoints = False):
+    def launch(self, fchdir, command_line, interpreter, encoding = 'utf-8', fload_breakpoints = False):
         command_line = as_unicode(command_line, encoding, fstrict = True)
         interpreter = as_unicode(interpreter, encoding, fstrict = True)
 
@@ -2216,6 +2216,20 @@ g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
 # ---------------------------- General Utils ------------------------------
 #
 
+def get_python_executable( interpreter=None ):
+    '''Return the python executable, usable to launch the debuggee.
+    Pass a value that may override the default executable.
+
+    Executable is returned as unicode, taking into accoun the file system encoding.'''
+    fse = sys.getfilesystemencoding()
+    if interpreter:
+        python_exec = interpreter
+    else:
+        python_exec = sys.executable
+    if python_exec.endswith('w.exe'):
+        python_exec = python_exec[:-5] + '.exe'
+    python_exec = as_unicode(python_exec, fse)
+    return python_exec
 
 
 def job_wrapper(event, foo, *args, **kwargs):
@@ -10605,14 +10619,8 @@ class CSessionManagerInternal:
             ExpandedFilename, args)
 
         # XXX Should probably adjust path of interpreter if any
-        if interpreter:
-            python_exec = interpreter
-        else:
-            python_exec = sys.executable
-        if python_exec.endswith('w.exe'):
-            python_exec = python_exec[:-5] + '.exe'
 
-        python_exec = as_unicode(python_exec, fse)
+        python_exec = get_python_executable( interpreter )
 
         if as_bytes('?') in as_bytes(python_exec + debugger, encoding, fstrict = False):
             raise BadMBCSPath
