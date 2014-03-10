@@ -3377,7 +3377,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         (t, v, tb) = exc_info
 
         if t != None:
-            rpdb2.print_exception(t, b, tb)
+            rpdb2.print_exception(t, v, tb)
             return
 
         (warning, error) = r
