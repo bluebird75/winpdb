@@ -2231,6 +2231,39 @@ def get_python_executable( interpreter=None ):
     python_exec = as_unicode(python_exec, fse)
     return python_exec
 
+def parse_console_launch( arg ):
+    '''Split a the console command launch into chdir option, interprter option and real commandline
+
+    Returns: (fchdir, intrepreter, arg)
+    '''
+    fchdir = True
+    interpreter = None
+    if arg == '':
+        return (fchdir, interpreter, arg)
+
+    idx = 0
+    while idx < len(arg):
+        if arg[:2] == '-k':
+            fchdir = False
+            arg = arg[2:].strip()
+        elif arg[:2] == '-i':
+            arg = arg[2:].strip()
+            if arg[0] in ('"', "'"):
+                st = 1
+                end = arg.find(arg[0],1 )
+                interpreter = '"%s"' % arg[st:end]
+            else:
+                st = 0
+                end = arg.find(' ', 1 )
+                interpreter = arg[st:end]
+            arg = arg[end+1:].strip()
+        else:
+            # no more arguments for us
+            break
+
+
+    return (fchdir, interpreter, arg)
+
 
 def job_wrapper(event, foo, *args, **kwargs):
     try:
@@ -11960,21 +11993,12 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
 
     def do_launch(self, arg):
-        if arg == '':
-            self.printer(STR_BAD_ARGUMENT)
-            return
-
-        if arg[:2] == '-k':
-            fchdir = False
-            _arg = arg[2:].strip()
-        else:
-            fchdir = True
-            _arg = arg
+        fchdir, interpreter, command_line = parse_console_launch( arg )
 
         self.fPrintBroken = True
 
         try:
-            self.m_session_manager.launch(fchdir, _arg, interpreter)
+            self.m_session_manager.launch(fchdir, command_line, interpreter)
             return
 
         except BadArgument:
@@ -13105,12 +13129,14 @@ Shutdown the debugged script.""", self.m_stdout)
 
 
     def help_launch(self):
-        _print("""launch [-k] <script_name> [<script_args>]
+        _print("""launch [-k] [-i interpreter] <script_name> [<script_args>]
 
 Start script <script_name> and attach to it.
 
 -k  Don't change the current working directory. By default the working
-    directory of the launched script is set to its folder.""", self.m_stdout)
+    directory of the launched script is set to its folder.
+
+-i Specify a custom interpreter to use.""", self.m_stdout)
 
 
     def help_restart(self):
