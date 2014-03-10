@@ -382,7 +382,9 @@ COMPLETIONS_WARNING_THRESHOLD = 32
 ENABLED = True
 DISABLED = False
 
-WINPDB_WILDCARD = "Python source (*.py;*.pyw)|*.py;*.pyw|All files (*)|*"
+WILDCARD_WINPDB = "Python source (*.py;*.pyw)|*.py;*.pyw|All files (*)|*"
+WILDCARD_EXECUTABLES = "Executable (*.exe)|*.exe|All files (*)|*"
+WILDCARD_ALL = "All files (*)|*"
 
 PYTHON_WARNING_TITLE = "Python Interpreter Warning"
 PYTHON_WARNING_MSG = """Winpdb was started with the wrong Python interpreter version.
@@ -397,7 +399,8 @@ MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you 
 MSG_WARNING_TITLE = "Warning"
 MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in this session."
 MSG_ERROR_TITLE = "Error"
-MSG_ERROR_FILE_NOT_FOUND = "File not found."
+MSG_ERROR_FILE_NOT_FOUND = "Script not found."
+MSG_ERROR_INTERPRETER_NOT_FOUND = "Interpreter not found."
 MSG_ERROR_FILE_NOT_PYTHON = "'%s' does not seem to be a Python source file. Only Python files are accepted."
 
 STR_FILE_LOAD_ERROR = "Failed to load source file '%s' from debuggee."
@@ -473,6 +476,7 @@ LABEL_ENCODING = "Set encoding:"
 LABEL_PWD = "Set password:"
 LABEL_OPEN = "File name:"
 LABEL_LAUNCH_COMMAND_LINE = "Command line:"
+LABEL_LAUNCH_INTERPRETER = "Python interpreter:"
 LABEL_ATTACH_HOST = "Host:"
 LABEL_CONSOLE = "Command:"
 BUTTON_LAUNCH_BROWSE = "Browse"
@@ -2050,8 +2054,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
                 self.m_code_viewer.set_file( fname, fComplain=True)
             return True
 
+        # XXX should display launch dialog instead of launching program directly
         if self.m_state in STATE_DRAGDROP_OPEN_TARGET:
-            (fchdir, command_line, interpreter) = (True, filenames[0], u'')
+            (fchdir, command_line, interpreter) = (True, filenames[0], rpdb2.get_python_executable())
             self.m_async_sm.launch(fchdir, command_line, interpreter)
             return True
 
@@ -4497,7 +4502,7 @@ class COpenDialog(wx.Dialog):
         (_path, filename, args) = rpdb2.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
-        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WINPDB_WILDCARD, style = wx.OPEN | wx.CHANGE_DIR)
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.OPEN | wx.CHANGE_DIR)
         r = dlg.ShowModal()
         if r == wx.ID_OK:
             path = dlg.GetPaths()[0]
@@ -4521,14 +4526,16 @@ class COpenDialog(wx.Dialog):
 
 
 class CLaunchDialog(wx.Dialog):
-    def __init__(self, parent, fchdir = True, command_line = '', interpreter=u''):
+    def __init__(self, parent, fchdir, command_line, interpreter):
         wx.Dialog.__init__(self, parent, -1, DLG_LAUNCH_TITLE)
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
 
+        # Description of the dialog
         label = wx.StaticText(self, -1, STATIC_LAUNCH_DESC)
         sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
 
+        # Choice of command-line
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
@@ -4544,13 +4551,27 @@ class CLaunchDialog(wx.Dialog):
         sizerh.Add(self.m_entry_commandline, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         
         btn = wx.Button(self, label = BUTTON_LAUNCH_BROWSE)
-        self.Bind(wx.EVT_BUTTON, self.do_browse, btn)
+        self.Bind(wx.EVT_BUTTON, self.do_browse_commandline, btn)
         sizerh.Add(btn, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
+        # Choice of set working directory
         self.m_cb = wx.CheckBox(self, -1, CHECKBOX_LAUNCH)
         self.m_cb.SetValue(fchdir)
         sizerv.Add(self.m_cb, 0, wx.ALIGN_LEFT | wx.ALL, 5)
-        
+       
+        # Choice of interpreter
+        sizerh = wx.BoxSizer(wx.HORIZONTAL)
+        sizerv.Add(sizerh, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        label = wx.StaticText(self, -1, LABEL_LAUNCH_INTERPRETER)
+        sizerh.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        self.m_entry_interpreter = wx.TextCtrl(self, value = interpreter, size = (200, -1))
+        sizerh.Add(self.m_entry_interpreter, 0, wx.ALIGN_LEFT | wx.EXPAND | wx.ALL, 5)
+
+        btn = wx.Button(self, label = BUTTON_LAUNCH_BROWSE)
+        self.Bind(wx.EVT_BUTTON, self.do_browse_interpreter, btn)
+        sizerh.Add(btn, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
+        # Env remark
         label = wx.StaticText(self, -1, STATIC_LAUNCH_ENV, size = (400, -1))
         try:
             label.Wrap(400)
@@ -4588,14 +4609,14 @@ class CLaunchDialog(wx.Dialog):
         event.Skip()        
 
             
-    def do_browse(self, event = None):        
+    def do_browse_commandline(self, event = None):        
         command_line = self.m_entry_commandline.GetValue()
         (_path, filename, args) = rpdb2.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
         cwd = rpdb2.getcwdu()
             
-        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WINPDB_WILDCARD, style = wx.OPEN | wx.CHANGE_DIR)
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.OPEN | wx.CHANGE_DIR)
         r = dlg.ShowModal()
 
         os.chdir(cwd)
@@ -4611,6 +4632,36 @@ class CLaunchDialog(wx.Dialog):
         dlg.Destroy()
         
         self.m_entry_commandline.SetValue(abs_path)
+
+    def do_browse_interpreter(self, event=None):
+        interpreter = self.m_entry_interpreter.GetValue()
+        (_path, filename) = os.path.split( interpreter )
+        _abs_path = os.path.abspath(_path)
+
+        cwd = rpdb2.getcwdu()
+
+        if os.name == rpdb2.POSIX:
+            wildcard = WILDCARD_ALL
+        else:
+            wildcard = WILDCARD_EXECUTABLES
+            
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = wildcard, style = wx.OPEN | wx.CHANGE_DIR)
+        r = dlg.ShowModal()
+
+        os.chdir(cwd)
+
+        if r == wx.ID_OK:
+            path = dlg.GetPaths()[0]
+            abs_path = os.path.abspath(path)
+            if (' ' in abs_path):
+                abs_path = '"' + abs_path + '"'
+        else:
+            abs_path = interpreter
+
+        dlg.Destroy()
+        
+        self.m_entry_interpreter.SetValue(abs_path)
+
 
         
     def do_validate(self):
@@ -4635,6 +4686,15 @@ class CLaunchDialog(wx.Dialog):
             command_line = (abs_path + ' ' + args).strip()
             
         self.m_entry_commandline.SetValue(command_line)
+
+        interpreter = self.m_entry_interpreter.GetValue()
+        try:
+            interpreter = rpdb2.FindFile( interpreter )
+        except IOError:                    
+            dlg = wx.MessageDialog(self, MSG_ERROR_INTERPRETER_NOT_FOUND, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return False
         
         return True
 
@@ -4650,9 +4710,7 @@ class CLaunchDialog(wx.Dialog):
     def get_command_line(self):
         command_line = self.m_entry_commandline.GetValue()
         command_line = rpdb2.as_unicode(command_line, wx.GetDefaultPyEncoding())
-        # XXX Fetch value of interpreter
-        interpreter = u''
-
+        interpreter = self.m_entry_interpreter.GetValue()
         return (command_line, self.m_cb.GetValue(), interpreter)
 
 
