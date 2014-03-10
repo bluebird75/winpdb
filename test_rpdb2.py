@@ -18,11 +18,6 @@ if sys.platform != 'win32' or sys.version_info[:2] < (2,7) or ((3,0) <= sys.vers
 else:
     CREATE_NEW_PROCESS_GROUP=subprocess.CREATE_NEW_PROCESS_GROUP
 
-if sys.version_info[:2] < (3,0):
-    def u(s): return unicode(s)
-else:
-    def u(s): return s
-
 HAS_PSKILL=False
 try:
     subprocess.call('pskill')
@@ -31,12 +26,12 @@ except OSError:
     pass
 
 PYTHON='C:/Python27/python.exe'
-DEBUGME=u('debugme.py')
+DEBUGME=rpdb2.as_unicode('debugme.py')
 RPDB2 = 'rpdb2.py'
-PWD=u('toto')
+PWD=rpdb2.as_unicode('toto')
+DEBUGLEVEL='INFO'
 
 STEPS = [ 'start', 'f1', 'f2', 'f3', 'done' ]
-LINE_IN_F2=16
 
 class FakeStdin:
     def __init__(self):
@@ -58,11 +53,17 @@ class FakeStdin:
         time.sleep(0.1)
 
 def dbg( t ):
-    print( '>>>>>> %s <<<<<<' % t )
+    if DEBUGLEVEL != 'INFO':
+        print( '>>>>>> %s <<<<<<' % t )
 
 class Rpdb2Stdout(StringIO):
-    def __init__(self, *args):
-        StringIO.__init__(self, *args)
+    def __init__(self, *args, **kwargs):
+        if kwargs.has_key('dispStdout'):
+            self.dispStdout = kwargs['dispStdout']
+            del kwargs['dispStdout']
+        else:
+            self.dispStdout = True
+        StringIO.__init__(self, *args, **kwargs)
         self.attached = False
 
     reAttached = re.compile(r'\*\*\* Successfully attached to.*')
@@ -74,14 +75,36 @@ class Rpdb2Stdout(StringIO):
         elif self.reDetached.match(t):
             self.attached = False
 
-        sys.stdout.write( '%s' % t )
+        if self.dispStdout:
+            sys.stdout.write( '%s' % t )
 
 
 class TestRpdb2Stdout( unittest.TestCase ):
     def testReAttached( self ):
         self.assertNotEqual( Rpdb2Stdout.reAttached.match( '*** Successfully attached to\n' ), None )
 
+
+def findBpHint( fname ):
+    content = open(fname).readlines()
+    return _findBpHintWithContent( content )
+
+reBpHint = re.compile( '# (BP\w+)' )
+
+def _findBpHintWithContent( content ):
+    d = {}
+    i = 0
+    for l in content:
+        i += 1
+        mo = reBpHint.search( l )
+        if mo:
+            d[ mo.group(1) ] = i
+    return d
+
 class TestRpdb2( unittest.TestCase ):
+
+    def __init__(self, *args, **kwargs):
+        super( TestRpdb2, self ).__init__(*args, **kwargs)
+        self.bp1Line = findBpHint( 'tests/debugme.py' )['BP1']
 
     def setUp(self):
         self.cleanBpFiles()
@@ -89,7 +112,7 @@ class TestRpdb2( unittest.TestCase ):
         self.console = None
         self.sm = None
         self.fakeStdin = FakeStdin()
-        self.rpdb2Stdout = Rpdb2Stdout()
+        self.rpdb2Stdout = Rpdb2Stdout( dispStdout=False )
         self.script = subprocess.Popen( [ PYTHON, RPDB2, '-d', '--pwd=%s' % PWD, os.path.join( 'tests', DEBUGME ) ], 
                         creationflags=CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
 
@@ -221,7 +244,7 @@ class TestRpdb2( unittest.TestCase ):
         self.startPdb2()
         self.attach()
         self.breakp( 'f1' )
-        self.breakp( LINE_IN_F2 )
+        self.breakp( self.bp1Line )
         self.go() # break during definition of f1
         self.go() # break during call of f1
         assert os.path.exists( 'start' )
@@ -235,4 +258,4 @@ class TestRpdb2( unittest.TestCase ):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main( argv=[sys.argv[0] + '-v'] + sys.argv[1:] )

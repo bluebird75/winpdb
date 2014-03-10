@@ -17,7 +17,7 @@ def step(t):
 def f1( t ):
     step( 'f1' )
     v = f2( '33' )
-    v += f3( 'abcd' )
+    v += f3( 'abcd' )  # BP1
     return v
 
 def f2( t ):

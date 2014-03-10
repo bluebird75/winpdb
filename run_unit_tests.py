@@ -24,6 +24,10 @@ class TestGetPythonExecutable( TestCase ):
         sys.executable = 'python30w.exe'
         self.assertEqual( 'python30.exe', rpdb2.get_python_executable( ) )
 
+class TestFindBpHint( TestCase ):
+    def testReBpHint(self):
+        self.assertEqual( test_rpdb2.reBpHint.search( 'asldfkj # BP1\n').group(1), 'BP1' )
+
 class TestRpdb2( TestCase ):
 
     def testParseConsoleLaunchBackwardCompatibility( self ):
