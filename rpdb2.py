@@ -2193,6 +2193,8 @@ g_signals_pending = []
 
 g_fFirewallTest = True
 
+g_fStopOnExit = False
+
 
 
 if is_py3k() and sys.version_info[:2] > (3,0):
@@ -10622,6 +10624,7 @@ class CSessionManagerInternal:
         r = ['', ' --remote'][self.m_fAllowRemote]
         c = ['', ' --chdir'][fchdir]
         p = ['', ' --pwd="%s"' % self.m_rpdb2_pwd][os.name == 'nt']
+        t = ['', ' --stop-on-exit'][int(g_fStopOnExit)]
 
         # Adjust filename to base64 to circumvent encoding problems
         b = ''
@@ -10648,7 +10651,7 @@ class CSessionManagerInternal:
 
         debug_prints = ['', ' --debug'][g_fDebug]
 
-        options = '"%s"%s --debugee%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, b, rid, 
+        options = '"%s"%s --debugee%s%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, t, b, rid, 
             ExpandedFilename, args)
 
         # XXX Should probably adjust path of interpreter if any
@@ -14279,6 +14282,7 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
     # there is a syntax error in the debugged script or if
     # there was a problem loading the debugged script.
     #
+
     imp.load_source('__main__', _path)
 
 
@@ -14349,6 +14353,7 @@ def PrintUsage(fExtended = False):
     -c, --chdir     Change the working directory to that of the launched
                     script.
     -i, --interpreter= Launch debuggee with the given interpreter executable
+    -t, --stop-on-exit Break interpreter just before exit
     -v, --version   Print version information.
     --debug         Debug prints.
 
@@ -14374,6 +14379,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     global g_fScreen
     global g_fDebug
     global g_fFirewallTest
+    global g_fStopOnExit
 
     create_rpdb_settings_folder()
 
@@ -14383,10 +14389,10 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     try:
         options, _rpdb2_args = getopt.getopt(
                             argv[1:],
-                            'hdao:rtep:scvi:',
+                            'hdao:rtep:scvi:t',
                             ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 
                              'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 
-                             'base64=', 'nofwtest', 'version', 'debug', 'interpreter=']
+                             'base64=', 'nofwtest', 'version', 'debug', 'interpreter=', 'stop-on-exit']
                             )
 
     except getopt.GetoptError:
@@ -14442,6 +14448,8 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
             g_fFirewallTest = False
         if o in ['-i', '--interpreter']:
             interpreter = a
+        if o in ['-t', '--stop-on-exit']:
+            g_fStopOnExit = True
 
     arg = None
     argv = None
@@ -14579,11 +14587,14 @@ if __name__ == '__main__':
 
     #
     # Debuggee breaks (pauses) here
-    # before program termination.
+    # before program termination if
+    # -t/--stop-on-exit was specified
     #
     # You can step to debug any exit handlers.
     #
-    rpdb2.setbreak()
+    if rpdb2.g_fStopOnExit:
+        rpdb2.print_debug( 'Stop before exit')
+        rpdb2.setbreak()
 
 
 
