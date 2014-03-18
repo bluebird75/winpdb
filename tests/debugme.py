@@ -1,4 +1,4 @@
-import sys
+import sys, os
 
 def is_py3k():
     return sys.version_info[0] >= 3
@@ -12,7 +12,7 @@ prefix = 'DEBUGME: '
 
 def step(t):
     print( prefix + u(t) )
-    open( t, 'w' ).write(t+'\n')
+    open( os.path.join( os.path.dirname( __file__), t ), 'w' ).write(t+'\n')
 
 def f1( t ):
     step( 'f1' )
