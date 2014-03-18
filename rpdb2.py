@@ -14593,7 +14593,7 @@ if __name__ == '__main__':
     # You can step to debug any exit handlers.
     #
     if rpdb2.g_fStopOnExit:
-        rpdb2.print_debug( 'Stop before exit')
+        rpdb2.print_debug( 'Breaking before exit')
         rpdb2.setbreak()
 
 
