@@ -5288,6 +5288,16 @@ class CEventSync(CEvent):
 class CEventDispatcherRecord:
     """
     Internal structure that binds a callback to particular events.
+
+    The match rules are:
+    - event must always be a instance of a registered type
+    - further filtering is possible on events that have a state:
+        + if event_type_dict contains a key EVENT_INCLUDE, only event whose state is 
+           listed EVENT_INCLUDE are matched successfully
+        + or if event_type_dict contains a key EVENT_EXCLUDE, only event whose state is not 
+           listed EVENT_EXCLUDE are matched successfully
+
+    EVENT_INCLUDE and EVENT_EXCLUDE may not be used together
     """
 
     def __init__(self, callback, event_type_dict, fSingleUse):
@@ -5327,7 +5337,13 @@ class CEventDispatcherRecord:
 class CEventDispatcher:
     """
     Events dispatcher.
-    Dispatchers can be chained together.
+
+    Dispatchers can be chained together by specifying a source event dispatcher in constructor.
+    
+    By default, the source event distpacher will duplicate all events to this dispatcher.
+
+    It is possible to forwarded to the second dispatcher and not fired in the source dispatcher
+    by using register_chain_override() on those events, before event registration.
     """
 
     def __init__(self, chained_event_dispatcher = None):

@@ -1,7 +1,7 @@
 
 # Python
-import unittest, subprocess, threading, platform
-import os, time, socket, sys, re, signal
+import unittest, subprocess
+import os, time, sys, re, signal
 
 # RPDB2
 import rpdb2
@@ -241,6 +241,7 @@ class TestRpdb2( unittest.TestCase ):
 
         assert os.path.exists( 'tests/f1' )
         assert os.path.exists( 'tests/done' )
+        assert os.path.exists( 'tests/atexit' )
 
     def testBp( self ):
         self.failIfCanNotKillTheProcess()
@@ -257,6 +258,7 @@ class TestRpdb2( unittest.TestCase ):
         assert os.path.exists( 'tests/f2' )
         self.go() # run until the end
         assert os.path.exists('tests/done')
+        assert os.path.exists('tests/atexit')
 
 
 # class TestRpdb2StopOnExit( TestRpdb2 ):
