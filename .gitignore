@@ -1,4 +1,7 @@
 *.pyc
 *.sublime-project
 *.sublime-workspace
+tests/f*
+tests/start
 tests/atexit
+tests/done
