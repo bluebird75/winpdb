@@ -182,6 +182,79 @@ class TestCEventDispatcher( TestCase ):
         self.assertEquals( secondCallbackTrace, [ ev2 ] )
 
 
+class TestCEventQueue( TestCase ):
+    def testGetEventIndex( self ):
+        evd = rpdb2.CEventDispatcher()
+        evq = rpdb2.CEventQueue( evd, 5 )
+        evq.register_event_types( { rpdb2.CEventNull : {} } )
+
+        ev1 = rpdb2.CEventNull() 
+        evd.fire_event( ev1 )
+        self.assertEquals( 1, evq.get_event_index() )
+        ev2 = rpdb2.CEventNull() 
+        evd.fire_event( ev2 )
+        self.assertEquals( 2, evq.get_event_index() )
+
+    def testWaitForEvent( self ):
+        evd = rpdb2.CEventDispatcher()
+        evq = rpdb2.CEventQueue( evd, 5 )
+        evq.register_event_types( { rpdb2.CEventNull : {} } )
+
+        ev1 = rpdb2.CEventNull() 
+        evd.fire_event( ev1 )
+        ev2 = rpdb2.CEventNull() 
+        evd.fire_event( ev2 )
+
+        new_index, sub_events = evq.wait_for_event( 0.1, 0 )
+        self.assertEquals( 2, new_index )
+        self.assertEquals( [ev1, ev2], sub_events )
+
+        new_index, sub_events = evq.wait_for_event( 0.1, 1 )
+        self.assertEquals( 2, new_index )
+        self.assertEquals( [ ev2 ], sub_events )
+
+        new_index, sub_events = evq.wait_for_event( 0.1, 2 )
+        self.assertEquals( 2, new_index )
+        self.assertEquals( [], sub_events )
+
+        new_index, sub_events = evq.wait_for_event( 0.1, 3 )
+        self.assertEquals( 2, new_index )
+        self.assertEquals( [], sub_events )
+
+    def testEventQueueOverflow(self):
+        evd = rpdb2.CEventDispatcher()
+        evq = rpdb2.CEventQueue( evd, 3 )
+        evq.register_event_types( { rpdb2.CEventNull : {} } )
+
+        ev1 = rpdb2.CEventNull() 
+        ev2 = rpdb2.CEventNull() 
+        ev3 = rpdb2.CEventNull() 
+        ev4 = rpdb2.CEventNull() 
+        evd.fire_event( ev1 )
+        evd.fire_event( ev2 )
+
+        new_index, sub_events = evq.wait_for_event( 0.1, 0 )
+        self.assertEquals( 2, new_index )
+        self.assertEquals( [ev1, ev2], sub_events )
+
+        evd.fire_event( ev3 )
+        new_index, sub_events = evq.wait_for_event( 0.1, 2 )
+        self.assertEquals( 3, new_index )
+        self.assertEquals( [ev3], sub_events )
+
+        new_index, sub_events = evq.wait_for_event( 0.1, 0 )
+        self.assertEquals( 3, new_index )
+        self.assertEquals( [ev1, ev2, ev3], sub_events )
+
+        evd.fire_event( ev4 )
+        new_index, sub_events = evq.wait_for_event( 0.1, 3 )
+        self.assertEquals( 4, new_index )
+        self.assertEquals( [ev4], sub_events )
+
+        new_index, sub_events = evq.wait_for_event( 0.1, 0 )
+        self.assertEquals( 4, new_index )
+        self.assertEquals( [ev2, ev3, ev4], sub_events )
+
 
 class TestFindBpHint( TestCase ):
     def testReBpHint(self):
