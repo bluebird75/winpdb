@@ -1,7 +1,7 @@
 
 # Python
-import unittest, subprocess, threading, platform
-import os, time, socket, sys, re, signal
+import unittest, subprocess
+import os, time, sys, re, signal
 
 # RPDB2
 import rpdb2
@@ -13,25 +13,30 @@ if IS_PYTHON_LESS_THAN_26:
 else:
     from io import StringIO
 
+DEBUGLEVEL='INFO'
+def dbg( t ):
+    if DEBUGLEVEL != 'INFO':
+        print( '>>>>>> %s <<<<<<' % t )
+
 if sys.platform != 'win32' or sys.version_info[:2] < (2,7) or ((3,0) <= sys.version_info[:2] <= (3,1)):
     CREATE_NEW_PROCESS_GROUP=0x200
 else:
     CREATE_NEW_PROCESS_GROUP=subprocess.CREATE_NEW_PROCESS_GROUP
 
 HAS_PSKILL=False
-try:
-    subprocess.call('pskill')
-    HAS_PSKILL=True
-except OSError:
-    pass
+if sys.platform == 'win32':
+    try:
+        rpdb2.FindFile('pskill.exe')
+        HAS_PSKILL=True
+    except IOError:
+        pass
 
 PYTHON='C:/Python27/python.exe'
 DEBUGME=rpdb2.as_unicode('debugme.py')
 RPDB2 = 'rpdb2.py'
 PWD=rpdb2.as_unicode('toto')
-DEBUGLEVEL='INFO'
 
-STEPS = [ 'start', 'f1', 'f2', 'f3', 'done' ]
+STEPS = [ 'tests/%s' % f for f in ('start', 'f1', 'f2', 'f3', 'done') ]
 
 class FakeStdin:
     def __init__(self):
@@ -52,13 +57,9 @@ class FakeStdin:
                 return p
         time.sleep(0.1)
 
-def dbg( t ):
-    if DEBUGLEVEL != 'INFO':
-        print( '>>>>>> %s <<<<<<' % t )
-
 class Rpdb2Stdout(StringIO):
     def __init__(self, *args, **kwargs):
-        if kwargs.has_key('dispStdout'):
+        if 'dispStdout' in kwargs:
             self.dispStdout = kwargs['dispStdout']
             del kwargs['dispStdout']
         else:
@@ -105,6 +106,7 @@ class TestRpdb2( unittest.TestCase ):
     def __init__(self, *args, **kwargs):
         super( TestRpdb2, self ).__init__(*args, **kwargs)
         self.bp1Line = findBpHint( 'tests/debugme.py' )['BP1']
+        self.rpdb2Args = []
 
     def setUp(self):
         self.cleanBpFiles()
@@ -113,7 +115,8 @@ class TestRpdb2( unittest.TestCase ):
         self.sm = None
         self.fakeStdin = FakeStdin()
         self.rpdb2Stdout = Rpdb2Stdout( dispStdout=False )
-        self.script = subprocess.Popen( [ PYTHON, RPDB2, '-d', '--pwd=%s' % PWD, os.path.join( 'tests', DEBUGME ) ], 
+        self.script = subprocess.Popen( [ PYTHON, RPDB2, '-d', '--pwd=%s' % PWD] 
+                        + self.rpdb2Args + [os.path.join( 'tests', DEBUGME ) ], 
                         creationflags=CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
 
     def cleanStepFiles(self):
@@ -236,8 +239,9 @@ class TestRpdb2( unittest.TestCase ):
         self.attach()
         self.go()
 
-        assert os.path.exists( 'f1' )
-        assert os.path.exists( 'done' )
+        assert os.path.exists( 'tests/f1' )
+        assert os.path.exists( 'tests/done' )
+        assert os.path.exists( 'tests/atexit' )
 
     def testBp( self ):
         self.failIfCanNotKillTheProcess()
@@ -247,15 +251,17 @@ class TestRpdb2( unittest.TestCase ):
         self.breakp( self.bp1Line )
         self.go() # break during definition of f1
         self.go() # break during call of f1
-        assert os.path.exists( 'start' )
-        assert not os.path.exists( 'f1' )
+        assert os.path.exists( 'tests/start' )
+        assert not os.path.exists( 'tests/f1' )
         self.go() # break after call of f2
-        assert os.path.exists( 'f1' )
-        assert os.path.exists( 'f2' )
+        assert os.path.exists( 'tests/f1' )
+        assert os.path.exists( 'tests/f2' )
         self.go() # run until the end
-        assert os.path.exists('done')
+        assert os.path.exists('tests/done')
+        assert os.path.exists('tests/atexit')
 
 
 
 if __name__ == '__main__':
-    unittest.main( argv=[sys.argv[0] + '-v'] + sys.argv[1:] )
+    # unittest.main( argv=[sys.argv[0] + '-v'] + sys.argv[1:] )
+    unittest.main()
