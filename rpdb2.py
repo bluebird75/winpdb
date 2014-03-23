@@ -1294,10 +1294,14 @@ class CSessionManager:
 
         return self.__smi.set_synchronicity(fsynchronicity)
 
-
     def get_synchronicity(self):
         return self.__smi.get_synchronicity()
 
+    def set_breakonexit(self, fbreakonexit):
+        return self.__smi.set_breakonexit(fbreakonexit)
+
+    def get_breakonexit(self):
+        return self.__smi.get_breakonexit()
 
     def get_state(self):
         """
@@ -1972,6 +1976,7 @@ STR_ENVIRONMENT = 'The current environment mapping is:'
 STR_ENVIRONMENT_EMPTY = 'The current environment mapping is not set.'
 STR_SYNCHRONICITY_BAD = "Can not process command when thread is running unless synchronicity mode is turned on. Type 'help synchro' at the command prompt for more information."
 STR_SYNCHRONICITY_MODE = 'The synchronicity mode is set to: %s'
+STR_BREAKONEXIT_MODE = 'The break-on-exit mode is set to: %s'
 STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
 STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
 STR_FORK_MODE = "Fork mode is set to: %s, %s."
@@ -2193,7 +2198,7 @@ g_signals_pending = []
 
 g_fFirewallTest = True
 
-g_fStopOnExit = False
+g_fbreakonexit = False
 
 
 
@@ -5137,6 +5142,17 @@ class CEventSynchronicity(CEvent):
         return self.m_fsynchronicity == arg
 
 
+class CEventBreakOnExit(CEvent):
+    """
+    Mode of break on exit
+    Sent when mode changes
+    """
+    def __init__(self,fbreakonexit):
+        self.m_fbreakonexit = fbreakonexit
+
+    def is_match(self,arg):
+        return self.m_fbreakonexit == arg
+
 
 class CEventTrap(CEvent):
     """
@@ -5454,6 +5470,9 @@ class CEventQueue:
     Add queue semantics above an event dispatcher.
     Instead of firing event callbacks, new events are returned in a list
     upon request.
+
+    Events are stored in a FIFO of size MAX_EVENT_LIST_LENGTH (defaults to 1000)
+
     """
 
     def __init__(self, event_dispatcher, max_event_list_length = MAX_EVENT_LIST_LENGTH):
@@ -5501,7 +5520,7 @@ class CEventQueue:
 
     def wait_for_event(self, timeout, event_index):
         """
-        Return the new events which were fired.
+        Return the events above index event_index which were fired.
         """
 
         try:
@@ -8112,6 +8131,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventForkSwitch: {},
             CEventExecSwitch: {},
             CEventSynchronicity: {},
+            CEventBreakOnExit: {},
             CEventTrap: {},
             CEventForkMode: {},
             CEventPsycoWarning: {},
@@ -9261,7 +9281,6 @@ class CDebuggerEngine(CDebuggerCore):
         if self.m_state_manager.get_state() == STATE_BROKEN:
             self.notify_namespace()
 
-
     def set_trap_unhandled_exceptions(self, ftrap):
         self.m_ftrap = ftrap
 
@@ -10010,11 +10029,14 @@ class CDebuggeeServer(CIOServer):
         self.m_debugger.stop_debuggee()
         return 0
 
-
     def export_set_synchronicity(self, fsynchronicity):
         self.m_debugger.set_synchronicity(fsynchronicity)
         return 0
 
+    def export_set_breakonexit(self, fbreakonexit):
+        global g_fbreakonexit
+        g_fbreakonexit = fbreakonexit
+        return 0
 
     def export_set_trap_unhandled_exceptions(self, ftrap):
         self.m_debugger.set_trap_unhandled_exceptions(ftrap)
@@ -10450,6 +10472,10 @@ class CSessionManagerInternal:
         self.m_event_dispatcher_proxy.register_callback(self.on_event_synchronicity, event_type_dict, fSingleUse = False)
         self.m_event_dispatcher.register_chain_override(event_type_dict)
 
+        event_type_dict = {CEventBreakOnExit: {}}
+        self.m_event_dispatcher_proxy.register_callback(self.on_event_breakonexit, event_type_dict, fSingleUse = False)
+        self.m_event_dispatcher.register_chain_override(event_type_dict)
+
         event_type_dict = {CEventTrap: {}}
         self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
         self.m_event_dispatcher.register_chain_override(event_type_dict)
@@ -10466,6 +10492,7 @@ class CSessionManagerInternal:
 
         self.m_fsynchronicity = True
         self.m_ftrap = True
+        self.m_breakonexit = False
 
         self.m_ffork_into_child = False
         self.m_ffork_auto = False
@@ -10640,7 +10667,6 @@ class CSessionManagerInternal:
         r = ['', ' --remote'][self.m_fAllowRemote]
         c = ['', ' --chdir'][fchdir]
         p = ['', ' --pwd="%s"' % self.m_rpdb2_pwd][os.name == 'nt']
-        t = ['', ' --stop-on-exit'][int(g_fStopOnExit)]
 
         # Adjust filename to base64 to circumvent encoding problems
         b = ''
@@ -10667,7 +10693,7 @@ class CSessionManagerInternal:
 
         debug_prints = ['', ' --debug'][g_fDebug]
 
-        options = '"%s"%s --debugee%s%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, t, b, rid, 
+        options = '"%s"%s --debugee%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, b, rid, 
             ExpandedFilename, args)
 
         # XXX Should probably adjust path of interpreter if any
@@ -10808,6 +10834,7 @@ class CSessionManagerInternal:
         self.m_server_info = self.get_server_info()
 
         self.getSession().getProxy().set_synchronicity(self.m_fsynchronicity)
+        self.getSession().getProxy().set_breakonexit(self.m_breakonexit)
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
         self.getSession().getProxy().set_fork_mode(self.m_ffork_into_child, self.m_ffork_auto)
 
@@ -11185,10 +11212,30 @@ class CSessionManagerInternal:
         event = CEventSynchronicity(fsynchronicity)
         self.m_event_dispatcher.fire_event(event)
 
-
     def get_synchronicity(self):
         return self.m_fsynchronicity
 
+    def on_event_breakonexit(self, event):
+        ffire = self.m_breakonexit != event.m_fbreakonexit
+        self.m_fbreakonexit = event.m_fbreakonexit
+
+        if ffire:
+            event = CEventBreakOnExit(event.m_fbreakonexit)
+            self.m_event_dispatcher.fire_event(event)
+
+    def set_breakonexit(self, fbreakonexit):
+        self.m_breakonexit = fbreakonexit
+        if self.__is_attached():
+            try:
+                self.getSession().getProxy().set_breakonexit(fbreakonexit)
+            except NotAttached:
+                pass
+
+        event = CEventBreakOnExit(fbreakonexit)
+        self.m_event_dispatcher.fire_event(event)
+
+    def get_breakonexit(self):
+        return self.m_breakonexit
 
     def on_event_trap(self, event):
         ffire = self.m_ftrap != event.m_ftrap
@@ -11685,6 +11732,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         event_type_dict = {CEventSynchronicity: {}}
         self.m_session_manager.register_callback(self.synchronicity_handler, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {CEventBreakOnExit: {}}
+        self.m_session_manager.register_callback(self.breakonexit_handler, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventTrap: {}}
         self.m_session_manager.register_callback(self.trap_handler, event_type_dict, fSingleUse = False)
 
@@ -11999,6 +12049,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
     def synchronicity_handler(self, event):
         self.printer(STR_SYNCHRONICITY_MODE % str(event.m_fsynchronicity))
 
+    def breakonexit_handler( self, event):
+        self.printer(STR_BREAKONEXIT_MODE % str(event.m_fbreakonexit))
 
     def trap_handler(self, event):
         self.printer(STR_TRAP_MODE_SET % str(event.m_ftrap))
@@ -12766,6 +12818,22 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     do_a = do_analyze
 
+    def do_breakonexit(self, arg):
+        if arg == '':
+            fbreakonexit = self.m_session_manager.get_breakonexit()
+            _print(STR_BREAKONEXIT_MODE % str(fbreakonexit), self.m_stdout)
+            return
+
+        if arg == str(True):
+            fbreakonexit = True
+        elif arg == str(False):
+            fbreakonexit = False
+        else:
+            _print(STR_BAD_ARGUMENT, self.m_stdout)
+            return
+
+        self.m_session_manager.set_breakonexit(fbreakonexit)
+
 
     def do_synchro(self, arg):
         if arg == '':
@@ -12995,6 +13063,7 @@ analyze     - Toggle analyze last exception mode.
 trap        - Get or set "trap unhandled exceptions" mode.
 fork        - Get or set fork handling mode.
 synchro     - Get or set synchronicity mode.
+breakonexit - Get or set break-on-exit mode.
 
 License:
 ----------------
@@ -13092,6 +13161,17 @@ Debuggee will ignore unhandled exceptions.
 When set to True:
 Debuggee will pause on unhandled exceptions for inspection.""", self.m_stdout)
 
+
+    def help_breakonexit(self):
+        _print("""breakonexit [True | False]
+
+Get or set the break-on-exit mode.
+
+If you want to debug the atexit handlers, you need
+to set break-on-exit to True. The debugger will then
+break just before executing the atexit handlers.
+
+Default is False.""", self.m_stdout)
 
     def help_synchro(self):
         _print("""synchro [True | False]
@@ -14369,7 +14449,6 @@ def PrintUsage(fExtended = False):
     -c, --chdir     Change the working directory to that of the launched
                     script.
     -i, --interpreter= Launch debuggee with the given interpreter executable
-    -t, --stop-on-exit Break interpreter just before exit
     -v, --version   Print version information.
     --debug         Debug prints.
 
@@ -14395,7 +14474,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     global g_fScreen
     global g_fDebug
     global g_fFirewallTest
-    global g_fStopOnExit
+    global g_fbreakonexit
 
     create_rpdb_settings_folder()
 
@@ -14405,10 +14484,10 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     try:
         options, _rpdb2_args = getopt.getopt(
                             argv[1:],
-                            'hdao:rtep:scvi:t',
+                            'hdao:rtep:scvi:',
                             ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 
                              'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 
-                             'base64=', 'nofwtest', 'version', 'debug', 'interpreter=', 'stop-on-exit']
+                             'base64=', 'nofwtest', 'version', 'debug', 'interpreter=' ]
                             )
 
     except getopt.GetoptError:
@@ -14464,8 +14543,6 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
             g_fFirewallTest = False
         if o in ['-i', '--interpreter']:
             interpreter = a
-        if o in ['-t', '--stop-on-exit']:
-            g_fStopOnExit = True
 
     arg = None
     argv = None
@@ -14603,12 +14680,11 @@ if __name__ == '__main__':
 
     #
     # Debuggee breaks (pauses) here
-    # before program termination if
-    # -t/--stop-on-exit was specified
+    # before program termination if breakonexit is set
     #
     # You can step to debug any exit handlers.
     #
-    if rpdb2.g_fStopOnExit:
+    if rpdb2.g_fbreakonexit:
         rpdb2.print_debug( 'Breaking before exit')
         rpdb2.setbreak()
 
