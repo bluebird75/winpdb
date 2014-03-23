@@ -3,7 +3,7 @@ import sys
 from unittest import main, TestCase
 
 import rpdb2
-import test_rpdb2
+import run_func_tests
 
 class TestGetPythonExecutable( TestCase ):
     def setUp(self):
@@ -256,10 +256,6 @@ class TestCEventQueue( TestCase ):
         self.assertEquals( [ev2, ev3, ev4], sub_events )
 
 
-class TestFindBpHint( TestCase ):
-    def testReBpHint(self):
-        self.assertEqual( test_rpdb2.reBpHint.search( 'asldfkj # BP1\n').group(1), 'BP1' )
-
 class TestRpdb2( TestCase ):
 
     def testParseConsoleLaunchBackwardCompatibility( self ):
@@ -283,6 +279,23 @@ class TestRpdb2( TestCase ):
         self.assertEqual( (True, None, 'titi -k -i toto' ), rpdb2.parse_console_launch( 'titi -k -i toto' ) )
         self.assertEqual( (True, None, 'titi -i toto' ), rpdb2.parse_console_launch( 'titi -i toto' ) )
 
+#
+# Tests related to Rpdb2 functional tests
+#
+
+class TestFindBpHint( TestCase ):
+    def testReBpHint(self):
+        self.assertEqual( run_func_tests.reBpHint.search( 'asldfkj # BP1\n').group(1), 'BP1' )
+
+
+class TestRpdb2Stdout( TestCase ):
+
+    def testAttaching( self ):
+        rso = run_func_tests.Rpdb2Stdout( dispStdout=False )
+        self.assertEquals( False, rso.attached )
+        rso.write(r'*** Successfully attached to.*\n')
+        self.assertEquals( True, rso.attached )
+        rso.write(r'*** Detached from script.*\n' )
 
 if __name__ == '__main__':
     main()

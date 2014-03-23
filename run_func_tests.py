@@ -58,6 +58,10 @@ class FakeStdin:
         time.sleep(0.1)
 
 class Rpdb2Stdout(StringIO):
+    reAttached = re.compile(r'\*\*\* Successfully attached to.*')
+    reDetached = re.compile(r'\*\*\* Detached from script.*' )
+
+
     def __init__(self, *args, **kwargs):
         if 'dispStdout' in kwargs:
             self.dispStdout = kwargs['dispStdout']
@@ -65,16 +69,19 @@ class Rpdb2Stdout(StringIO):
         else:
             self.dispStdout = True
         StringIO.__init__(self, *args, **kwargs)
-        self.attached = False
 
-    reAttached = re.compile(r'\*\*\* Successfully attached to.*')
-    reDetached = re.compile(r'\*\*\* Detached from script.*' )
+        self.matcher = (
+            ( self.reAttached, 'attached', True),
+            ( self.reDetached, 'attached', False),
+        )
+
+        for m in self.matcher:
+            setattr( self, m[1], False )
 
     def write(self,t):
-        if self.reAttached.match( t ):
-            self.attached = True
-        elif self.reDetached.match(t):
-            self.attached = False
+        for retomatch, attr, assignment in self.matcher:
+            if retomatch.match( t ):
+                setattr( self, attr, assignment )
 
         if self.dispStdout:
             sys.stdout.write( '%s' % t )
@@ -270,6 +277,10 @@ class TestRpdb2( unittest.TestCase ):
         # check that debugger stops before exit
         # 
 
+# - test the console commands: 
+#    + read break on exit default status
+#    + change break on exit status
+#    + run with different settings of break on exit
 
 if __name__ == '__main__':
     # unittest.main( argv=[sys.argv[0] + '-v'] + sys.argv[1:] )
