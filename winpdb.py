@@ -588,11 +588,13 @@ TB_FILTER = "Filter out methods and functions from classes and objects in the na
 TB_EXCEPTION = "Toggle 'analyze exception' mode"
 TB_ENCODING = "Set the source encoding for the name-space viewer and the exec/eval console commands"
 TB_SYNCHRONICITY = "Set the synchronicity mode"
+TB_BREAKONEXIT = "Set the break-on-exit mode"
 TB_TRAP = "Toggle 'trap unhandled exceptions' mode"
 
 TB_FILTER_TEXT = " Filter: %s "
 TB_ENCODING_TEXT = " Encoding: %s "
 TB_SYNCHRONICITY_TEXT = " Synchronicity: %s "
+TB_BREAKONEXIT_TEXT = " Break-on-exit: %s "
 
 COMMAND = "command"
 TOOLTIP = "tooltip"
@@ -1429,13 +1431,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             {LABEL: ML_SEPARATOR},
             {LABEL: TB_ENCODING, TEXT: TB_ENCODING_TEXT, COMMAND: self.do_encoding},
             {LABEL: ML_SEPARATOR},
-            {LABEL: TB_SYNCHRONICITY, TEXT: TB_SYNCHRONICITY_TEXT, COMMAND: self.do_synchronicity}
+            {LABEL: TB_SYNCHRONICITY, TEXT: TB_SYNCHRONICITY_TEXT, COMMAND: self.do_synchronicity},
+            {LABEL: ML_SEPARATOR},
+            {LABEL: TB_BREAKONEXIT, TEXT: TB_BREAKONEXIT_TEXT, COMMAND: self.do_breakonexit},
         ]
 
         self.init_toolbar(toolbar_resource)
         self.set_toolbar_item_text(TB_FILTER, TB_FILTER_TEXT % FILTER_LEVELS[self.m_filter_level])
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % 'auto')
         self.set_toolbar_item_text(TB_SYNCHRONICITY, TB_SYNCHRONICITY_TEXT % 'True')
+        self.set_toolbar_item_text(TB_BREAKONEXIT, TB_BREAKONEXIT_TEXT % 'False')
 
         ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
         self.set_toggle(TB_TRAP, ftrap)
@@ -1525,6 +1530,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         event_type_dict = {rpdb2.CEventSynchronicity: {}}
         self.m_session_manager.register_callback(self.update_synchronicity, event_type_dict, fSingleUse = False)
+
+        event_type_dict = {rpdb2.CEventBreakOnExit: {}}
+        self.m_session_manager.register_callback(self.update_breakonexit, event_type_dict, fSingleUse = False)
 
         event_type_dict = {rpdb2.CEventClearSourceCache: {}}
         self.m_session_manager.register_callback(self.update_source_cache, event_type_dict, fSingleUse = False)
@@ -1698,6 +1706,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         dlg.Destroy()
 
+    def do_breakonexit(self, event):
+        fbreakonexit = self.m_session_manager.get_breakonexit()
+        fbreakonexit = not fbreakonexit
+        self.m_session_manager.set_breakonexit(fbreakonexit)
 
     def do_analyze_menu(self, event):
         state = self.m_session_manager.get_state()
@@ -1866,14 +1878,19 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % encoding)
 
-
     def update_synchronicity(self, event):
         wx.CallAfter(self.callback_synchronicity, event)
-
 
     def callback_synchronicity(self, event):
         fsynchronicity = self.m_session_manager.get_synchronicity()
         self.set_toolbar_item_text(TB_SYNCHRONICITY, TB_SYNCHRONICITY_TEXT % str(fsynchronicity))
+
+    def update_breakonexit(self, event):
+        wx.CallAfter(self.callback_breakonexit, event)
+
+    def callback_breakonexit(self, event):
+        fbreakonexit = self.m_session_manager.get_breakonexit()
+        self.set_toolbar_item_text(TB_BREAKONEXIT, TB_BREAKONEXIT_TEXT % str(fbreakonexit))
 
 
     def update_state(self, event):
