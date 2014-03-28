@@ -57,10 +57,27 @@ class FakeStdin:
                 return p
         time.sleep(0.1)
 
+class ReNonMatcher:
+    '''Class that behaves like a non-matching RegExp:
+    - it returns None if the re matches
+    - it returns True if the re does not match.
+    '''
+    def __init__( self, re ):
+        self.re = re
+
+    def match( self, t ):
+        ret = self.re.match( t )
+        if ret:
+            return None
+        return True
+
 class Rpdb2Stdout(StringIO):
     reAttached = re.compile(r'\*\*\* Successfully attached to.*')
     reDetached = re.compile(r'\*\*\* Detached from script.*' )
-
+    reBreakonexitOn  = re.compile( r'.*break-on-exit mode.*True.*' )
+    reBreakonexitOff = re.compile( r'.*break-on-exit mode.*False.*' )
+    reWaitingOnBp    = re.compile( r'\*\*\* Debuggee is waiting at break point.*' )
+    reNotWaitingOnBp = ReNonMatcher( re.compile( r'\*\*\* Debuggee is waiting at break point.*' ) )
 
     def __init__(self, *args, **kwargs):
         if 'dispStdout' in kwargs:
@@ -71,26 +88,44 @@ class Rpdb2Stdout(StringIO):
         StringIO.__init__(self, *args, **kwargs)
 
         self.matcher = (
-            ( self.reAttached, 'attached', True),
-            ( self.reDetached, 'attached', False),
+            ( self.reAttached,      'attached',     True ),
+            ( self.reDetached,      'attached',     False),
+            ( self.reBreakonexitOn, 'breakonexit',  True ),
+            ( self.reBreakonexitOff,'breakonexit',  False),
+            ( self.reWaitingOnBp,   'waitingOnBp',  True ),
+            ( self.reNotWaitingOnBp,'waitingOnBp',  False),
         )
 
         for m in self.matcher:
             setattr( self, m[1], False )
 
+        self.lineCount = 0
+
     def write(self,t):
+        if len(t) == 0 or (len(t) == 1 and t == "\n"):
+            return
+
+        self.lineCount += 1
+        dbg('stdout %d="%s"' % (self.lineCount, t) )
+        if self.dispStdout:
+            sys.stdout.write( '%s' % t )
+
         for retomatch, attr, assignment in self.matcher:
             if retomatch.match( t ):
                 setattr( self, attr, assignment )
 
-        if self.dispStdout:
-            sys.stdout.write( '%s' % t )
 
 
 class TestRpdb2Stdout( unittest.TestCase ):
     def testReAttached( self ):
         self.assertNotEqual( Rpdb2Stdout.reAttached.match( '*** Successfully attached to\n' ), None )
 
+    def testreWaitingOnBp( self ):
+        self.assertTrue( Rpdb2Stdout.reWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') != None )
+        self.assertTrue( Rpdb2Stdout.reNotWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') == None )
+
+        self.assertTrue( Rpdb2Stdout.reWaitingOnBp.match('*** Totoro .') == None )
+        self.assertTrue( Rpdb2Stdout.reNotWaitingOnBp.match('*** Totoro .') != None )
 
 def findBpHint( fname ):
     content = open(fname).readlines()
@@ -121,7 +156,7 @@ class TestRpdb2( unittest.TestCase ):
         self.console = None
         self.sm = None
         self.fakeStdin = FakeStdin()
-        self.rpdb2Stdout = Rpdb2Stdout( dispStdout=False )
+        self.rpdb2Stdout = Rpdb2Stdout( dispStdout=True )
         self.script = subprocess.Popen( [ PYTHON, RPDB2, '-d', '--pwd=%s' % PWD] 
                         + self.rpdb2Args + [os.path.join( 'tests', DEBUGME ) ], 
                         creationflags=CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
@@ -159,6 +194,7 @@ class TestRpdb2( unittest.TestCase ):
         elif sys.platform == 'win32':
             # windows, Python < 2.6
             dbg( 'Teardown.Script: pskill')
+            self.failIfCanNotKillTheProcess()
             subprocess.call( ['pskill', '%s' % self.script.pid] )
             if self.script.poll() != None: return
             time.sleep(1.0)
@@ -186,12 +222,7 @@ class TestRpdb2( unittest.TestCase ):
         if self.console:
             if self.rpdb2Stdout.attached:
                 dbg( 'Teardown: Stopping...' )
-                self.fakeStdin.appendCmd('stop\n')
-                time.sleep(1.0)
-
-                #dbg( 'Teardown: Detaching...' )
-                #self.fakeStdin.appendCmd('detach\n')
-                #time.sleep(1.0)
+                self.stop()
 
             dbg( 'Teardown: Exiting...' )
             self.fakeStdin.appendCmd('exit\n')
@@ -217,19 +248,31 @@ class TestRpdb2( unittest.TestCase ):
         self.console.start()
         time.sleep(1.0)
 
+    def command( self, cmd, syncLines, timeout=3):
+        '''Send the command cmd to the debuggee and wait until syncLines lines have been outputted
+        by the debuggee or until the timeout expires'''
+        endLineCount = self.rpdb2Stdout.lineCount + syncLines
+        endTime = time.time() + timeout
+        self.fakeStdin.appendCmd( "%s\n" % cmd )
+        while (self.rpdb2Stdout.lineCount < endLineCount
+                and time.time() < endTime):
+            time.sleep(0.1)
 
     def attach( self ):
-        self.fakeStdin.appendCmd( "attach %s\n" % DEBUGME )
-        startCountDown = time.time()
-        while time.time() - startCountDown < 10.0:
-            time.sleep(1.0)
-            if self.rpdb2Stdout.attached: 
-                break
+        self.command("attach %s\n" % DEBUGME, 4, 10 )
         self.assertEqual( self.rpdb2Stdout.attached, True )
 
+    def stop( self ):
+        self.command( "stop", 3 )
+
+    def setBreakonexit( self, fbreakonexit ):
+        self.command( "breakonexit  %s\n" % str(fbreakonexit), 1 )
+
+    def getBreakonexit( self ):
+        self.command( "breakonexit\n", 1 )
+
     def go( self ):
-        self.fakeStdin.appendCmd( "go" )
-        time.sleep(1.0)
+        self.command( "go", 1 )
 
     def breakp( self, arg ):
         self.fakeStdin.appendCmd( "bp %s" % arg)
@@ -241,7 +284,6 @@ class TestRpdb2( unittest.TestCase ):
     #############[ tests ]##################
 
     def testGo( self ):
-        self.failIfCanNotKillTheProcess()
         self.startPdb2()
         self.attach()
         self.go()
@@ -251,7 +293,6 @@ class TestRpdb2( unittest.TestCase ):
         assert os.path.exists( 'tests/atexit' )
 
     def testBp( self ):
-        self.failIfCanNotKillTheProcess()
         self.startPdb2()
         self.attach()
         self.breakp( 'f1' )
@@ -267,6 +308,32 @@ class TestRpdb2( unittest.TestCase ):
         assert os.path.exists('tests/done')
         assert os.path.exists('tests/atexit')
 
+    def testChangingBreakonexit( self ):
+        self.startPdb2()
+        self.attach()
+        self.getBreakonexit()
+        self.assertEqual( self.rpdb2Stdout.breakonexit, False )
+        self.setBreakonexit( True )
+        self.assertEqual( self.rpdb2Stdout.breakonexit, True )
+        self.setBreakonexit( False )
+        self.assertEqual( self.rpdb2Stdout.breakonexit, False )
+
+    def testRunWithBreakonexit( self ):
+        self.startPdb2()
+        self.assertEquals( self.rpdb2Stdout.waitingOnBp, False )
+        self.attach()
+        self.setBreakonexit( True )
+        self.go()
+        self.assertEquals( self.rpdb2Stdout.attached, True )
+        self.assertEquals( self.rpdb2Stdout.waitingOnBp, True )
+        self.go()
+
+    def testRunWithoutBreakonexit( self ):
+        self.startPdb2()
+        self.attach()
+        self.setBreakonexit( False )
+        self.go()
+        self.assertEquals( self.rpdb2Stdout.attached, False )
 
 # class TestRpdb2StopOnExit( TestRpdb2 ):
 
