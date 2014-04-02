@@ -115,18 +115,6 @@ class Rpdb2Stdout(StringIO):
                 setattr( self, attr, assignment )
 
 
-
-class TestRpdb2Stdout( unittest.TestCase ):
-    def testReAttached( self ):
-        self.assertNotEqual( Rpdb2Stdout.reAttached.match( '*** Successfully attached to\n' ), None )
-
-    def testreWaitingOnBp( self ):
-        self.assertTrue( Rpdb2Stdout.reWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') != None )
-        self.assertTrue( Rpdb2Stdout.reNotWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') == None )
-
-        self.assertTrue( Rpdb2Stdout.reWaitingOnBp.match('*** Totoro .') == None )
-        self.assertTrue( Rpdb2Stdout.reNotWaitingOnBp.match('*** Totoro .') != None )
-
 def findBpHint( fname ):
     content = open(fname).readlines()
     return _findBpHintWithContent( content )

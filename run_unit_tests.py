@@ -287,6 +287,9 @@ class TestFindBpHint( TestCase ):
     def testReBpHint(self):
         self.assertEqual( run_func_tests.reBpHint.search( 'asldfkj # BP1\n').group(1), 'BP1' )
 
+    def testFindBpHint( self ):
+        self.assertEqual( run_func_tests._findBpHintWithContent( ['coucou\n', 'asd # BPXXX\n'] ), { 'BPXXX': 2 } )
+
 
 class TestRpdb2Stdout( TestCase ):
 
@@ -296,6 +299,16 @@ class TestRpdb2Stdout( TestCase ):
         rso.write(r'*** Successfully attached to.*\n')
         self.assertEquals( True, rso.attached )
         rso.write(r'*** Detached from script.*\n' )
+
+    def testReAttached( self ):
+        self.assertNotEqual( run_func_tests.Rpdb2Stdout.reAttached.match( '*** Successfully attached to\n' ), None )
+
+    def testreWaitingOnBp( self ):
+        self.assertTrue( run_func_tests.Rpdb2Stdout.reWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') != None )
+        self.assertTrue( run_func_tests.Rpdb2Stdout.reNotWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') == None )
+
+        self.assertTrue( run_func_tests.Rpdb2Stdout.reWaitingOnBp.match('*** Totoro .') == None )
+        self.assertTrue( run_func_tests.Rpdb2Stdout.reNotWaitingOnBp.match('*** Totoro .') != None )
 
 if __name__ == '__main__':
     main()
