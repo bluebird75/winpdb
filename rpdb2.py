@@ -2885,11 +2885,14 @@ def print_debug(_str):
 
     f = sys._getframe(1)
 
+    tid = thread.get_ident()
+    tname = thread_get_name( current_thread() )
+    threadinfo = '%s/%d' % ( tname, tid )
     filename = os.path.basename(f.f_code.co_filename)
     lineno = f.f_lineno
     name = f.f_code.co_name
 
-    str = '%s %s:%d in %s: %s' % (s, filename, lineno, name, _str)
+    str = '%s %s:%d %s %s(): %s' % (s, filename, lineno, threadinfo, name, _str)
 
     _print(str, sys.__stderr__)
 
