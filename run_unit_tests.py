@@ -28,38 +28,38 @@ class TestCEventDispatcherRecord( TestCase ):
 
     def testNoMatchForEmptyCallback( self ):
         er = rpdb2.CEventDispatcherRecord( None, {}, False)
-        self.assertEquals( False, er.is_match( rpdb2.CEventNull() ) )
+        self.assertEqual( False, er.is_match( rpdb2.CEventNull() ) )
 
     def testMatchNormal( self ):
         er = rpdb2.CEventDispatcherRecord( None, { rpdb2.CEventExit: {} }, False)
-        self.assertEquals( False, er.is_match( rpdb2.CEventNull() ) )
-        self.assertEquals( True, er.is_match( rpdb2.CEventExit() ) )
+        self.assertEqual( False, er.is_match( rpdb2.CEventNull() ) )
+        self.assertEqual( True, er.is_match( rpdb2.CEventExit() ) )
 
     def testMatchNormalWithArgs( self ):
         er = rpdb2.CEventDispatcherRecord( None, { rpdb2.CEventState: {} }, False)
-        self.assertEquals( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
+        self.assertEqual( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
 
     def testMatchExclude( self ):
         er = rpdb2.CEventDispatcherRecord( None, { rpdb2.CEventState: { rpdb2.EVENT_EXCLUDE: [rpdb2.STATE_BROKEN, rpdb2.STATE_ANALYZE] } }, False)
-        self.assertEquals( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
-        self.assertEquals( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_ANALYZE ) ) )
-        self.assertEquals( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_RUNNING ) ) )
+        self.assertEqual( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
+        self.assertEqual( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_ANALYZE ) ) )
+        self.assertEqual( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_RUNNING ) ) )
 
     def testMatchInclude( self ):
         er = rpdb2.CEventDispatcherRecord( None, {rpdb2.CEventState: { 
             rpdb2.EVENT_INCLUDE: [rpdb2.STATE_BROKEN, rpdb2.STATE_ANALYZE],
             } } , False)
-        self.assertEquals( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
-        self.assertEquals( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_ANALYZE ) ) )
-        self.assertEquals( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_RUNNING ) ) )
+        self.assertEqual( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
+        self.assertEqual( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_ANALYZE ) ) )
+        self.assertEqual( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_RUNNING ) ) )
 
     def testMatchIncludeExclude( self ):
         er = rpdb2.CEventDispatcherRecord( None, {rpdb2.CEventState: { 
             rpdb2.EVENT_INCLUDE: [rpdb2.STATE_BROKEN, rpdb2.STATE_ANALYZE],
             rpdb2.EVENT_EXCLUDE: [rpdb2.STATE_BROKEN],
             } } , False)
-        self.assertEquals( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_ANALYZE ) ) )
-        self.assertEquals( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
+        self.assertEqual( True, er.is_match( rpdb2.CEventState( rpdb2.STATE_ANALYZE ) ) )
+        self.assertEqual( False, er.is_match( rpdb2.CEventState( rpdb2.STATE_BROKEN ) ) )
 
 
 class TestCEventDispatcher( TestCase ):
@@ -75,23 +75,23 @@ class TestCEventDispatcher( TestCase ):
         evd.register_callback( self.callback, { rpdb2.CEventNull: {} }, False )
         ev1 = rpdb2.CEventNull() 
         evd.fire_event( ev1 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
 
         ev2 = rpdb2.CEventExit()
         evd.fire_event( ev2 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
 
     def testCallbackRemoval( self ):
         evd = rpdb2.CEventDispatcher()
         evd.register_callback( self.callback, { rpdb2.CEventNull: {} }, False )
         ev1 = rpdb2.CEventNull() 
         evd.fire_event( ev1 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
 
         evd.remove_callback( self.callback )
         ev2 = rpdb2.CEventNull() 
         evd.fire_event( ev2 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
 
     def testCallbackDoubleRemoval( self ):
         evd = rpdb2.CEventDispatcher()
@@ -110,11 +110,11 @@ class TestCEventDispatcher( TestCase ):
 
         ev1 = rpdb2.CEventNull() 
         evd.fire_event( ev1 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
 
         ev2 = rpdb2.CEventNull()
         evd.fire_event( ev2 )
-        self.assertEquals( self.m_callbackTrace, [ ev1, ev2 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1, ev2 ] )
 
     def testEventCallsCallbackSingleUse( self ):
         evd = rpdb2.CEventDispatcher()
@@ -122,11 +122,11 @@ class TestCEventDispatcher( TestCase ):
 
         ev1 = rpdb2.CEventNull() 
         evd.fire_event( ev1 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
         
         ev2 = rpdb2.CEventNull()
         evd.fire_event( ev2 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
 
     def testChainedDispatcher( self ):
         evd_first = rpdb2.CEventDispatcher()
@@ -136,8 +136,8 @@ class TestCEventDispatcher( TestCase ):
         def secondCallback( ev ):
             secondCallbackTrace.append( ev )
 
-        self.assertEquals( secondCallbackTrace, [] )
-        self.assertEquals( self.m_callbackTrace, [] )
+        self.assertEqual( secondCallbackTrace, [] )
+        self.assertEqual( self.m_callbackTrace, [] )
 
         evd_first.register_callback( self.callback, { rpdb2.CEventNull: {} }, False)
         evd_second.register_callback( secondCallback, { rpdb2.CEventNull: {} }, False)
@@ -145,14 +145,14 @@ class TestCEventDispatcher( TestCase ):
         # Event on first dispatcher
         ev1 = rpdb2.CEventNull() 
         evd_first.fire_event( ev1 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
-        self.assertEquals( secondCallbackTrace, [ ev1 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( secondCallbackTrace, [ ev1 ] )
 
         # Event on second dispatcher 
         ev2 = rpdb2.CEventNull() 
         evd_second.fire_event( ev2 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
-        self.assertEquals( secondCallbackTrace, [ ev1, ev2 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( secondCallbackTrace, [ ev1, ev2 ] )
 
     def testChainedDispatcherChainOverride( self ):
         evd_first = rpdb2.CEventDispatcher()
@@ -162,8 +162,8 @@ class TestCEventDispatcher( TestCase ):
         def secondCallback( ev ):
             secondCallbackTrace.append( ev )
 
-        self.assertEquals( secondCallbackTrace, [] )
-        self.assertEquals( self.m_callbackTrace, [] )
+        self.assertEqual( secondCallbackTrace, [] )
+        self.assertEqual( self.m_callbackTrace, [] )
 
         evd_second.register_chain_override( { rpdb2.CEventNull: {} } )
         evd_first.register_callback( self.callback, { rpdb2.CEventNull: {} }, False)
@@ -172,14 +172,14 @@ class TestCEventDispatcher( TestCase ):
         # Event on first dispatcher
         ev1 = rpdb2.CEventNull() 
         evd_first.fire_event( ev1 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
-        self.assertEquals( secondCallbackTrace, [] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( secondCallbackTrace, [] )
 
         # Event on second dispatcher 
         ev2 = rpdb2.CEventNull() 
         evd_second.fire_event( ev2 )
-        self.assertEquals( self.m_callbackTrace, [ ev1 ] )
-        self.assertEquals( secondCallbackTrace, [ ev2 ] )
+        self.assertEqual( self.m_callbackTrace, [ ev1 ] )
+        self.assertEqual( secondCallbackTrace, [ ev2 ] )
 
 
 class TestCEventQueue( TestCase ):
@@ -190,10 +190,10 @@ class TestCEventQueue( TestCase ):
 
         ev1 = rpdb2.CEventNull() 
         evd.fire_event( ev1 )
-        self.assertEquals( 1, evq.get_event_index() )
+        self.assertEqual( 1, evq.get_event_index() )
         ev2 = rpdb2.CEventNull() 
         evd.fire_event( ev2 )
-        self.assertEquals( 2, evq.get_event_index() )
+        self.assertEqual( 2, evq.get_event_index() )
 
     def testWaitForEvent( self ):
         evd = rpdb2.CEventDispatcher()
@@ -206,20 +206,20 @@ class TestCEventQueue( TestCase ):
         evd.fire_event( ev2 )
 
         new_index, sub_events = evq.wait_for_event( 0.1, 0 )
-        self.assertEquals( 2, new_index )
-        self.assertEquals( [ev1, ev2], sub_events )
+        self.assertEqual( 2, new_index )
+        self.assertEqual( [ev1, ev2], sub_events )
 
         new_index, sub_events = evq.wait_for_event( 0.1, 1 )
-        self.assertEquals( 2, new_index )
-        self.assertEquals( [ ev2 ], sub_events )
+        self.assertEqual( 2, new_index )
+        self.assertEqual( [ ev2 ], sub_events )
 
         new_index, sub_events = evq.wait_for_event( 0.1, 2 )
-        self.assertEquals( 2, new_index )
-        self.assertEquals( [], sub_events )
+        self.assertEqual( 2, new_index )
+        self.assertEqual( [], sub_events )
 
         new_index, sub_events = evq.wait_for_event( 0.1, 3 )
-        self.assertEquals( 2, new_index )
-        self.assertEquals( [], sub_events )
+        self.assertEqual( 2, new_index )
+        self.assertEqual( [], sub_events )
 
     def testEventQueueOverflow(self):
         evd = rpdb2.CEventDispatcher()
@@ -234,26 +234,26 @@ class TestCEventQueue( TestCase ):
         evd.fire_event( ev2 )
 
         new_index, sub_events = evq.wait_for_event( 0.1, 0 )
-        self.assertEquals( 2, new_index )
-        self.assertEquals( [ev1, ev2], sub_events )
+        self.assertEqual( 2, new_index )
+        self.assertEqual( [ev1, ev2], sub_events )
 
         evd.fire_event( ev3 )
         new_index, sub_events = evq.wait_for_event( 0.1, 2 )
-        self.assertEquals( 3, new_index )
-        self.assertEquals( [ev3], sub_events )
+        self.assertEqual( 3, new_index )
+        self.assertEqual( [ev3], sub_events )
 
         new_index, sub_events = evq.wait_for_event( 0.1, 0 )
-        self.assertEquals( 3, new_index )
-        self.assertEquals( [ev1, ev2, ev3], sub_events )
+        self.assertEqual( 3, new_index )
+        self.assertEqual( [ev1, ev2, ev3], sub_events )
 
         evd.fire_event( ev4 )
         new_index, sub_events = evq.wait_for_event( 0.1, 3 )
-        self.assertEquals( 4, new_index )
-        self.assertEquals( [ev4], sub_events )
+        self.assertEqual( 4, new_index )
+        self.assertEqual( [ev4], sub_events )
 
         new_index, sub_events = evq.wait_for_event( 0.1, 0 )
-        self.assertEquals( 4, new_index )
-        self.assertEquals( [ev2, ev3, ev4], sub_events )
+        self.assertEqual( 4, new_index )
+        self.assertEqual( [ev2, ev3, ev4], sub_events )
 
 
 class TestRpdb2( TestCase ):
@@ -295,9 +295,9 @@ class TestRpdb2Stdout( TestCase ):
 
     def testAttaching( self ):
         rso = run_func_tests.Rpdb2Stdout( dispStdout=False )
-        self.assertEquals( False, rso.attached )
+        self.assertEqual( False, rso.attached )
         rso.write(r'*** Successfully attached to.*\n')
-        self.assertEquals( True, rso.attached )
+        self.assertEqual( True, rso.attached )
         rso.write(r'*** Detached from script.*\n' )
 
     def testReAttached( self ):
