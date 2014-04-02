@@ -808,6 +808,12 @@ class CSessionManager:
 
         return self.__smi.launch(fchdir, command_line, interpreter, fload_breakpoints)
 
+    def wait_for_debuggee(self):
+        """
+        Wait until the debugee has been started and is ready to accept connections.
+        """
+        return self.__smi.wait_for_debuggee()
+
 
     def restart(self):
         """
@@ -9436,7 +9442,7 @@ class CWorkQueue:
                     print_debug('Creating an extra worker thread.')
                     self.__create_thread()
 
-                thread_set_name(current_thread(), '__worker_target - ' + name)
+                thread_set_name(current_thread(), '__worker_target-' + name)
 
                 try:
                     target(*args)
@@ -9459,7 +9465,7 @@ class CWorkQueue:
             self.m_lock.release()
 
 
-    def post_work_item(self, target, args, name = ''):
+    def post_work_item(self, target, args, name ): 
         if self.m_f_shutdown:
             return
 
@@ -10527,6 +10533,9 @@ class CSessionManagerInternal:
     def remove_callback(self, callback):
         return self.m_event_dispatcher.remove_callback(callback)
 
+
+    def wait_for_debuggee(self):
+        return self.__wait_for_debuggee(None)
 
     def __wait_for_debuggee(self, rid):
         try:
