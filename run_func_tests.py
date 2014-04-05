@@ -1,6 +1,6 @@
 
 # Python
-import unittest, subprocess
+import unittest, subprocess, threading
 import os, time, sys, re, signal
 
 # RPDB2
@@ -115,6 +115,18 @@ class Rpdb2Stdout(StringIO):
                 setattr( self, attr, assignment )
 
 
+
+class TestRpdb2Stdout( unittest.TestCase ):
+    def testReAttached( self ):
+        self.assertNotEqual( Rpdb2Stdout.reAttached.match( '*** Successfully attached to\n' ), None )
+
+    def testreWaitingOnBp( self ):
+        self.assertTrue( Rpdb2Stdout.reWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') != None )
+        self.assertTrue( Rpdb2Stdout.reNotWaitingOnBp.match('*** Debuggee is waiting at break point for further commands.') == None )
+
+        self.assertTrue( Rpdb2Stdout.reWaitingOnBp.match('*** Totoro .') == None )
+        self.assertTrue( Rpdb2Stdout.reNotWaitingOnBp.match('*** Totoro .') != None )
+
 def findBpHint( fname ):
     content = open(fname).readlines()
     return _findBpHintWithContent( content )
@@ -131,6 +143,30 @@ def _findBpHintWithContent( content ):
             d[ mo.group(1) ] = i
     return d
 
+class StdoutDisplayer:
+    def __init__(self, process ):
+        self.process = process
+        self.t = threading.Thread( target=self.displayStdout )
+        self.shouldStop = False
+        self.t.start()
+
+    def stop( self ):
+        self.shouldStop = True
+
+    def displayStdout( self ):
+        # Wait until stdout exists
+        while self.process.stdout == None and self.shouldStop == False:
+            print( 'OUT: ... waiting for process to start ...' )
+            time.sleep(1.1)
+
+        while True: # not self.shouldStop:
+            l = self.process.stdout.readline()
+            if not l:
+                break
+            if l[-1] == '\n':
+                l = l[:-1]
+            print( 'OUT: %s' % l )
+
 class TestRpdb2( unittest.TestCase ):
 
     def __init__(self, *args, **kwargs):
@@ -145,9 +181,10 @@ class TestRpdb2( unittest.TestCase ):
         self.sm = None
         self.fakeStdin = FakeStdin()
         self.rpdb2Stdout = Rpdb2Stdout( dispStdout=True )
-        self.script = subprocess.Popen( [ PYTHON, RPDB2, '-d', '--pwd=%s' % PWD] 
+        self.script = subprocess.Popen( [ PYTHON, '-u', RPDB2, '-d', '--pwd=%s' % PWD] 
                         + self.rpdb2Args + [os.path.join( 'tests', DEBUGME ) ], 
                         creationflags=CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
+        self.stdoutDisp = StdoutDisplayer( self.script )
 
     def cleanStepFiles(self):
         for fname in STEPS:
@@ -161,6 +198,8 @@ class TestRpdb2( unittest.TestCase ):
 
     def terminateScript( self ):
         dbg( 'Teardown.Script: check if finished')
+        self.stdoutDisp.stop()
+
         if self.script.poll() != None: return
 
         dbg( 'Teardown.Script: check if finished after 1 sec')
