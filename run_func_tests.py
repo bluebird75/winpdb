@@ -271,6 +271,7 @@ class TestRpdb2( unittest.TestCase ):
     def startPdb2(self):
         dbg('Start pdb2')
         self.sm = rpdb2.CSessionManager(PWD,True,False,'localhost')
+        self.sm.wait_for_debuggee()
         self.console = rpdb2.CConsoleInternal(self.sm, stdout=self.rpdb2Stdout, stdin=self.fakeStdin, fSplit=True )
         self.console.start()
         time.sleep(1.0)
@@ -281,9 +282,9 @@ class TestRpdb2( unittest.TestCase ):
         endLineCount = self.rpdb2Stdout.lineCount + syncLines
         endTime = time.time() + timeout
         self.fakeStdin.appendCmd( "%s\n" % cmd )
-        while (self.rpdb2Stdout.lineCount < endLineCount
+        while ( (syncLines == 0 or self.rpdb2Stdout.lineCount < endLineCount)
                 and time.time() < endTime):
-            time.sleep(0.1)
+            time.sleep(0.2)
 
     def attach( self ):
         self.command("attach %s\n" % DEBUGME, 4, 10 )
@@ -298,8 +299,8 @@ class TestRpdb2( unittest.TestCase ):
     def getBreakonexit( self ):
         self.command( "breakonexit\n", 1 )
 
-    def go( self ):
-        self.command( "go", 1 )
+    def go( self, syncLines=0, timeout=1):
+        self.command( "go", syncLines, timeout )
 
     def breakp( self, arg ):
         self.fakeStdin.appendCmd( "bp %s" % arg)
@@ -324,11 +325,11 @@ class TestRpdb2( unittest.TestCase ):
         self.attach()
         self.breakp( 'f1' )
         self.breakp( self.bp1Line )
-        self.go() # break during definition of f1
-        self.go() # break during call of f1
+        self.go(1) # break during definition of f1
+        self.go(1) # break during call of f1
         assert os.path.exists( 'tests/start' )
         assert not os.path.exists( 'tests/f1' )
-        self.go() # break after call of f2
+        self.go(1) # break after call of f2
         assert os.path.exists( 'tests/f1' )
         assert os.path.exists( 'tests/f2' )
         self.go() # run until the end
@@ -347,34 +348,20 @@ class TestRpdb2( unittest.TestCase ):
 
     def testRunWithBreakonexit( self ):
         self.startPdb2()
-        self.assertEquals( self.rpdb2Stdout.waitingOnBp, False )
+        self.assertEqual( self.rpdb2Stdout.waitingOnBp, False )
         self.attach()
         self.setBreakonexit( True )
-        self.go()
-        self.assertEquals( self.rpdb2Stdout.attached, True )
-        self.assertEquals( self.rpdb2Stdout.waitingOnBp, True )
+        self.go(syncLines=1, timeout=5)
+        self.assertEqual( self.rpdb2Stdout.attached, True )
+        self.assertEqual( self.rpdb2Stdout.waitingOnBp, True )
         self.go()
 
     def testRunWithoutBreakonexit( self ):
         self.startPdb2()
         self.attach()
         self.setBreakonexit( False )
-        self.go()
-        self.assertEquals( self.rpdb2Stdout.attached, False )
-
-# class TestRpdb2StopOnExit( TestRpdb2 ):
-
-#     def __init__(self):
-#         TestRpdb2.__init__(self)
-#         self.rpdb2Args = [ '--stop-on-exit' ]
-        # init with stop on exit flag
-        # check that debugger stops before exit
-        # 
-
-# - test the console commands: 
-#    + read break on exit default status
-#    + change break on exit status
-#    + run with different settings of break on exit
+        self.go(syncLines=3, timeout=20)
+        self.assertEqual( self.rpdb2Stdout.attached, False )
 
 if __name__ == '__main__':
     # unittest.main( argv=[sys.argv[0] + '-v'] + sys.argv[1:] )
