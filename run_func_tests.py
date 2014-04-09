@@ -172,6 +172,7 @@ class TestRpdb2( unittest.TestCase ):
 
     def __init__(self, *args, **kwargs):
         super( TestRpdb2, self ).__init__(*args, **kwargs)
+        rpdb2.create_rpdb_settings_folder()
         self.bp1Line = findBpHint( 'tests/debugme.py' )['BP1']
         self.rpdb2Args = []
 
