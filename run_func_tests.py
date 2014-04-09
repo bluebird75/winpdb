@@ -203,7 +203,12 @@ class TestRpdb2( unittest.TestCase ):
 
     def cleanBpFiles(self):
         bpldir = os.path.dirname( rpdb2.calc_bpl_filename( '' ) )
-        for fname in os.listdir( bpldir ):
+        try:
+            files = os.listdir( bpldir )
+        except OSError:
+            return
+
+        for fname in files:
             os.unlink( os.path.join( bpldir, fname ) )
 
     def terminateScript( self ):
