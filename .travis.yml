@@ -1,12 +1,11 @@
 language: python
 python:
-#  - "2.4"
-#  - "2.5"
-#  - "2.6"
+  - "2.5"
+  - "2.6"
   - "2.7"
 #  - "3.1"
 #  - "3.2"
-#  - "3.3"
+  - "3.3"
 
 # command to install dependencies
 # install: "pip install -r requirements.txt --use-mirrors"
@@ -15,7 +14,3 @@ python:
 script: 
 - python run_unit_tests.py
 - python run_func_tests.py
-
-# branches:
-#  only:
-#    - experiment_test
