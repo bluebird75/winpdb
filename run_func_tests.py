@@ -5,6 +5,7 @@ import os, time, sys, re, signal
 
 # RPDB2
 import rpdb2
+rpdb2.STARTUP_TIMEOUT = 10.0 # necessary because sometimes subprocess debugger is really slow to start
 
 # Compatibility support
 IS_PYTHON_LESS_THAN_26 = sys.version_info[:2] < (2,6)
@@ -31,7 +32,7 @@ if sys.platform == 'win32':
     except IOError:
         pass
 
-PYTHON='C:/Python27/python.exe'
+PYTHON=sys.executable
 DEBUGME=rpdb2.as_unicode('debugme.py')
 RPDB2 = 'rpdb2.py'
 PWD=rpdb2.as_unicode('toto')
@@ -181,9 +182,18 @@ class TestRpdb2( unittest.TestCase ):
         self.sm = None
         self.fakeStdin = FakeStdin()
         self.rpdb2Stdout = Rpdb2Stdout( dispStdout=True )
-        self.script = subprocess.Popen( [ PYTHON, '-u', RPDB2, '-d', '--pwd=%s' % PWD] 
-                        + self.rpdb2Args + [os.path.join( 'tests', DEBUGME ) ], 
-                        creationflags=CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
+	kwargs = {}
+	pythonCmdLine = [ PYTHON, '-u', RPDB2, '-d'] + self.rpdb2Args
+	rid = rpdb2.generate_rid()
+	rpdb2.create_pwd_file( rid, PWD )
+	if sys.platform == 'win32':
+		kwargs['creationflags'] = CREATE_NEW_PROCESS_GROUP
+		pythonCmdLine.append( '--pwd=%s' % PWD )
+	else:
+		pythonCmdLine.append( '--rid=%s' % rid )
+	pythonCmdLine.append ( '--debug' )
+	pythonCmdLine.append( os.path.join( 'tests', DEBUGME ) ) 
+        self.script = subprocess.Popen( pythonCmdLine, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs )
         self.stdoutDisp = StdoutDisplayer( self.script )
 
     def cleanStepFiles(self):
@@ -270,6 +280,7 @@ class TestRpdb2( unittest.TestCase ):
 
     def startPdb2(self):
         dbg('Start pdb2')
+	rpdb2.g_fDebug = True
         self.sm = rpdb2.CSessionManager(PWD,True,False,'localhost')
         self.sm.wait_for_debuggee()
         self.console = rpdb2.CConsoleInternal(self.sm, stdout=self.rpdb2Stdout, stdin=self.fakeStdin, fSplit=True )
