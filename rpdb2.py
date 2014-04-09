@@ -3957,7 +3957,11 @@ def cleanup_bpl_folder(path):
     if random.randint(0, 10) > 0:
         return
 
-    l = os.listdir(path)
+    try:
+        l = os.listdir(path)
+    except OSError:
+        # No bpl path
+        return
     if len(l) < MAX_BPL_FILES:
         return
 
