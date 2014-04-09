@@ -12,8 +12,8 @@ python:
 # install: "pip install -r requirements.txt --use-mirrors"
 
 # command to run tests
-script: python test_rpdb2.py
+script: python run_unit_tests.py
 
-branches:
-  only:
-    - experiment_test
+# branches:
+#  only:
+#    - experiment_test
