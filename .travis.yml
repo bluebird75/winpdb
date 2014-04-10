@@ -6,7 +6,7 @@ python:
 #  - "3.1"   Python 3.1 no longer supported by Travic CI
   - "3.2"
   - "3.3"
-  - "3.4"
+#   - "3.4"# Python 3.4 not yet available on Travis
   - "pypy"
 
 # command to install dependencies
@@ -15,4 +15,4 @@ python:
 # command to run tests
 script: 
 - python run_unit_tests.py
-- python run_func_tests.py
+- python run_func_tests.py -v
