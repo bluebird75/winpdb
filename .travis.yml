@@ -6,8 +6,8 @@ python:
 #  - "3.1"   Python 3.1 no longer supported by Travic CI
   - "3.2"
   - "3.3"
-#  - "3.4"
-#  - "pypy"
+  - "3.4"
+  - "pypy"
 
 # command to install dependencies
 # install: "pip install -r requirements.txt --use-mirrors"
