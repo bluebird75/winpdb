@@ -1,4 +1,4 @@
-
+[![Build Status](https://travis-ci.org/bluebird75/winpdb.svg?branch=winpdb)](https://travis-ci.org/bluebird75/winpdb)
 
 
 Winpdb - A GPL Python Debugger
