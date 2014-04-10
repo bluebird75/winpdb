@@ -79,6 +79,7 @@ class Rpdb2Stdout(StringIO):
     reBreakonexitOff = re.compile( r'.*break-on-exit mode.*False.*' )
     reWaitingOnBp    = re.compile( r'\*\*\* Debuggee is waiting at break point.*' )
     reNotWaitingOnBp = ReNonMatcher( re.compile( r'\*\*\* Debuggee is waiting at break point.*' ) )
+    reNotRunning = re.compile( r'\*\*\* Debuggee has terminated.*' )
 
     def __init__(self, *args, **kwargs):
         if 'dispStdout' in kwargs:
@@ -90,6 +91,8 @@ class Rpdb2Stdout(StringIO):
 
         self.matcher = (
             ( self.reAttached,      'attached',     True ),
+            # ( self.reAttached,      'running',      True ),
+            # ( self.reNotRunning,    'running',      False),
             ( self.reDetached,      'attached',     False),
             ( self.reBreakonexitOn, 'breakonexit',  True ),
             ( self.reBreakonexitOff,'breakonexit',  False),
@@ -106,15 +109,15 @@ class Rpdb2Stdout(StringIO):
         if len(t) == 0 or (len(t) == 1 and t == "\n"):
             return
 
-        self.lineCount += 1
-        dbg('stdout %d="%s"' % (self.lineCount, t) )
-        if self.dispStdout:
-            sys.stdout.write( '%s' % t )
-
         for retomatch, attr, assignment in self.matcher:
             if retomatch.match( t ):
                 setattr( self, attr, assignment )
 
+        dbg('stdout %d="%s"' % (self.lineCount, t) )
+        if self.dispStdout:
+            sys.stdout.write( 'RPDB2: %s' % t )
+
+        self.lineCount += 1
 
 
 class TestRpdb2Stdout( unittest.TestCase ):
@@ -192,7 +195,7 @@ class TestRpdb2( unittest.TestCase ):
             pythonCmdLine.append( '--pwd=%s' % PWD )
         else:
             pythonCmdLine.append( '--rid=%s' % rid )
-        pythonCmdLine.append ( '--debug' )
+        # pythonCmdLine.append ( '--debug' )
         pythonCmdLine.append( os.path.join( 'tests', DEBUGME ) ) 
         self.script = subprocess.Popen( pythonCmdLine, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs )
         self.stdoutDisp = StdoutDisplayer( self.script )
@@ -286,7 +289,7 @@ class TestRpdb2( unittest.TestCase ):
 
     def startPdb2(self):
         dbg('Start pdb2')
-        rpdb2.g_fDebug = True
+        # rpdb2.g_fDebug = True
         self.sm = rpdb2.CSessionManager(PWD,True,False,'localhost')
         self.sm.wait_for_debuggee()
         self.console = rpdb2.CConsoleInternal(self.sm, stdout=self.rpdb2Stdout, stdin=self.fakeStdin, fSplit=True )
@@ -304,7 +307,7 @@ class TestRpdb2( unittest.TestCase ):
             time.sleep(0.2)
 
     def attach( self ):
-        self.command("attach %s\n" % DEBUGME, 4, 10 )
+        self.command("attach %s\n" % DEBUGME, 4, 20 )
         self.assertEqual( self.rpdb2Stdout.attached, True )
 
     def stop( self ):
@@ -316,8 +319,16 @@ class TestRpdb2( unittest.TestCase ):
     def getBreakonexit( self ):
         self.command( "breakonexit\n", 1 )
 
-    def go( self, syncLines=0, timeout=1):
+    def goAndWaitOnBp( self, syncLines=1, timeout=20):
+        self.rpdb2Stdout.waitingOnBp = False
         self.command( "go", syncLines, timeout )
+        self.assertEqual( self.rpdb2Stdout.waitingOnBp, True )
+
+    def goAndExit( self, syncLines=3, timeout=20 ):
+        self.rpdb2Stdout.waitingOnBp = False
+        self.command( "go", syncLines, timeout )
+        # self.assertEqual( self.rpdb2Stdout.running,  False )
+        self.assertEqual( self.rpdb2Stdout.attached, False )
 
     def breakp( self, arg ):
         self.fakeStdin.appendCmd( "bp %s" % arg)
@@ -331,7 +342,7 @@ class TestRpdb2( unittest.TestCase ):
     def testGo( self ):
         self.startPdb2()
         self.attach()
-        self.go()
+        self.goAndExit()
 
         assert os.path.exists( 'tests/f1' )
         assert os.path.exists( 'tests/done' )
@@ -342,14 +353,14 @@ class TestRpdb2( unittest.TestCase ):
         self.attach()
         self.breakp( 'f1' )
         self.breakp( self.bp1Line )
-        self.go(1) # break during definition of f1
-        self.go(1) # break during call of f1
+        self.goAndWaitOnBp() # break during definition of f1
+        self.goAndWaitOnBp() # break during call of f1
         assert os.path.exists( 'tests/start' )
         assert not os.path.exists( 'tests/f1' )
-        self.go(1) # break after call of f2
+        self.goAndWaitOnBp() # break after call of f2
         assert os.path.exists( 'tests/f1' )
         assert os.path.exists( 'tests/f2' )
-        self.go() # run until the end
+        self.goAndExit() # run until the end
         assert os.path.exists('tests/done')
         assert os.path.exists('tests/atexit')
 
@@ -368,16 +379,16 @@ class TestRpdb2( unittest.TestCase ):
         self.assertEqual( self.rpdb2Stdout.waitingOnBp, False )
         self.attach()
         self.setBreakonexit( True )
-        self.go(syncLines=1, timeout=5)
+        self.goAndWaitOnBp()
         self.assertEqual( self.rpdb2Stdout.attached, True )
         self.assertEqual( self.rpdb2Stdout.waitingOnBp, True )
-        self.go()
+        self.goAndExit()
 
     def testRunWithoutBreakonexit( self ):
         self.startPdb2()
         self.attach()
         self.setBreakonexit( False )
-        self.go(syncLines=3, timeout=20)
+        self.goAndExit()
         self.assertEqual( self.rpdb2Stdout.attached, False )
 
 if __name__ == '__main__':
