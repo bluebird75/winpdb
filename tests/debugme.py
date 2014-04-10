@@ -13,7 +13,9 @@ pathprefix = os.path.join( os.path.dirname( __file__) )
 
 def step(t):
     print( prefix + u(t) )
-    open( '%s/%s' % (pathprefix, t ), 'w' ).write(t+'\n')
+    f = open( '%s/%s' % (pathprefix, t ), 'w' )
+    f.write(t+'\n')
+    f.close()
 
 def f1( t ):
     step( 'f1' )
