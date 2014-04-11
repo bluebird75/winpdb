@@ -295,7 +295,6 @@ import cmd
 import imp
 import os
 import re
-import types
 import warnings
 
 try:
@@ -3982,7 +3981,7 @@ def cleanup_bpl_folder(path):
 
 def calc_bpl_filename(filename):
     key = as_bytes(filename)
-    tmp_filename = hmac.new(key).hexdigest()[:10]
+    tmp_filename = hmac.new(key, digestmod=_md5).hexdigest()[:10]
 
     if os.name == POSIX:
         home = os.path.expanduser('~')
