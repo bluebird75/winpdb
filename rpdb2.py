@@ -295,7 +295,7 @@ import cmd
 import imp
 import os
 import re
-import types
+import warnings
 
 try:
     import hashlib
@@ -304,14 +304,13 @@ except:
     import md5
     _md5 = md5
 
+if sys.version_info[:2] == (2,6):
+    # disable warning about sets being deprecated for Python 2.6
+    warnings.filterwarnings( 'ignore', 'the sets module.*', DeprecationWarning, 'rpdb2' )
+
 try:
     import compiler
     import sets
-except:
-    pass
-
-try:
-    import popen2
 except:
     pass
 
@@ -589,12 +588,13 @@ class CSimpleSessionManager:
         self.__sm.shutdown()
 
 
-    def launch(self, fchdir, command_line, encoding = 'utf-8', fload_breakpoints = False):
+    def launch(self, fchdir, command_line, interpreter, encoding = 'utf-8', fload_breakpoints = False):
         command_line = as_unicode(command_line, encoding, fstrict = True)
+        interpreter = as_unicode(interpreter, encoding, fstrict = True)
 
         self.m_fRunning = False
 
-        self.__sm.launch(fchdir, command_line, fload_breakpoints)
+        self.__sm.launch(fchdir, command_line, interpreter, fload_breakpoints)
 
 
     def request_go(self):
@@ -791,7 +791,7 @@ class CSessionManager:
         return self.__smi.refresh()
 
 
-    def launch(self, fchdir, command_line, encoding = 'utf-8', fload_breakpoints = True):
+    def launch(self, fchdir, command_line, interpreter, encoding = 'utf-8', fload_breakpoints = True):
         """
         Launch debuggee in a new process and attach.
         fchdir - Change current directory to that of the debuggee.
@@ -803,8 +803,15 @@ class CSessionManager:
         """
 
         command_line = as_unicode(command_line, encoding, fstrict = True)
+        interpreter = as_unicode(interpreter, encoding, fstrict = True)
 
-        return self.__smi.launch(fchdir, command_line, fload_breakpoints)
+        return self.__smi.launch(fchdir, command_line, interpreter, fload_breakpoints)
+
+    def wait_for_debuggee(self):
+        """
+        Wait until the debugee has been started and is ready to accept connections.
+        """
+        return self.__smi.wait_for_debuggee()
 
 
     def restart(self):
@@ -1292,10 +1299,14 @@ class CSessionManager:
 
         return self.__smi.set_synchronicity(fsynchronicity)
 
-
     def get_synchronicity(self):
         return self.__smi.get_synchronicity()
 
+    def set_breakonexit(self, fbreakonexit):
+        return self.__smi.set_breakonexit(fbreakonexit)
+
+    def get_breakonexit(self):
+        return self.__smi.get_breakonexit()
 
     def get_state(self):
         """
@@ -1700,6 +1711,7 @@ def is_unicode(s):
 
 
 def as_unicode(s, encoding = 'utf-8', fstrict = False):
+    '''Return an unicode string, corresponding to s, encoding it if necessary'''
     if is_unicode(s):
         return s
 
@@ -1969,6 +1981,7 @@ STR_ENVIRONMENT = 'The current environment mapping is:'
 STR_ENVIRONMENT_EMPTY = 'The current environment mapping is not set.'
 STR_SYNCHRONICITY_BAD = "Can not process command when thread is running unless synchronicity mode is turned on. Type 'help synchro' at the command prompt for more information."
 STR_SYNCHRONICITY_MODE = 'The synchronicity mode is set to: %s'
+STR_BREAKONEXIT_MODE = 'The break-on-exit mode is set to: %s'
 STR_TRAP_MODE = 'Trap unhandled exceptions mode is set to: %s'
 STR_TRAP_MODE_SET = "Trap unhandled exceptions mode was set to: %s."
 STR_FORK_MODE = "Fork mode is set to: %s, %s."
@@ -2190,9 +2203,11 @@ g_signals_pending = []
 
 g_fFirewallTest = True
 
+g_fbreakonexit = False
 
 
-if is_py3k():
+
+if is_py3k() and sys.version_info[:2] > (3,0):
     g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
     g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
 else:
@@ -2213,6 +2228,53 @@ g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
 # ---------------------------- General Utils ------------------------------
 #
 
+def get_python_executable( interpreter=None ):
+    '''Return the python executable, usable to launch the debuggee.
+    Pass a value that may override the default executable.
+
+    Executable is returned as unicode, taking into accoun the file system encoding.'''
+    fse = sys.getfilesystemencoding()
+    if interpreter:
+        python_exec = interpreter
+    else:
+        python_exec = sys.executable
+    if python_exec.endswith('w.exe'):
+        python_exec = python_exec[:-5] + '.exe'
+    python_exec = as_unicode(python_exec, fse)
+    return python_exec
+
+def parse_console_launch( arg ):
+    '''Split a the console command launch into chdir option, interprter option and real commandline
+
+    Returns: (fchdir, intrepreter, arg)
+    '''
+    fchdir = True
+    interpreter = None
+    if arg == '':
+        return (fchdir, interpreter, arg)
+
+    idx = 0
+    while idx < len(arg):
+        if arg[:2] == '-k':
+            fchdir = False
+            arg = arg[2:].strip()
+        elif arg[:2] == '-i':
+            arg = arg[2:].strip()
+            if arg[0] in ('"', "'"):
+                st = 1
+                end = arg.find(arg[0],1 )
+                interpreter = '"%s"' % arg[st:end]
+            else:
+                st = 0
+                end = arg.find(' ', 1 )
+                interpreter = arg[st:end]
+            arg = arg[end+1:].strip()
+        else:
+            # no more arguments for us
+            break
+
+
+    return (fchdir, interpreter, arg)
 
 
 def job_wrapper(event, foo, *args, **kwargs):
@@ -2828,11 +2890,14 @@ def print_debug(_str):
 
     f = sys._getframe(1)
 
+    tid = thread.get_ident()
+    tname = thread_get_name( current_thread() )
+    threadinfo = '%s/%d' % ( tname, tid )
     filename = os.path.basename(f.f_code.co_filename)
     lineno = f.f_lineno
     name = f.f_code.co_name
 
-    str = '%s %s:%d in %s: %s' % (s, filename, lineno, name, _str)
+    str = '%s %s:%d %s %s(): %s' % (s, filename, lineno, threadinfo, name, _str)
 
     _print(str, sys.__stderr__)
 
@@ -3074,6 +3139,12 @@ def calc_frame_path(frame):
         return lowered
 
 
+if is_py3k() and sys.version_info[:2] > (3,0):
+    base64_encodestring = base64.encodebytes
+    base64_decodestring = base64.decodebytes
+else:
+    base64_encodestring = base64.encodestring
+    base64_decodestring = base64.decodestring
 
 def my_abspath(path):
     """
@@ -3885,7 +3956,11 @@ def cleanup_bpl_folder(path):
     if random.randint(0, 10) > 0:
         return
 
-    l = os.listdir(path)
+    try:
+        l = os.listdir(path)
+    except OSError:
+        # No bpl path
+        return
     if len(l) < MAX_BPL_FILES:
         return
 
@@ -3906,7 +3981,7 @@ def cleanup_bpl_folder(path):
 
 def calc_bpl_filename(filename):
     key = as_bytes(filename)
-    tmp_filename = hmac.new(key).hexdigest()[:10]
+    tmp_filename = hmac.new(key, digestmod=_md5).hexdigest()[:10]
 
     if os.name == POSIX:
         home = os.path.expanduser('~')
@@ -4742,7 +4817,7 @@ class CCrypto:
         if fencrypt:
             s = self.__encrypt(s)
 
-        s = base64.encodestring(s)
+        s = base64_encodestring(s)
         u = as_unicode(s)
 
         return (fcompress, digest, u)
@@ -4761,7 +4836,7 @@ class CCrypto:
             raise EncryptionNotSupported
 
         s = as_bytes(msg)
-        s = base64.decodestring(s)
+        s = base64_decodestring(s)
 
         if fencrypt:
             s = self.__decrypt(s)
@@ -5079,6 +5154,17 @@ class CEventSynchronicity(CEvent):
         return self.m_fsynchronicity == arg
 
 
+class CEventBreakOnExit(CEvent):
+    """
+    Mode of break on exit
+    Sent when mode changes
+    """
+    def __init__(self,fbreakonexit):
+        self.m_fbreakonexit = fbreakonexit
+
+    def is_match(self,arg):
+        return self.m_fbreakonexit == arg
+
 
 class CEventTrap(CEvent):
     """
@@ -5230,6 +5316,16 @@ class CEventSync(CEvent):
 class CEventDispatcherRecord:
     """
     Internal structure that binds a callback to particular events.
+
+    The match rules are:
+    - event must always be a instance of a registered type
+    - further filtering is possible on events that have a state:
+        + if event_type_dict contains a key EVENT_INCLUDE, only event whose state is 
+           listed EVENT_INCLUDE are matched successfully
+        + or if event_type_dict contains a key EVENT_EXCLUDE, only event whose state is not 
+           listed EVENT_EXCLUDE are matched successfully
+
+    EVENT_INCLUDE and EVENT_EXCLUDE may not be used together
     """
 
     def __init__(self, callback, event_type_dict, fSingleUse):
@@ -5269,7 +5365,13 @@ class CEventDispatcherRecord:
 class CEventDispatcher:
     """
     Events dispatcher.
-    Dispatchers can be chained together.
+
+    Dispatchers can be chained together by specifying a source event dispatcher in constructor.
+    
+    By default, the source event distpacher will duplicate all events to this dispatcher.
+
+    It is possible to forwarded to the second dispatcher and not fired in the source dispatcher
+    by using register_chain_override() on those events, before event registration.
     """
 
     def __init__(self, chained_event_dispatcher = None):
@@ -5380,6 +5482,9 @@ class CEventQueue:
     Add queue semantics above an event dispatcher.
     Instead of firing event callbacks, new events are returned in a list
     upon request.
+
+    Events are stored in a FIFO of size MAX_EVENT_LIST_LENGTH (defaults to 1000)
+
     """
 
     def __init__(self, event_dispatcher, max_event_list_length = MAX_EVENT_LIST_LENGTH):
@@ -5427,7 +5532,7 @@ class CEventQueue:
 
     def wait_for_event(self, timeout, event_index):
         """
-        Return the new events which were fired.
+        Return the events above index event_index which were fired.
         """
 
         try:
@@ -7281,7 +7386,8 @@ class CDebuggerCore:
         Set rpdb2 to wrap all signal handlers.
         """
         for key, value in list(vars(signal).items()):
-            if not key.startswith('SIG') or key in ['SIG_IGN', 'SIG_DFL', 'SIGRTMIN', 'SIGRTMAX']:
+            if not key.startswith('SIG') or key in ['SIG_IGN', 'SIG_DFL', 
+                'SIGRTMIN', 'SIGRTMAX', 'SIG_BLOCK', 'SIG_UNBLOCK', 'SIG_SETMASK' ]:
                 continue
 
             handler = signal.getsignal(value)
@@ -8037,6 +8143,7 @@ class CDebuggerEngine(CDebuggerCore):
             CEventForkSwitch: {},
             CEventExecSwitch: {},
             CEventSynchronicity: {},
+            CEventBreakOnExit: {},
             CEventTrap: {},
             CEventForkMode: {},
             CEventPsycoWarning: {},
@@ -9186,7 +9293,6 @@ class CDebuggerEngine(CDebuggerCore):
         if self.m_state_manager.get_state() == STATE_BROKEN:
             self.notify_namespace()
 
-
     def set_trap_unhandled_exceptions(self, ftrap):
         self.m_ftrap = ftrap
 
@@ -9339,7 +9445,7 @@ class CWorkQueue:
                     print_debug('Creating an extra worker thread.')
                     self.__create_thread()
 
-                thread_set_name(current_thread(), '__worker_target - ' + name)
+                thread_set_name(current_thread(), '__worker_target-' + name)
 
                 try:
                     target(*args)
@@ -9362,7 +9468,7 @@ class CWorkQueue:
             self.m_lock.release()
 
 
-    def post_work_item(self, target, args, name = ''):
+    def post_work_item(self, target, args, name ): 
         if self.m_f_shutdown:
             return
 
@@ -9935,11 +10041,14 @@ class CDebuggeeServer(CIOServer):
         self.m_debugger.stop_debuggee()
         return 0
 
-
     def export_set_synchronicity(self, fsynchronicity):
         self.m_debugger.set_synchronicity(fsynchronicity)
         return 0
 
+    def export_set_breakonexit(self, fbreakonexit):
+        global g_fbreakonexit
+        g_fbreakonexit = fbreakonexit
+        return 0
 
     def export_set_trap_unhandled_exceptions(self, ftrap):
         self.m_debugger.set_trap_unhandled_exceptions(ftrap)
@@ -10375,6 +10484,10 @@ class CSessionManagerInternal:
         self.m_event_dispatcher_proxy.register_callback(self.on_event_synchronicity, event_type_dict, fSingleUse = False)
         self.m_event_dispatcher.register_chain_override(event_type_dict)
 
+        event_type_dict = {CEventBreakOnExit: {}}
+        self.m_event_dispatcher_proxy.register_callback(self.on_event_breakonexit, event_type_dict, fSingleUse = False)
+        self.m_event_dispatcher.register_chain_override(event_type_dict)
+
         event_type_dict = {CEventTrap: {}}
         self.m_event_dispatcher_proxy.register_callback(self.on_event_trap, event_type_dict, fSingleUse = False)
         self.m_event_dispatcher.register_chain_override(event_type_dict)
@@ -10387,9 +10500,11 @@ class CSessionManagerInternal:
 
         self.m_last_command_line = None
         self.m_last_fchdir = None
+        self.m_last_interpreter = None
 
         self.m_fsynchronicity = True
         self.m_ftrap = True
+        self.m_breakonexit = False
 
         self.m_ffork_into_child = False
         self.m_ffork_auto = False
@@ -10422,6 +10537,9 @@ class CSessionManagerInternal:
         return self.m_event_dispatcher.remove_callback(callback)
 
 
+    def wait_for_debuggee(self):
+        return self.__wait_for_debuggee(None)
+
     def __wait_for_debuggee(self, rid):
         try:
             time.sleep(STARTUP_TIMEOUT / 2)
@@ -10451,8 +10569,9 @@ class CSessionManagerInternal:
         return self.getSession().get_encryption()
 
 
-    def launch(self, fchdir, command_line, fload_breakpoints = True):
+    def launch(self, fchdir, command_line, interpreter, fload_breakpoints = True ):
         assert(is_unicode(command_line))
+        assert(is_unicode(interpreter))
 
         self.__verify_unattached()
 
@@ -10493,12 +10612,13 @@ class CSessionManagerInternal:
 
         try:
             try:
-                self._spawn_server(fchdir, ExpandedFilename, args, rid)
+                self._spawn_server(fchdir, ExpandedFilename, args, rid, interpreter)
                 server = self.__wait_for_debuggee(rid)
                 self.attach(server.m_rid, server.m_filename, fsupress_pwd_warning = True, fsetenv = True, ffirewall_test = False, server = server, fload_breakpoints = fload_breakpoints)
 
                 self.m_last_command_line = command_line
                 self.m_last_fchdir = fchdir
+                self.m_last_interpreter = interpreter
 
             except:
                 if self.m_state_manager.get_state() != STATE_DETACHED:
@@ -10516,29 +10636,29 @@ class CSessionManagerInternal:
         which were used in last launch.
         """
 
-        if None in (self.m_last_fchdir, self.m_last_command_line):
+        if None in (self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter):
             return
 
         if self.m_state_manager.get_state() != STATE_DETACHED:
             self.stop_debuggee()
 
-        self.launch(self.m_last_fchdir, self.m_last_command_line)
+        self.launch(self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter)
 
 
     def get_launch_args(self):
         """
         Return command_line and fchdir arguments which were used in last
-        launch as (last_fchdir, last_command_line).
+        launch as (last_fchdir, last_command_line, last_interpreter).
         Returns None if there is no info.
         """
 
-        if None in (self.m_last_fchdir, self.m_last_command_line):
-            return (None, None)
+        if None in (self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter):
+            return (None, None, None)
 
-        return (self.m_last_fchdir, self.m_last_command_line)
+        return (self.m_last_fchdir, self.m_last_command_line, self.m_last_interpreter)
 
 
-    def _spawn_server(self, fchdir, ExpandedFilename, args, rid):
+    def _spawn_server(self, fchdir, ExpandedFilename, args, rid, interpreter):
         """
         Start an OS console to act as server.
         What it does is to start rpdb again in a new console in server only mode.
@@ -10563,6 +10683,7 @@ class CSessionManagerInternal:
         c = ['', ' --chdir'][fchdir]
         p = ['', ' --pwd="%s"' % self.m_rpdb2_pwd][os.name == 'nt']
 
+        # Adjust filename to base64 to circumvent encoding problems
         b = ''
 
         encoding = detect_locale()
@@ -10573,11 +10694,12 @@ class CSessionManagerInternal:
 
         if as_bytes('?') in as_bytes(ExpandedFilename, encoding, fstrict = False):
             _u = as_bytes(ExpandedFilename)
-            _b = base64.encodestring(_u)
+            _b = base64_encodestring(_u)
             _b = _b.strip(as_bytes('\n')).translate(g_safe_base64_to)
             _b = as_string(_b, fstrict = True)
             b = ' --base64=%s' % _b
 
+        # for .pyc files, strip the c
         debugger = os.path.abspath(__file__)
         if debugger[-1:] == 'c':
             debugger = debugger[:-1]
@@ -10586,13 +10708,12 @@ class CSessionManagerInternal:
 
         debug_prints = ['', ' --debug'][g_fDebug]
 
-        options = '"%s"%s --debugee%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, b, rid, ExpandedFilename, args)
+        options = '"%s"%s --debugee%s%s%s%s%s --rid=%s "%s" %s' % (debugger, debug_prints, p, e, r, c, b, rid, 
+            ExpandedFilename, args)
 
-        python_exec = sys.executable
-        if python_exec.endswith('w.exe'):
-            python_exec = python_exec[:-5] + '.exe'
+        # XXX Should probably adjust path of interpreter if any
 
-        python_exec = as_unicode(python_exec, fse)
+        python_exec = get_python_executable( interpreter )
 
         if as_bytes('?') in as_bytes(python_exec + debugger, encoding, fstrict = False):
             raise BadMBCSPath
@@ -10728,6 +10849,7 @@ class CSessionManagerInternal:
         self.m_server_info = self.get_server_info()
 
         self.getSession().getProxy().set_synchronicity(self.m_fsynchronicity)
+        self.getSession().getProxy().set_breakonexit(self.m_breakonexit)
         self.getSession().getProxy().set_trap_unhandled_exceptions(self.m_ftrap)
         self.getSession().getProxy().set_fork_mode(self.m_ffork_into_child, self.m_ffork_auto)
 
@@ -11105,10 +11227,30 @@ class CSessionManagerInternal:
         event = CEventSynchronicity(fsynchronicity)
         self.m_event_dispatcher.fire_event(event)
 
-
     def get_synchronicity(self):
         return self.m_fsynchronicity
 
+    def on_event_breakonexit(self, event):
+        ffire = self.m_breakonexit != event.m_fbreakonexit
+        self.m_fbreakonexit = event.m_fbreakonexit
+
+        if ffire:
+            event = CEventBreakOnExit(event.m_fbreakonexit)
+            self.m_event_dispatcher.fire_event(event)
+
+    def set_breakonexit(self, fbreakonexit):
+        self.m_breakonexit = fbreakonexit
+        if self.__is_attached():
+            try:
+                self.getSession().getProxy().set_breakonexit(fbreakonexit)
+            except NotAttached:
+                pass
+
+        event = CEventBreakOnExit(fbreakonexit)
+        self.m_event_dispatcher.fire_event(event)
+
+    def get_breakonexit(self):
+        return self.m_breakonexit
 
     def on_event_trap(self, event):
         ffire = self.m_ftrap != event.m_ftrap
@@ -11605,6 +11747,9 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         event_type_dict = {CEventSynchronicity: {}}
         self.m_session_manager.register_callback(self.synchronicity_handler, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {CEventBreakOnExit: {}}
+        self.m_session_manager.register_callback(self.breakonexit_handler, event_type_dict, fSingleUse = False)
+
         event_type_dict = {CEventTrap: {}}
         self.m_session_manager.register_callback(self.trap_handler, event_type_dict, fSingleUse = False)
 
@@ -11919,6 +12064,8 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
     def synchronicity_handler(self, event):
         self.printer(STR_SYNCHRONICITY_MODE % str(event.m_fsynchronicity))
 
+    def breakonexit_handler( self, event):
+        self.printer(STR_BREAKONEXIT_MODE % str(event.m_fbreakonexit))
 
     def trap_handler(self, event):
         self.printer(STR_TRAP_MODE_SET % str(event.m_ftrap))
@@ -11932,21 +12079,12 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
 
     def do_launch(self, arg):
-        if arg == '':
-            self.printer(STR_BAD_ARGUMENT)
-            return
-
-        if arg[:2] == '-k':
-            fchdir = False
-            _arg = arg[2:].strip()
-        else:
-            fchdir = True
-            _arg = arg
+        fchdir, interpreter, command_line = parse_console_launch( arg )
 
         self.fPrintBroken = True
 
         try:
-            self.m_session_manager.launch(fchdir, _arg)
+            self.m_session_manager.launch(fchdir, command_line, interpreter)
             return
 
         except BadArgument:
@@ -12695,6 +12833,22 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
 
     do_a = do_analyze
 
+    def do_breakonexit(self, arg):
+        if arg == '':
+            fbreakonexit = self.m_session_manager.get_breakonexit()
+            _print(STR_BREAKONEXIT_MODE % str(fbreakonexit), self.m_stdout)
+            return
+
+        if arg == str(True):
+            fbreakonexit = True
+        elif arg == str(False):
+            fbreakonexit = False
+        else:
+            _print(STR_BAD_ARGUMENT, self.m_stdout)
+            return
+
+        self.m_session_manager.set_breakonexit(fbreakonexit)
+
 
     def do_synchro(self, arg):
         if arg == '':
@@ -12924,6 +13078,7 @@ analyze     - Toggle analyze last exception mode.
 trap        - Get or set "trap unhandled exceptions" mode.
 fork        - Get or set fork handling mode.
 synchro     - Get or set synchronicity mode.
+breakonexit - Get or set break-on-exit mode.
 
 License:
 ----------------
@@ -13022,6 +13177,17 @@ When set to True:
 Debuggee will pause on unhandled exceptions for inspection.""", self.m_stdout)
 
 
+    def help_breakonexit(self):
+        _print("""breakonexit [True | False]
+
+Get or set the break-on-exit mode.
+
+If you want to debug the atexit handlers, you need
+to set break-on-exit to True. The debugger will then
+break just before executing the atexit handlers.
+
+Default is False.""", self.m_stdout)
+
     def help_synchro(self):
         _print("""synchro [True | False]
 
@@ -13077,12 +13243,14 @@ Shutdown the debugged script.""", self.m_stdout)
 
 
     def help_launch(self):
-        _print("""launch [-k] <script_name> [<script_args>]
+        _print("""launch [-k] [-i interpreter] <script_name> [<script_args>]
 
 Start script <script_name> and attach to it.
 
 -k  Don't change the current working directory. By default the working
-    directory of the launched script is set to its folder.""", self.m_stdout)
+    directory of the launched script is set to its folder.
+
+-i Specify a custom interpreter to use.""", self.m_stdout)
 
 
     def help_restart(self):
@@ -14225,12 +14393,14 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
     # there is a syntax error in the debugged script or if
     # there was a problem loading the debugged script.
     #
+
     imp.load_source('__main__', _path)
 
 
 
-def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host):
+def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter):
     assert(is_unicode(command_line))
+    assert(is_unicode(interpreter))
     assert(_rpdb2_pwd == None or is_unicode(_rpdb2_pwd))
 
     if (not fAllowUnencrypted) and not is_encryption_supported():
@@ -14247,7 +14417,7 @@ def StartClient(command_line, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fA
         if fAttach:
             sm.attach(command_line)
         elif command_line != '':
-            sm.launch(fchdir, command_line)
+            sm.launch(fchdir, command_line, interpreter)
 
     except (socket.error, CConnectionException):
         sm.report_exception(*sys.exc_info())
@@ -14293,6 +14463,7 @@ def PrintUsage(fExtended = False):
                     screen rpdb2 -s [options] [<script-name> [<script-args>...]]
     -c, --chdir     Change the working directory to that of the launched
                     script.
+    -i, --interpreter= Launch debuggee with the given interpreter executable
     -v, --version   Print version information.
     --debug         Debug prints.
 
@@ -14318,6 +14489,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     global g_fScreen
     global g_fDebug
     global g_fFirewallTest
+    global g_fbreakonexit
 
     create_rpdb_settings_folder()
 
@@ -14327,8 +14499,10 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     try:
         options, _rpdb2_args = getopt.getopt(
                             argv[1:],
-                            'hdao:rtep:scv',
-                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 'base64=', 'nofwtest', 'version', 'debug']
+                            'hdao:rtep:scvi:',
+                            ['help', 'debugee', 'debuggee', 'attach', 'host=', 'remote', 
+                             'plaintext', 'encrypt', 'pwd=', 'rid=', 'screen', 'chdir', 
+                             'base64=', 'nofwtest', 'version', 'debug', 'interpreter=' ]
                             )
 
     except getopt.GetoptError:
@@ -14347,6 +14521,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
     fchdir = False
     fAllowRemote = False
     fAllowUnencrypted = True
+    interpreter = as_unicode('')
 
     for o, a in options:
         if o in ['-h', '--help']:
@@ -14381,6 +14556,8 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
             encoded_path = a
         if o in ['--nofwtest']:
             g_fFirewallTest = False
+        if o in ['-i', '--interpreter']:
+            interpreter = a
 
     arg = None
     argv = None
@@ -14414,6 +14591,14 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
 
     if fAttach and fAllowRemote:
         _print("--attach and --remote can not be used together.")
+        return 2
+
+    if fAttach and interpreter:
+        _print("--attach and --interpreter can not be used together")
+        return 2
+
+    if fWrap and interpreter:
+        _print("--debuggee and --interpreter can not be used together")
         return 2
 
     if (host is not None) and not fAttach:
@@ -14461,7 +14646,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
         try:
             if encoded_path != None:
                 _b = as_bytes(encoded_path).translate(g_safe_base64_from)
-                _u = base64.decodestring(_b)
+                _u = base64_decodestring(_b)
                 _path = as_unicode(_u)
                 _rpdb2_args[0] = _path
 
@@ -14469,6 +14654,8 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
         except IOError:
             _print(STR_FILE_NOT_FOUND % _rpdb2_args[0])
             return 2
+
+    # XXX Make sure interpreter is correctly encoded
 
     if fWrap:
         if (not fAllowUnencrypted) and not is_encryption_supported():
@@ -14478,10 +14665,10 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
         StartServer(_rpdb2_args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, secret)
 
     elif fAttach:
-        StartClient_func(_rpdb2_args[0], fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(_rpdb2_args[0], fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter)
 
     elif fStart:
-        StartClient_func(as_unicode(''), fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(as_unicode(''), fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter)
 
     else:
         if len(_rpdb2_args) == 0:
@@ -14489,7 +14676,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
         else:
             _rpdb2_args = '"' + '" "'.join(_rpdb2_args) + '"'
 
-        StartClient_func(_rpdb2_args, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host)
+        StartClient_func(_rpdb2_args, fAttach, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, host, interpreter)
 
     return 0
 
@@ -14508,11 +14695,13 @@ if __name__ == '__main__':
 
     #
     # Debuggee breaks (pauses) here
-    # before program termination.
+    # before program termination if breakonexit is set
     #
     # You can step to debug any exit handlers.
     #
-    rpdb2.setbreak()
+    if rpdb2.g_fbreakonexit:
+        rpdb2.print_debug( 'Breaking before exit')
+        rpdb2.setbreak()
 
 
 

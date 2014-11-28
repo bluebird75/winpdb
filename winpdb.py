@@ -382,7 +382,9 @@ COMPLETIONS_WARNING_THRESHOLD = 32
 ENABLED = True
 DISABLED = False
 
-WINPDB_WILDCARD = "Python source (*.py;*.pyw)|*.py;*.pyw|All files (*)|*"
+WILDCARD_WINPDB = "Python source (*.py;*.pyw)|*.py;*.pyw|All files (*)|*"
+WILDCARD_EXECUTABLES = "Executable (*.exe)|*.exe|All files (*)|*"
+WILDCARD_ALL = "All files (*)|*"
 
 PYTHON_WARNING_TITLE = "Python Interpreter Warning"
 PYTHON_WARNING_MSG = """Winpdb was started with the wrong Python interpreter version.
@@ -397,7 +399,8 @@ MSG_WARNING_UNHANDLED_EXCEPTION = "An unhandled exception was caught. Would you 
 MSG_WARNING_TITLE = "Warning"
 MSG_WARNING_TEMPLATE = "%s\n\nClick 'Cancel' to ignore this warning in this session."
 MSG_ERROR_TITLE = "Error"
-MSG_ERROR_FILE_NOT_FOUND = "File not found."
+MSG_ERROR_FILE_NOT_FOUND = "Script not found."
+MSG_ERROR_INTERPRETER_NOT_FOUND = "Interpreter not found."
 MSG_ERROR_FILE_NOT_PYTHON = "'%s' does not seem to be a Python source file. Only Python files are accepted."
 
 STR_FILE_LOAD_ERROR = "Failed to load source file '%s' from debuggee."
@@ -473,6 +476,7 @@ LABEL_ENCODING = "Set encoding:"
 LABEL_PWD = "Set password:"
 LABEL_OPEN = "File name:"
 LABEL_LAUNCH_COMMAND_LINE = "Command line:"
+LABEL_LAUNCH_INTERPRETER = "Python interpreter:"
 LABEL_ATTACH_HOST = "Host:"
 LABEL_CONSOLE = "Command:"
 BUTTON_LAUNCH_BROWSE = "Browse"
@@ -584,11 +588,13 @@ TB_FILTER = "Filter out methods and functions from classes and objects in the na
 TB_EXCEPTION = "Toggle 'analyze exception' mode"
 TB_ENCODING = "Set the source encoding for the name-space viewer and the exec/eval console commands"
 TB_SYNCHRONICITY = "Set the synchronicity mode"
+TB_BREAKONEXIT = "Set the break-on-exit mode"
 TB_TRAP = "Toggle 'trap unhandled exceptions' mode"
 
 TB_FILTER_TEXT = " Filter: %s "
 TB_ENCODING_TEXT = " Encoding: %s "
 TB_SYNCHRONICITY_TEXT = " Synchronicity: %s "
+TB_BREAKONEXIT_TEXT = " Break-on-exit: %s "
 
 COMMAND = "command"
 TOOLTIP = "tooltip"
@@ -1425,13 +1431,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             {LABEL: ML_SEPARATOR},
             {LABEL: TB_ENCODING, TEXT: TB_ENCODING_TEXT, COMMAND: self.do_encoding},
             {LABEL: ML_SEPARATOR},
-            {LABEL: TB_SYNCHRONICITY, TEXT: TB_SYNCHRONICITY_TEXT, COMMAND: self.do_synchronicity}
+            {LABEL: TB_SYNCHRONICITY, TEXT: TB_SYNCHRONICITY_TEXT, COMMAND: self.do_synchronicity},
+            {LABEL: ML_SEPARATOR},
+            {LABEL: TB_BREAKONEXIT, TEXT: TB_BREAKONEXIT_TEXT, COMMAND: self.do_breakonexit},
         ]
 
         self.init_toolbar(toolbar_resource)
         self.set_toolbar_item_text(TB_FILTER, TB_FILTER_TEXT % FILTER_LEVELS[self.m_filter_level])
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % 'auto')
         self.set_toolbar_item_text(TB_SYNCHRONICITY, TB_SYNCHRONICITY_TEXT % 'True')
+        self.set_toolbar_item_text(TB_BREAKONEXIT, TB_BREAKONEXIT_TEXT % 'False')
 
         ftrap = self.m_session_manager.get_trap_unhandled_exceptions()
         self.set_toggle(TB_TRAP, ftrap)
@@ -1522,20 +1531,23 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         event_type_dict = {rpdb2.CEventSynchronicity: {}}
         self.m_session_manager.register_callback(self.update_synchronicity, event_type_dict, fSingleUse = False)
 
+        event_type_dict = {rpdb2.CEventBreakOnExit: {}}
+        self.m_session_manager.register_callback(self.update_breakonexit, event_type_dict, fSingleUse = False)
+
         event_type_dict = {rpdb2.CEventClearSourceCache: {}}
         self.m_session_manager.register_callback(self.update_source_cache, event_type_dict, fSingleUse = False)
 
         wx.CallAfter(self.__init2)
 
 
-    def start(self, fchdir, command_line, fAttach):
+    def start(self, fchdir, command_line, fAttach, interpreter):
         self.m_console.start()
 
         if fAttach:
             self.m_async_sm.attach(command_line, encoding = rpdb2.detect_locale())
             
         elif command_line != '':
-            self.m_async_sm.launch(fchdir, command_line, encoding = rpdb2.detect_locale())
+            self.m_async_sm.launch(fchdir, command_line, interpreter, encoding = rpdb2.detect_locale())
 
         
     #
@@ -1694,6 +1706,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         dlg.Destroy()
 
+    def do_breakonexit(self, event):
+        fbreakonexit = self.m_session_manager.get_breakonexit()
+        fbreakonexit = not fbreakonexit
+        self.m_session_manager.set_breakonexit(fbreakonexit)
 
     def do_analyze_menu(self, event):
         state = self.m_session_manager.get_state()
@@ -1862,14 +1878,19 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % encoding)
 
-
     def update_synchronicity(self, event):
         wx.CallAfter(self.callback_synchronicity, event)
-
 
     def callback_synchronicity(self, event):
         fsynchronicity = self.m_session_manager.get_synchronicity()
         self.set_toolbar_item_text(TB_SYNCHRONICITY, TB_SYNCHRONICITY_TEXT % str(fsynchronicity))
+
+    def update_breakonexit(self, event):
+        wx.CallAfter(self.callback_breakonexit, event)
+
+    def callback_breakonexit(self, event):
+        fbreakonexit = self.m_session_manager.get_breakonexit()
+        self.set_toolbar_item_text(TB_BREAKONEXIT, TB_BREAKONEXIT_TEXT % str(fbreakonexit))
 
 
     def update_state(self, event):
@@ -2014,16 +2035,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def do_launch(self, event):
-        (fchdir, command_line) = self.m_session_manager.get_launch_args()
+        (fchdir, command_line, interpreter) = self.m_session_manager.get_launch_args()
 
-        if None in (fchdir, command_line):
-            (fchdir, command_line) = (True, '')
+        if None in (fchdir, command_line, interpreter):
+            (fchdir, command_line, interpreter) = (True, '', rpdb2.get_python_executable())
             
-        launch_dialog = CLaunchDialog(self, fchdir, command_line)
+        launch_dialog = CLaunchDialog(self, fchdir, command_line, interpreter)
         r = launch_dialog.ShowModal()
         if r == wx.ID_OK:
-            (command_line, fchdir) = launch_dialog.get_command_line()
-            self.m_async_sm.launch(fchdir, command_line)
+            (command_line, fchdir, interpreter) = launch_dialog.get_command_line()
+            self.m_async_sm.launch(fchdir, command_line, interpreter)
             
         launch_dialog.Destroy()
 
@@ -2050,9 +2071,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
                 self.m_code_viewer.set_file( fname, fComplain=True)
             return True
 
+        # XXX should display launch dialog instead of launching program directly
         if self.m_state in STATE_DRAGDROP_OPEN_TARGET:
-            (fchdir, command_line) = (True, filenames[0])            
-            self.m_async_sm.launch(fchdir, command_line)
+            (fchdir, command_line, interpreter) = (True, filenames[0], rpdb2.get_python_executable())
+            self.m_async_sm.launch(fchdir, command_line, interpreter)
             return True
 
     def do_attach(self, event):
@@ -2168,13 +2190,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
 class CWinpdbApp(wx.App):
-    def __init__(self, session_manager, fchdir, command_line, fAttach, fAllowUnencrypted):
+    def __init__(self, session_manager, fchdir, command_line, fAttach, fAllowUnencrypted, interpreter):
         self.m_frame = None
         self.m_session_manager = session_manager
         self.m_fchdir = fchdir
         self.m_command_line = command_line
         self.m_fAttach = fAttach
         self.m_fAllowUnencrypted = fAllowUnencrypted
+        self.m_interpreter = interpreter
         
         self.m_settings = CSettings(WINPDB_SETTINGS_DEFAULT)
 
@@ -2194,7 +2217,7 @@ class CWinpdbApp(wx.App):
         
         self.m_frame = CWinpdbWindow(self.m_session_manager, self.m_settings)
         self.m_frame.Show()
-        self.m_frame.start(self.m_fchdir, self.m_command_line, self.m_fAttach)
+        self.m_frame.start(self.m_fchdir, self.m_command_line, self.m_fAttach, self.m_interpreter)
 
         self.SetTopWindow(self.m_frame)
 
@@ -3371,7 +3394,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         (t, v, tb) = exc_info
 
         if t != None:
-            rpdb2.print_exception(t, b, tb)
+            rpdb2.print_exception(t, v, tb)
             return
 
         (warning, error) = r
@@ -4496,7 +4519,7 @@ class COpenDialog(wx.Dialog):
         (_path, filename, args) = rpdb2.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
-        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WINPDB_WILDCARD, style = wx.OPEN | wx.CHANGE_DIR)
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.OPEN | wx.CHANGE_DIR)
         r = dlg.ShowModal()
         if r == wx.ID_OK:
             path = dlg.GetPaths()[0]
@@ -4520,14 +4543,16 @@ class COpenDialog(wx.Dialog):
 
 
 class CLaunchDialog(wx.Dialog):
-    def __init__(self, parent, fchdir = True, command_line = ''):
+    def __init__(self, parent, fchdir, command_line, interpreter):
         wx.Dialog.__init__(self, parent, -1, DLG_LAUNCH_TITLE)
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
 
+        # Description of the dialog
         label = wx.StaticText(self, -1, STATIC_LAUNCH_DESC)
         sizerv.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
 
+        # Choice of command-line
         sizerh = wx.BoxSizer(wx.HORIZONTAL)
         sizerv.Add(sizerh, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
@@ -4543,13 +4568,27 @@ class CLaunchDialog(wx.Dialog):
         sizerh.Add(self.m_entry_commandline, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         
         btn = wx.Button(self, label = BUTTON_LAUNCH_BROWSE)
-        self.Bind(wx.EVT_BUTTON, self.do_browse, btn)
+        self.Bind(wx.EVT_BUTTON, self.do_browse_commandline, btn)
         sizerh.Add(btn, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
+        # Choice of set working directory
         self.m_cb = wx.CheckBox(self, -1, CHECKBOX_LAUNCH)
         self.m_cb.SetValue(fchdir)
         sizerv.Add(self.m_cb, 0, wx.ALIGN_LEFT | wx.ALL, 5)
-        
+       
+        # Choice of interpreter
+        sizerh = wx.BoxSizer(wx.HORIZONTAL)
+        sizerv.Add(sizerh, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        label = wx.StaticText(self, -1, LABEL_LAUNCH_INTERPRETER)
+        sizerh.Add(label, 0, wx.ALIGN_LEFT | wx.ALL, 5)
+        self.m_entry_interpreter = wx.TextCtrl(self, value = interpreter, size = (200, -1))
+        sizerh.Add(self.m_entry_interpreter, 0, wx.ALIGN_LEFT | wx.EXPAND | wx.ALL, 5)
+
+        btn = wx.Button(self, label = BUTTON_LAUNCH_BROWSE)
+        self.Bind(wx.EVT_BUTTON, self.do_browse_interpreter, btn)
+        sizerh.Add(btn, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
+        # Env remark
         label = wx.StaticText(self, -1, STATIC_LAUNCH_ENV, size = (400, -1))
         try:
             label.Wrap(400)
@@ -4587,14 +4626,14 @@ class CLaunchDialog(wx.Dialog):
         event.Skip()        
 
             
-    def do_browse(self, event = None):        
+    def do_browse_commandline(self, event = None):        
         command_line = self.m_entry_commandline.GetValue()
         (_path, filename, args) = rpdb2.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
         cwd = rpdb2.getcwdu()
             
-        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WINPDB_WILDCARD, style = wx.OPEN | wx.CHANGE_DIR)
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.OPEN | wx.CHANGE_DIR)
         r = dlg.ShowModal()
 
         os.chdir(cwd)
@@ -4610,6 +4649,36 @@ class CLaunchDialog(wx.Dialog):
         dlg.Destroy()
         
         self.m_entry_commandline.SetValue(abs_path)
+
+    def do_browse_interpreter(self, event=None):
+        interpreter = self.m_entry_interpreter.GetValue()
+        (_path, filename) = os.path.split( interpreter )
+        _abs_path = os.path.abspath(_path)
+
+        cwd = rpdb2.getcwdu()
+
+        if os.name == rpdb2.POSIX:
+            wildcard = WILDCARD_ALL
+        else:
+            wildcard = WILDCARD_EXECUTABLES
+            
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = wildcard, style = wx.OPEN | wx.CHANGE_DIR)
+        r = dlg.ShowModal()
+
+        os.chdir(cwd)
+
+        if r == wx.ID_OK:
+            path = dlg.GetPaths()[0]
+            abs_path = os.path.abspath(path)
+            if (' ' in abs_path):
+                abs_path = '"' + abs_path + '"'
+        else:
+            abs_path = interpreter
+
+        dlg.Destroy()
+        
+        self.m_entry_interpreter.SetValue(abs_path)
+
 
         
     def do_validate(self):
@@ -4634,6 +4703,15 @@ class CLaunchDialog(wx.Dialog):
             command_line = (abs_path + ' ' + args).strip()
             
         self.m_entry_commandline.SetValue(command_line)
+
+        interpreter = self.m_entry_interpreter.GetValue()
+        try:
+            interpreter = rpdb2.FindFile( interpreter )
+        except IOError:                    
+            dlg = wx.MessageDialog(self, MSG_ERROR_INTERPRETER_NOT_FOUND, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return False
         
         return True
 
@@ -4649,16 +4727,16 @@ class CLaunchDialog(wx.Dialog):
     def get_command_line(self):
         command_line = self.m_entry_commandline.GetValue()
         command_line = rpdb2.as_unicode(command_line, wx.GetDefaultPyEncoding())
+        interpreter = self.m_entry_interpreter.GetValue()
+        return (command_line, self.m_cb.GetValue(), interpreter)
 
-        return (command_line, self.m_cb.GetValue())
 
 
-
-def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, host):
+def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, host, interpreter):
     sm = rpdb2.CSessionManager(pwd, fAllowUnencrypted, fRemote, host)
 
     try:
-        app = CWinpdbApp(sm, fchdir, command_line, fAttach, fAllowUnencrypted)
+        app = CWinpdbApp(sm, fchdir, command_line, fAttach, fAllowUnencrypted, interpreter)
 
     except SystemError:
         if os.name == rpdb2.POSIX:
