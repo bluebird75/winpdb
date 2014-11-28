@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/bluebird75/winpdb.svg?branch=winpdb)](https://travis-ci.org/bluebird75/winpdb)
-
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/bluebird75/winpdb/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
 Winpdb - A GPL Python Debugger
 
