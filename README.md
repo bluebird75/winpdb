@@ -1,115 +1,139 @@
 [![Build Status](https://travis-ci.org/bluebird75/winpdb.svg?branch=winpdb)](https://travis-ci.org/bluebird75/winpdb)
 
 
-A fork of Winpdb - A GPL Python Debugger
+*A fork of Winpdb - A GPL Python Debugger*
 
-Modifications by Philippe Fremy (phil at freehackers dot org)
-Initial Author: Nir Aides, nir@winpdb.org
-Website: http://www.winpdb.org/
-Version: 1.4.8
+* Modifications by Philippe Fremy (phil at freehackers dot org)
+* Initial Author: Nir Aides, nir at winpdb dot org
+* Website: http://www.winpdb.org/
+* Based on version: 1.4.8
 
 
-Introduction
+## Introduction
 
-    This is a small fork of Winpdb. The official Winpdb development is stale and the fact that Winpdb
-    did not work on Python 2.7 prompted me to work on this. I worked on a very minimal changes (see below) 
-    that I intend to contribute back if Nir Aides allows it.
+Winpdb is a portable (Windows / Linux) graphical debugger for Python. It supports breakpoints, stack inspection, multithreaded debugging and more.
+
+This is a small fork of Winpdb. I started it when realising the the official Winpdb had a blocking bug
+on the most recent Python 2.7 . I initially worked on fixing  Python 2.7 support, then fixed a few other minor
+bugs and added some small useful features. I intend to contribute this back if Nir Aides allows it.
     
-    Changes from the official Windpb :
-    * Fix an a bug that prevented Winpdb to work on Python 2.7
-    * Adapt Rpdb2 (the console version of Winpdb) to Python 2.7 - 3.4
-    * Add unit-tests and a functional test suite and 
-    * Add a Continuous Integration server with travis CI
-    * Allow to specify the Python interpreter being used on the command-line and in the launcher dialog of Winpdb
-    * Change the default behavior of break-on-exit to fix a recurring crash on Windows when closing abruptly
-      the debuggee
-    * support drag'n drop of files to display their source
+Changes from the official Windpb :
+* Fix support for Python 2.7 for Winpdb
+* Support for Python 2.7 - 3.4 for Rpdb2, the console version of Winpdb.
+* Support for PyPy for Rpdb2
+* Allow to specify a different Python interpreter for the debuggee
+* Avoid crash on Windows when closing debugger
+* support drag'n drop of files to display their source
+* Add unit-tests and a functional test suite 
+* Add a Continuous Integration server with travis CI
+  
+The changes allow Winpdb to be usable with the most recent Python versions.
 
-    The rest of this page is from the original Winpdb README
+## PyPy, Python 3, Winpdb and WxPython
 
-Requirements
+Winpdb uses WxPython for its graphical interface. However, WxPython is not yet available for Python 3: it is impossible to run the graphical interface of Winpdb on Python 3. The same restrictions apply to PyPy which does
+not support WxPython.
 
-    CPython
-    Winpdb graphical interface is compatible with CPython 2.3 - 2.7 . 
-    Winpdb console and core (rpdb2) is compatible with CPython 2.3 - 3.4 and PyPy. 
+The Python 3 problem will be fixed when WxPython finally supports Python 3 (see Phoenix project: http://wiki.wxpython.org/ProjectPhoenix ) but you can already debug your Python 3 and PyPy programs.
+
+Because the Winpdb core and the console version Rpdb2 work with PyPy and Python 3, I have added
+the ability to specify the Python interpreter to use for the program being debugged (in the launch dialog of Winpdb, or on the command line with -i ). Just run Winpdb with Python 2 and specify the interpreter you want!
+
+You can enjoy the beauty of a graphical debugger with the convenience of latest Python advances.
+
+
+## Requirements
+
+Platform supported:
+* Linux
+* Windows XP and above
+* MacOs is probably working but not tested
+
+To run the graphical interface Winpdb:
+* CPython 2.5 - 2.7
+* WxPython
+
+To debug a program:
+* CPython 2.5 - 2.7 or CPython 3.0 - 3.4 or PyPy
+
+Winpdb is NOT compatible with Jython or IronPython.
+
+## Installation
+
+Most Linux distributions include wxPython as a package called python-wxgtk. 
+Use your distribution’s package manager (e.g. synaptic, aptitude or yum) 
+to find and install it.
+
+On Windows you need to install the wxPython runtime from 
+http://www.wxpython.org/ (The unicode version is preferred).
+
+You can run Winpdb without installing it by just downloading it :
+
+    python /path/to/winpdb/directory/winpdb.py program_to_debug.py
+
+#### Installation by hand
+
+In a console with admin privileges type:
+
+    python setup.py install -f
+
+On Ubuntu you can type in a normal console:
     
-    Winpdb is NOT compatible with Jython or IronPython. (http://www.python.org/download/)
+    sudo python setup.py install -f
 
-    wxPython
-    To use the Winpdb GUI you need wxPython 2.6.x or later 
-    installed. WxPython is not available for Python 3.x , which is why
-    you can only use the console Winpdb (rpdb2) with Python 3. When WxPython
-    gets ported to Python 3, this fork will support it. See the Project Phoenix
-    on WxPython wiki: http://wiki.wxpython.org/ProjectPhoenix .
-    
-    Most Linux distributions include wxPython as a package called python-wxgtk. 
-    Use your distribution’s package manager (e.g. synaptic, aptitude or yum) 
-    to find and install it.
+**Where do the files go?**
 
-    On Windows you need to install the wxPython runtime from 
-    http://www.wxpython.org/ (The unicode version is preferred).
+The setup script copies rpdb2.py and winpdb.py modules to the Python 
+site-packages folder. The scripts rpdb2, winpdb are copied to the 
+Python binaries (scripts) folder:
 
-	
-Installation
+On Linux this folder is usually /usr/bin and is in the path by default. 
 
-    In a console with admin privileges type:
+On Windows this folder is %PYTHONHOME%\Scripts and is not in the path by
+default.
 
-        python setup.py install -f
+**Insufficient permissions?**
 
-    On Ubuntu you can type in a normal console:
-        
-        sudo python setup.py install -f
+In the event of insufficient permissions, installation can be avoided 
+completely. To use Winpdb simply launch it from the folder in which it is 
+placed.
 
-    Where do the files go? 
+## Launch Time
 
-    The setup script copies rpdb2.py and winpdb.py modules to the Python 
-    site-packages folder. The scripts rpdb2, winpdb are copied to the 
-    Python binaries (scripts) folder:
+On Linux systems start the debugger from a console with:
 
-    On Linux this folder is usually /usr/bin and is in the path by default. 
+    winpdb
 
-    On Windows this folder is %PYTHONHOME%\Scripts and is not in the path by
-    default.
+On Windows systems start the debugger with:
+
+    %PYTHONHOME%\Scripts\winpdb
+
+Note that the Python interpreter must be in the PATH for this to work.
 
 
-    Insufficient permissions?
+## Documentation
 
-    In the event of insufficient permissions, installation can be avoided 
-    completely. To use Winpdb simply launch it from the folder in which it is 
-    placed.
+Use the -h command-line flag for command-line help.
 
+Use the RPDB2 console 'help' command for detailed description of debugger 
+commands.
 
-
-Launch Time
-
-    On Linux systems start the debugger from a console with:
-
-        winpdb
-
-    On Windows systems start the debugger with:
-
-        %PYTHONHOME%\Scripts\winpdb
-
-    Note that the Python interpreter must be in the PATH for this to work.
+Online documentation is available at:
+http://www.winpdb.org
 
 
+## Community
 
-Documentation
+You can ask questions about Winpdb on the dedicated google group: https://groups.google.com/forum/#!forum/winpdb
 
-    Use the -h command-line flag for command-line help.
+## Further Development
 
-    Use the RPDB2 console 'help' command for detailed description of debugger 
-    commands.
+Winpdb is open source. If you would like it to develop further you are
+welcome to contribute to development, send feedback or make a donation.
 
-    Online documentation is available at:
-    http://www.winpdb.org
+The official repository of Winpdb (un-)maintained by Nir Aides is : https://code.google.com/p/winpdb/
 
-
-
-Further Development
-
-    Winpdb is open source. If you would like it to develop further you are
-    welcome to contribute to development, send feedback or make a donation.
+Else, you can just open bugs and contribute on Github.
 
 	
 
