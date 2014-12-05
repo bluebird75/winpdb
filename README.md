@@ -1,26 +1,47 @@
 [![Build Status](https://travis-ci.org/bluebird75/winpdb.svg?branch=winpdb)](https://travis-ci.org/bluebird75/winpdb)
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/bluebird75/winpdb/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
-Winpdb - A GPL Python Debugger
 
-Contact: Nir Aides
-Email:   nir@winpdb.org
+A fork of Winpdb - A GPL Python Debugger
+
+Modifications by Philippe Fremy (phil at freehackers dot org)
+Initial Author: Nir Aides, nir@winpdb.org
 Website: http://www.winpdb.org/
 Version: 1.4.8
 
 
+Introduction
+
+    This is a small fork of Winpdb. The official Winpdb development is stale and the fact that Winpdb
+    did not work on Python 2.7 prompted me to work on this. I worked on a very minimal changes (see below) 
+    that I intend to contribute back if Nir Aides allows it.
+    
+    Changes from the official Windpb :
+    * Fix an a bug that prevented Winpdb to work on Python 2.7
+    * Adapt Rpdb2 (the console version of Winpdb) to Python 2.7 - 3.4
+    * Add unit-tests and a functional test suite and 
+    * Add a Continuous Integration server with travis CI
+    * Allow to specify the Python interpreter being used on the command-line and in the launcher dialog of Winpdb
+    * Change the default behavior of break-on-exit to fix a recurring crash on Windows when closing abruptly
+      the debuggee
+    * support drag'n drop of files to display their source
+
+    The rest of this page is from the original Winpdb README
 
 Requirements
 
     CPython
-    Winpdb is compatible with CPython 2.3 or later. Winpdb is NOT 
-    compatible with Jython or IronPython. (http://www.python.org/download/)
+    Winpdb graphical interface is compatible with CPython 2.3 - 2.7 . 
+    Winpdb console and core (rpdb2) is compatible with CPython 2.3 - 3.4 and PyPy. 
+    
+    Winpdb is NOT compatible with Jython or IronPython. (http://www.python.org/download/)
 
     wxPython
     To use the Winpdb GUI you need wxPython 2.6.x or later 
-    installed. You can still use rpdb2 which is the console version of the 
-    debugger without wxPython.
-
+    installed. WxPython is not available for Python 3.x , which is why
+    you can only use the console Winpdb (rpdb2) with Python 3. When WxPython
+    gets ported to Python 3, this fork will support it. See the Project Phoenix
+    on WxPython wiki: http://wiki.wxpython.org/ProjectPhoenix .
+    
     Most Linux distributions include wxPython as a package called python-wxgtk. 
     Use your distribution’s package manager (e.g. synaptic, aptitude or yum) 
     to find and install it.
