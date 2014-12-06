@@ -51,7 +51,7 @@ Platform supported:
 
 To run the graphical interface Winpdb:
 * CPython 2.5 - 2.7
-* WxPython
+* WxPython 2.6 and above
 
 To debug a program:
 * CPython 2.5 - 2.7 or CPython 3.0 - 3.4 or PyPy
@@ -100,15 +100,13 @@ placed.
 
 ## Launch Time
 
-On Linux systems start the debugger from a console with:
+The simplest way to launch winpdb is:
 
-    winpdb
+    python -m winpdb
+    
+To launch the console debugger:
 
-On Windows systems start the debugger with:
-
-    %PYTHONHOME%\Scripts\winpdb
-
-Note that the Python interpreter must be in the PATH for this to work.
+    python -m rpdb2
 
 
 ## Documentation
