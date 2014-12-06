@@ -135,3 +135,7 @@ Else, you can just open bugs and contribute on Github.
 
 	
 
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/bluebird75/winpdb/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
