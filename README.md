@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/bluebird75/winpdb.svg?branch=winpdb)](https://travis-ci.org/bluebird75/winpdb)
+[![Build status](https://ci.appveyor.com/api/projects/status/l3a98gaeamkgwrl7?svg=true)](https://ci.appveyor.com/project/bluebird75/winpdb)
 
 
 *A fork of Winpdb - A GPL Python Debugger*
