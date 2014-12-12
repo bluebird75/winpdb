@@ -3956,7 +3956,11 @@ def cleanup_bpl_folder(path):
     if random.randint(0, 10) > 0:
         return
 
-    l = os.listdir(path)
+    try:
+        l = os.listdir(path)
+    except OSError:
+        # No bpl path
+        return
     if len(l) < MAX_BPL_FILES:
         return
 
@@ -4613,7 +4617,7 @@ class CThread (threading.Thread):
 
 
     def __del__(self):
-        #print_debug('Destructor called for ' + thread_get_name(self))
+        print_debug('Destructor called for ' + thread_get_name(self))
 
         #threading.Thread.__del__(self)
 
@@ -4669,7 +4673,7 @@ class CThread (threading.Thread):
                 continue
 
             try:
-                #print_debug('Calling shutdown of thread %s.' % thread_get_name(t))
+                print_debug('Calling shutdown of thread %s.' % thread_get_name(t))
                 t.shutdown()
             except:
                 pass
@@ -9277,7 +9281,10 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        g_server.m_work_queue.post_work_item(target = _atexit, args = (True, ), name = '_atexit')
+        # g_server.m_work_queue.post_work_item(target = _atexit, args = (True, ), name = '_atexit')
+        # return
+        t = threading.Thread( target=_atexit, args=(True,), name='_atexit' )
+        t.start()
 
 
     def set_synchronicity(self, fsynchronicity):
@@ -9390,23 +9397,31 @@ class CWorkQueue:
 
         self.m_lock.acquire()
         self.m_f_shutdown = True
-        lock_notify_all(self.m_lock)
+        try:
+            lock_notify_all(self.m_lock)
+        finally:
+            self.m_lock.release()
 
         t0 = time.time()
 
         while self.m_n_threads > 0:
-            if time.time() - t0 > SHUTDOWN_TIMEOUT:
-                self.m_lock.release()
+            print_debug('m_n_threads: %d' % self.m_n_threads)
+            print_debug('Alive threads: %s' % ' '.join( 
+                '%s/%d' % (t.name, t.ident) for t in threading.enumerate() ) )
+            if time.time() - t0 > SHUTDOWN_TIMEOUT+10:
+                # self.m_lock.release()
                 print_debug('Shut down of worker queue has TIMED OUT!')
                 return
 
             safe_wait(self.m_lock, 0.1)
 
-        self.m_lock.release()
+        # self.m_lock.release()
         print_debug('Shutting down worker queue, done.')
 
 
     def __worker_target(self):
+        print_debug('Starting a work item')
+        print_debug('Current threads and available: %d - %d' % (self.m_n_threads, self.m_n_available ) )
         try:
             self.m_lock.acquire()
 
@@ -9455,9 +9470,10 @@ class CWorkQueue:
 
                 if self.m_n_available > self.m_size:
                     break
-
+            print_debug('Worker thread shutdown')
             self.m_n_threads -= 1
             self.m_n_available -= 1
+            print_debug('Current threads and available: %d - %d' % (self.m_n_threads, self.m_n_available ) )
             lock_notify_all(self.m_lock)
 
         finally:
@@ -10393,6 +10409,7 @@ class CServerList:
                     pass
 
         if key != None:
+            print 'Unknown server while key is %s' % key
             raise UnknownServer
 
         sil.sort()
@@ -10406,6 +10423,7 @@ class CServerList:
 
 
     def findServers(self, key):
+        print 'Find servers: key=%s' % key
         try:
             n = int(key)
             _s = [s for s in self.m_list if (s.m_pid == n) or (s.m_rid == key)]
@@ -10415,6 +10433,7 @@ class CServerList:
             _s = [s for s in self.m_list if key in s.m_filename]
 
         if _s == []:
+            print 'Unknown server, empty list'
             raise UnknownServer
 
         return _s
@@ -14199,24 +14218,29 @@ def _atexit(fabort = False):
     if g_fignore_atexit:
         return
 
-    print_debug("Entered _atexit() in pid %d" % _getpid())
+    print_debug("Entered _atexit() in pid %d " % _getpid() )
 
     if g_debugger is None:
         return
 
+    print_debug("stoptrace()")
     if not fabort:
         g_debugger.stoptrace()
 
+    print_debug("send_event_exit()")
     g_debugger.send_event_exit()
 
     time.sleep(1.0)
 
+    print_debug("g_server.shutdown()")
     g_server.shutdown()
+    print_debug("g_debugger.shutdown()")
     g_debugger.shutdown()
 
     if not fabort:
         return
 
+    print_debug('Killing self')
     if hasattr(os, 'kill') and hasattr(signal, 'SIGKILL'):
         os.kill(os.getpid(), signal.SIGKILL)
     else:
