@@ -280,6 +280,18 @@ import sys
 
 WXVER = "2.6"
 
+STR_BAD_PYTHON_ERROR_TITLE = 'Winpdb Error'
+STR_BAD_PYTHON_ERROR_MSG = """Unsupported Python version
+Winpdb does not run with this version of Python. You need
+Python 2.x with at least WxPython 2.6 to run Winpdb.
+
+To debug a program written for PyPy or Python 3.x , launch
+Winpdb with Python 2 and select the interpreter to use in 
+the launch dialog.
+
+Alternatively, the console debugger rpdb2 works with all versions 
+of Python."""
+
 STR_WXPYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_WXPYTHON_ERROR_MSG = """wxPython was not found.
 wxPython 2.6 or higher is required to run the winpdb GUI.
@@ -295,7 +307,33 @@ Start the X server or try to use rpdb2 instead of winpdb."""
 
 
 import rpdb2
+import platform
 
+def myErrorMsgDialog(title, msg):
+    '''Display an error dialog with Tkinter and exit. In case
+    of error, display the error message on stderr.'''
+    myTkMsgBox = None
+
+    if sys.version_info[0] == 2:
+        # Python 2
+        import Tkinter
+        import tkMessageBox
+
+        Tkinter.Tk().wm_withdraw()
+        myTkMsgBox = tkMessageBox
+    else:
+        # Python 3
+        import tkinter.messagebox
+        tkinter.Tk().wm_withdraw()
+        myTkMsgBox = tkinter.messagebox
+
+    myTkMsgBox.showerror(title, msg )
+
+
+if platform.python_implementation()  != 'CPython' or int(platform.python_version_tuple()[0]) > 2:
+    # Only CPython 2.x supported
+    myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
+    sys.exit(1)
 
 
 if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
@@ -304,20 +342,8 @@ if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
         wxversion.ensureMinimal(WXVER)
     except ImportError:
         rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
-        
-        try:
-            import Tkinter
-            import tkMessageBox
-
-            Tkinter.Tk().wm_withdraw()
-            tkMessageBox.showerror(STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG)
-
-        except:
-            pass
-
+        myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
         sys.exit(1)
-
-
 
 import wx
 
