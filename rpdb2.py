@@ -8485,7 +8485,7 @@ class CDebuggerEngine(CDebuggerCore):
 
             ctx.frame_release()
 
-        #print code_list
+        #print( code_list )
 
         __s = [(a, b, c, d) for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
 
@@ -10409,7 +10409,7 @@ class CServerList:
                     pass
 
         if key != None:
-            print 'Unknown server while key is %s' % key
+            print( 'Unknown server while key is %s' % key )
             raise UnknownServer
 
         sil.sort()
@@ -10423,7 +10423,7 @@ class CServerList:
 
 
     def findServers(self, key):
-        print 'Find servers: key=%s' % key
+        print( 'Find servers: key=%s' % key )
         try:
             n = int(key)
             _s = [s for s in self.m_list if (s.m_pid == n) or (s.m_rid == key)]
@@ -10433,7 +10433,7 @@ class CServerList:
             _s = [s for s in self.m_list if key in s.m_filename]
 
         if _s == []:
-            print 'Unknown server, empty list'
+            print( 'Unknown server, empty list' )
             raise UnknownServer
 
         return _s
