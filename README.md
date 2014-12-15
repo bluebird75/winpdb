@@ -101,13 +101,30 @@ placed.
 
 ## Launch Time
 
-The simplest way to launch winpdb is:
+If you have installed Winpdb, the simplest way to launch winpdb is:
 
     python -m winpdb
     
-To launch the console debugger:
+And to launch the console debugger:
 
     python -m rpdb2
+    
+You can pass directly the program to debug if you wish:
+
+    python -m winpdb my_program.py
+
+    
+If you did not installed Winpdb, you can still run it by specifying its path:
+
+    python /path/to/winpdb/winpdb.py 
+    
+and to launch your program directly
+
+    python /path/to/winpdb/winpdb.py my_program.py
+    
+Find out about the other command-line options with --help .    
+    
+
 
 
 ## Documentation
@@ -133,10 +150,4 @@ welcome to contribute to development, send feedback or make a donation.
 The official repository of Winpdb (un-)maintained by Nir Aides is : https://code.google.com/p/winpdb/
 
 Else, you can just open bugs and contribute on Github.
-
-	
-
-
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/bluebird75/winpdb/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
