@@ -8,7 +8,7 @@ python:
   - "3.3"
   - "3.4"
   - "pypy"
-  - "pypy3"
+#  - "pypy3" # Disabling pypy3 on Travis until bug is resolved.
 
 # command to install dependencies
 # install: "pip install -r requirements.txt --use-mirrors"
