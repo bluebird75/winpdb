@@ -1,0 +1,13 @@
+version: 1.0.{build}
+
+environment:
+  matrix:
+  - PYTHON: c:\Python27\python.exe
+  - PYTHON: c:\Python33\python.exe
+  - PYTHON: c:\Python34\python.exe
+
+build_script:
+- '%PYTHON% run_unit_tests.py'
+- '%PYTHON% run_func_tests.py -v'
+
+
