@@ -1773,6 +1773,8 @@ def as_bytes(s, encoding = 'utf-8', fstrict = True):
 PYTHON_TAB_WIDTH = 4
 
 GNOME_DEFAULT_TERM = 'gnome-terminal'
+GNOME_DEFAULT_TERM_BEFORE_3_8 = 'gnome-terminal --disable-factory'
+GNOME_DEFAULT_TERM_BEFORE_3_8_CHECK_FILE = "/../share/gnome-terminal/profile-manager.ui" #this glade-related file present for only gnome terminal versions 2.24-3.6
 NT_DEBUG = 'nt_debug'
 SCREEN = 'screen'
 MAC = 'mac'
@@ -1793,7 +1795,8 @@ osSpawn = {
     NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd.exe /K ""%(exec)s" %(options)s"',
     POSIX: "%(term)s -e %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
     'Terminal': "Terminal --disable-server -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
-    GNOME_DEFAULT_TERM: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
+    GNOME_DEFAULT_TERM_BEFORE_3_8: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
+    GNOME_DEFAULT_TERM: "gnome-terminal -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
     MAC: '%(exec)s %(options)s',
     DARWIN: '%(exec)s %(options)s',
     SCREEN: 'screen -t debuggee_console %(exec)s %(options)s'
@@ -3532,8 +3535,14 @@ def CalcTerminalCommand():
             return term
 
     elif IsPrefixInEnviron(GNOME_PREFIX):
-        if IsFileInPath(GNOME_DEFAULT_TERM):
-            return GNOME_DEFAULT_TERM
+        try:
+            gnome_terminal_path = FindFile(GNOME_DEFAULT_TERM)
+            if gnome_terminal_path:
+                if myisfile(os.path.dirname(gnome_terminal_path) + GNOME_DEFAULT_TERM_BEFORE_3_8_CHECK_FILE):
+                    return GNOME_DEFAULT_TERM_BEFORE_3_8
+                return GNOME_DEFAULT_TERM
+        except IOError:
+            pass
 
     if IsFileInPath(XTERM):
         return XTERM
