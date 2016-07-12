@@ -4,10 +4,11 @@
 
 *A fork of Winpdb - A GPL Python Debugger*
 
-* Modifications by Philippe Fremy (phil at freehackers dot org)
+* Modifications/Bugfix by Philippe Fremy (phil at freehackers dot org)
 * Initial Author: Nir Aides, nir at winpdb dot org
 * Website: http://www.winpdb.org/
 * Based on version: 1.4.8
+* Supports Python 2.5 - 3.5 and PyPy
 
 
 ## Introduction
@@ -20,7 +21,7 @@ bugs and added some small useful features. I intend to contribute this back if N
     
 Changes from the official Windpb :
 * Fix support for Python 2.7 for Winpdb
-* Support for Python 2.7 - 3.4 for Rpdb2, the console version of Winpdb.
+* Support for Python 2.7 - 3.5 for Rpdb2, the console version of Winpdb.
 * Support for PyPy for Rpdb2
 * Allow to specify a different Python interpreter for the debuggee
 * Avoid crash on Windows when closing debugger
@@ -55,7 +56,7 @@ To run the graphical interface Winpdb:
 * WxPython 2.6 and above
 
 To debug a program:
-* CPython 2.5 - 2.7 or CPython 3.0 - 3.4 or PyPy
+* CPython 2.5 - 2.7 or CPython 3.0 - 3.5 or PyPy
 
 Winpdb is NOT compatible with Jython or IronPython.
 
