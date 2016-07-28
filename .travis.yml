@@ -11,6 +11,12 @@ python:
   - "pypy"
 #  - "pypy3" # Disabling pypy3 on Travis until bug is resolved.
 
+matrix:
+  allow_failures:
+    - env: "pypy" # pypy not stable...
+
+
+
 # command to install dependencies
 # install: "pip install -r requirements.txt --use-mirrors"
 
