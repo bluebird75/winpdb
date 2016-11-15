@@ -152,3 +152,4 @@ The official repository of Winpdb (un-)maintained by Nir Aides is : https://code
 
 Else, you can just open bugs and contribute on Github.
 
+![Piwik Stats](https://stats.sylphide-consulting.com/piwik//piwik.php?idsite=38&amp;rec=1)
