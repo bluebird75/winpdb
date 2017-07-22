@@ -14,7 +14,7 @@ if IS_PYTHON_LESS_THAN_26:
 else:
     from io import StringIO
 
-DEBUGLEVEL='INFO'
+DEBUGLEVEL='DEBUG'
 def dbg( t ):
     if DEBUGLEVEL != 'INFO':
         print( '>>>>>> %s <<<<<<' % t )
@@ -111,6 +111,7 @@ class Rpdb2Stdout(StringIO):
 
         for retomatch, attr, assignment in self.matcher:
             if retomatch.match( t ):
+                dbg('Auto-setting %s to %s' % (attr, assignment) )
                 setattr( self, attr, assignment )
 
         dbg('stdout %d="%s"' % (self.lineCount, t) )
@@ -325,8 +326,10 @@ class TestRpdb2( unittest.TestCase ):
         self.assertEqual( self.rpdb2Stdout.waitingOnBp, True )
 
     def goAndExit( self, syncLines=3, timeout=20 ):
+        dbg( "Starting goAndExit" )
         self.rpdb2Stdout.waitingOnBp = False
         self.command( "go", syncLines, timeout )
+        dbg( "go sync done" )
         # self.assertEqual( self.rpdb2Stdout.running,  False )
         self.assertEqual( self.rpdb2Stdout.attached, False )
 
