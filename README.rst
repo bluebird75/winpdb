@@ -1,19 +1,19 @@
-| |Build Status Linux| |Build status Windows|
+|Build Status Linux| |Build status Windows|
 
 *Winpdb Reborn - A GPL Python Debugger, reborn from the unmaintained
 Winpdb*
 
-by Nir Aides (initial author) and Philippe Fremy (current maintainer)
+by Philippe Fremy, and Nir Aides as initial author
 
 Description
 ===========
 
-Winpdb is a portable (Windows / Linux) graphical debugger for Python. It supports breakpoints, stepping, stack 
+*Winpdb Reborn* is a portable (Windows / Linux) graphical debugger for Python. It supports breakpoints, stepping, stack 
 inspection, multithreaded debugging and more. It works on both Python 2 and 3.
 
 The original Winpdb was no longer maintained since the release v1.4.8 in
-2010. I (Philippe Fremy) am providing a maintained version and new
-developments.
+2010. I (Philippe Fremy) am providing a maintained version with new
+functionality under the *Winpdb Reborn* name.
 
 Requirements
 ============
@@ -26,8 +26,8 @@ Platform supported:
 
 To run Winpdb:
 
--  Any version of CPython above 2.5 included: 2.5, 2.6, 2.7, 3.0 - 3.6
--  WxPython 2.6 or above, and WxPython 4.0
+-  Any version of CPython above 2.5: 2.5, 2.6, 2.7, 3.0 - 3.6
+-  For the GUI: WxPython 2.6 or above, and WxPython 4.0
 
 Winpdb is NOT compatible with Jython or IronPython.
 
@@ -57,39 +57,34 @@ The standard way to install winpdb is with pip, as administrator/root::
     # python -m pip install winpdb-reborn
 
 This will install winpdb and the only dependency WxPython automatically. On Windows,
-| shortcuts for the start menu are created. | *Winpdb Reborn* is not packaged yet by any linux distro. If you see a
-  winpdb package,
-| that’s the old unmaintained winpdb which does not work with python 2.7
-  or python 3.
+shortcuts for the start menu are created. 
+
+*Winpdb Reborn* is not packaged yet by any linux distro. If your package manager proposes
+to install winpdb, that’s the old unmaintained winpdb which works neither with python 2.7 nor with python 3.
 
 Additional installation methods
 -------------------------------
 
 To install from a checkout or from an archive::
 
-    python setup.py install -f
+    # python setup.py install -f
 
 No install mode
 ---------------
 
-| If you don’t want to install winpdb, you can still try it by calling
-  it explicitely with
-| your program to debug::
+If you don’t want to install winpdb, you can still try it by calling it explicitely with
+your program to debug::
 
     $ python /the/path/to/winpdb.py my_program.py 
 
-Where do the files go?
-----------------------
+Where do the files go ?
+-----------------------
 
-| The setup script copies rpdb2.py and winpdb.py modules to the Python
-| site-packages folder. The scripts rpdb2, winpdb are copied to the
-| Python binaries (scripts) folder:
-
-On Linux this folder is usually /usr/bin and is in the path by default.
-
-| On Windows this folder is %PYTHONHOME%\\Scripts and is not in the path
-  by
-| default.
+The setup script copies rpdb2.py and winpdb.py modules to the Python
+site-packages folder. The scripts rpdb2, winpdb are copied to the
+Python binaries (scripts) folder. On Linux this folder is usually ``/usr/bin`` 
+and is in the path by default. On Windows this folder is ``%PYTHONHOME%\Scripts`` and is not in the path
+by default.
 
 Usage
 =====
@@ -102,7 +97,7 @@ or even::
 
     $ winpdb my_program.py
 
-Find out about the other command-line options with –help .
+Find out about the other command-line options with ``–-help`` .
 
 Documentation
 =============
