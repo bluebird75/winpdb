@@ -2,88 +2,87 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/l3a98gaeamkgwrl7?svg=true&passingText=Windows%20Build%20passing&failingText=Windows%20Build%20failed)](https://ci.appveyor.com/project/bluebird75/winpdb)
 
 
-*A fork of Winpdb - A GPL Python Debugger*
+*Winpdb Reborn - A GPL Python Debugger, reborn from the unmaintained Winpdb*
 
-* Modifications/Bugfix by Philippe Fremy (phil at freehackers dot org)
-* Initial Author: Nir Aides, nir at winpdb dot org
-* Website: http://www.winpdb.org/
-* Based on version: 1.4.8
-* Supports Python 2.5 - 3.5 and PyPy
-
-
-## Introduction
-
-Winpdb is a portable (Windows / Linux) graphical debugger for Python. It supports breakpoints, stack inspection, multithreaded debugging and more.
-
-This is a small fork of Winpdb. I started it when realising the the official Winpdb had a blocking bug
-on the most recent Python 2.7 . I initially worked on fixing  Python 2.7 support, then fixed a few other minor
-bugs and added some small useful features. I intend to contribute this back if Nir Aides allows it.
-    
-Changes from the official Windpb :
-* Fix support for Python 2.7 for Winpdb
-* Support for Python 2.7 - 3.5 for Rpdb2, the console version of Winpdb.
-* Support for PyPy for Rpdb2
-* Allow to specify a different Python interpreter for the debuggee
-* Avoid crash on Windows when closing debugger
-* support drag'n drop of files to display their source
-* Add unit-tests and a functional test suite 
-* Add a Continuous Integration server with travis CI
-  
-The changes allow Winpdb to be usable with the most recent Python versions.
-
-## PyPy, Python 3, Winpdb and WxPython
-
-Winpdb uses WxPython for its graphical interface. However, WxPython is not yet available for Python 3: it is impossible to run the graphical interface of Winpdb on Python 3. The same restrictions apply to PyPy which does
-not support WxPython.
-
-The Python 3 problem will be fixed when WxPython finally supports Python 3 (see Phoenix project: http://wiki.wxpython.org/ProjectPhoenix ) but you can already debug your Python 3 and PyPy programs.
-
-Because the Winpdb core and the console version Rpdb2 work with PyPy and Python 3, I have added
-the ability to specify the Python interpreter to use for the program being debugged (in the launch dialog of Winpdb, or on the command line with -i ). Just run Winpdb with Python 2 and specify the interpreter you want!
-
-You can enjoy the beauty of a graphical debugger with the convenience of latest Python advances.
+* New developments and bug fixes by Philippe Fremy (phil at freehackers dot org)
+* Initial author: Nir Aides, nir at winpdb dot org
+* Website: https://github.com/bluebird75/winpdb 
+* Supports Python 2.5 - 3.6 and PyPy
 
 
-## Requirements
+Description
+===========
+
+Winpdb is a portable (Windows / Linux) graphical debugger for Python. It supports breakpoints, stepping, stack inspection, multithreaded debugging and more. It
+works on both Python 2 and 3.
+
+The original Winpdb was no longer maintained since the release v1.4.8 in 2010. I (Philippe Fremy) am providing a maintained version and new developments.
+
+
+Requirements
+============
 
 Platform supported:
 * Linux
 * Windows XP and above
 * MacOs is probably working but not tested
 
-To run the graphical interface Winpdb:
-* CPython 2.5 - 2.7
-* WxPython 2.6 and above
-
-To debug a program:
-* CPython 2.5 - 2.7 or CPython 3.0 - 3.5 or PyPy
+To run Winpdb:
+* Any version of CPython above 2.5 included:  2.5, 2.6, 2.7, 3.0 - 3.6
+* WxPython 2.6 or above, and WxPython 4.0
 
 Winpdb is NOT compatible with Jython or IronPython.
 
-## Installation
 
-Most Linux distributions include wxPython as a package called python-wxgtk. 
-Use your distribution’s package manager (e.g. synaptic, aptitude or yum) 
-to find and install it.
+Release history
+===============
 
-On Windows you need to install the wxPython runtime from 
-http://www.wxpython.org/ (The unicode version is preferred).
+Version 3.0
+-----------
+* First official release by Philippe Fremy
+* Add support for python 3 GUI (using WxPython Phoenix)
+* Allow installation of all dependencies with pip
+* Add support for Python 2.7, 3.5 and 3.6
+* Add support for PyPy to Rpdb2
+* Can now specify a different Python interpreter for the program under debug, allowing PyPy support
+* Avoid crash on Windows when closing debugger
+* Support drag'n drop of files to display their source
+* Add unit-tests and a functional test suite 
+* Add a Continuous Integration server with travis CI
 
-You can run Winpdb without installing it by just downloading it :
 
-    python /path/to/winpdb/directory/winpdb.py program_to_debug.py
+Installation
+============
 
-#### Installation by hand
+The standard way to install winpdb is with pip, as administrator/root:
 
-In a console with admin privileges type:
+	# python -m pip install winpdb-reborn
+
+This will install winpdb and the only dependency WxPython automatically. On Windows, 
+shortcuts for the start menu are created.
+
+*Winpdb Reborn* is not packaged yet by any linux distro. If you see a winpdb package, 
+that's the old unmaintained winpdb which does not work with python 2.7 or python 3.
+
+Additional installation methods
+-------------------------------
+
+To install from a checkout or from an archive:
 
     python setup.py install -f
 
-On Ubuntu you can type in a normal console:
-    
-    sudo python setup.py install -f
 
-**Where do the files go?**
+No install mode
+---------------
+
+If you don't want to install winpdb, you can still try it by calling it explicitely with
+your program to debug:
+
+	$ python /the/path/to/winpdb.py my_program.py 
+
+
+Where do the files go?
+----------------------
 
 The setup script copies rpdb2.py and winpdb.py modules to the Python 
 site-packages folder. The scripts rpdb2, winpdb are copied to the 
@@ -94,41 +93,25 @@ On Linux this folder is usually /usr/bin and is in the path by default.
 On Windows this folder is %PYTHONHOME%\Scripts and is not in the path by
 default.
 
-**Insufficient permissions?**
-
-In the event of insufficient permissions, installation can be avoided 
-completely. To use Winpdb simply launch it from the folder in which it is 
-placed.
-
-## Launch Time
+Usage
+=====
 
 If you have installed Winpdb, the simplest way to launch winpdb is:
 
-    python -m winpdb
-    
-And to launch the console debugger:
-
-    python -m rpdb2
-    
-You can pass directly the program to debug if you wish:
-
     python -m winpdb my_program.py
 
-    
-If you did not installed Winpdb, you can still run it by specifying its path:
+or even:
 
-    python /path/to/winpdb/winpdb.py 
-    
-and to launch your program directly
+	winpdb my_program.py
 
-    python /path/to/winpdb/winpdb.py my_program.py
     
 Find out about the other command-line options with --help .    
     
 
+Documentation
+=============
 
-
-## Documentation
+XXX
 
 Use the -h command-line flag for command-line help.
 
@@ -139,17 +122,21 @@ Online documentation is available at:
 http://www.winpdb.org
 
 
-## Community
+Community
+=========
 
 You can ask questions about Winpdb on the dedicated google group: https://groups.google.com/forum/#!forum/winpdb
 
-## Further Development
+Feel free to raise issues or propose improvements on the Github repository.
 
-Winpdb is open source. If you would like it to develop further you are
-welcome to contribute to development, send feedback or make a donation.
+XXX
+===
 
-The official repository of Winpdb (un-)maintained by Nir Aides is : https://code.google.com/p/winpdb/
+## PyPy and lower versions of Python
 
-Else, you can just open bugs and contribute on Github.
+Because the Winpdb core and the console version Rpdb2 work with PyPy and Python 3, I have added
+the ability to specify the Python interpreter to use for the program being debugged (in the launch dialog of Winpdb, or on the command line with -i ). Just run Winpdb with Python 2 and specify the interpreter you want!
+
+You can enjoy the beauty of a graphical debugger with the convenience of latest Python advances.
 
 ![stats](https://stats.sylphide-consulting.com/piwik/piwik.php?idsite=38&rec=1)
