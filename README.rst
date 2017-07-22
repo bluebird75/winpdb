@@ -1,22 +1,15 @@
-| |Build Status Linux|
-| |Build status Windows|
+| |Build Status Linux| |Build status Windows|
 
 *Winpdb Reborn - A GPL Python Debugger, reborn from the unmaintained
 Winpdb*
 
--  New developments and bug fixes by Philippe Fremy (phil at freehackers
-   dot org)
--  Initial author: Nir Aides, nir at winpdb dot org
--  Website: https://github.com/bluebird75/winpdb
--  Supports Python 2.5 - 3.6 and PyPy
+by Nir Aides (initial author) and Philippe Fremy (current maintainer)
 
 Description
 ===========
 
-| Winpdb is a portable (Windows / Linux) graphical debugger for Python.
-  It supports breakpoints, stepping, stack inspection, multithreaded
-  debugging and more. It
-| works on both Python 2 and 3.
+Winpdb is a portable (Windows / Linux) graphical debugger for Python. It supports breakpoints, stepping, stack 
+inspection, multithreaded debugging and more. It works on both Python 2 and 3.
 
 The original Winpdb was no longer maintained since the release v1.4.8 in
 2010. I (Philippe Fremy) am providing a maintained version and new
@@ -63,11 +56,8 @@ The standard way to install winpdb is with pip, as administrator/root::
 
     # python -m pip install winpdb-reborn
 
-| This will install winpdb and the only dependency WxPython
-  automatically. On Windows,
-| shortcuts for the start menu are created.
-
-| *Winpdb Reborn* is not packaged yet by any linux distro. If you see a
+This will install winpdb and the only dependency WxPython automatically. On Windows,
+| shortcuts for the start menu are created. | *Winpdb Reborn* is not packaged yet by any linux distro. If you see a
   winpdb package,
 | that’s the old unmaintained winpdb which does not work with python 2.7
   or python 3.
