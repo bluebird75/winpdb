@@ -329,28 +329,35 @@ def myErrorMsgDialog(title, msg):
 
     myTkMsgBox.showerror(title, msg )
 
+ALLOW_PYTHON3=True
 
-if platform.python_implementation()  != 'CPython' or int(platform.python_version_tuple()[0]) > 2:
-    # Only CPython 2.x supported
-    myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
-    sys.exit(1)
-
-
-if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
-    try:
-        import wxversion   
-        wxversion.ensureMinimal(WXVER)
-    except ImportError:
-        rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
-        myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
+if not ALLOW_PYTHON3:
+    if platform.python_implementation()  != 'CPython' or int(platform.python_version_tuple()[0]) > 2:
+        # Only CPython 2.x supported
+        myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
         sys.exit(1)
+
+
+if not ALLOW_PYTHON3:
+    if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
+        try:
+            import wx
+            version.ensureMinimal(WXVER)
+        except ImportError:
+            rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
+            myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
+            sys.exit(1)
 
 import wx
 
 assert wx.VERSION_STRING >= WXVER
         
 import wx.lib.wxpTag
-import wx.gizmos
+if ALLOW_PYTHON3:
+    import wx.dataview
+else:
+    import wx.gizmos
+
 import wx.html
 
 import wx.lib.mixins.listctrl  as  listmix
@@ -360,9 +367,14 @@ import wx.stc as stc
 
 import webbrowser
 import traceback
-import cStringIO
+if not ALLOW_PYTHON3:
+    from cStringIO import StringIO
+    import xmlrpclib
+    import Queue
+else:
+    from io import StringIO
+
 import threading
-import xmlrpclib
 import tempfile
 import textwrap
 import keyword
@@ -372,7 +384,6 @@ import socket
 import string
 import codecs
 import pickle
-import Queue
 import time
 import os
 import re
@@ -819,7 +830,7 @@ def open_new(url):
 def image_from_base64(str_b64):
     b = rpdb2.as_bytes(str_b64)
     s = base64.decodestring(b)
-    stream = cStringIO.StringIO(s)
+    stream = StringIO(s)
     image = wx.ImageFromStream(stream)
 
     return image
@@ -2231,7 +2242,7 @@ class CWinpdbApp(wx.App):
 
 
     def OnInit(self):
-        wx.SystemOptions.SetOptionInt("mac.window-plain-transition", 1)
+        wx.SystemOptions.SetOption("mac.window-plain-transition", 1)
 
         self.m_settings.load_settings()
         
@@ -3346,7 +3357,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         sizerv = wx.BoxSizer(wx.VERTICAL)
         
-        self.m_tree = wx.gizmos.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
+        self.m_tree = wx.dataview.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
 
         self.m_tree.AddColumn(TLC_HEADER_NAME)
         self.m_tree.AddColumn(TLC_HEADER_TYPE)
