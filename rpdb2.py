@@ -5,6 +5,7 @@
 
     A remote Python debugger for CPython
 
+    Copyright (C) 2013-2017 Philippe Fremy
     Copyright (C) 2005-2009 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it
@@ -22,7 +23,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA
 """
 
-COPYRIGHT_NOTICE = """Copyright (C) 2005-2009 Nir Aides"""
+COPYRIGHT_NOTICE = """Copyright (C) 2013-2017 Philippe Fremy, 2005-2009 Nir Aides"""
 
 CREDITS_NOTICE = """Work on version 2.4.8 was sponsored by Investortools, Inc."""
 
@@ -539,9 +540,9 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 4, 8, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.4.8 - Tychod"
-RPDB_VERSION = "RPDB_2_4_8"
+VERSION = (2, 4, 9, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.9 - Tychod"
+RPDB_VERSION = "RPDB_2_4_9"
 RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_0"
 
 
@@ -1857,7 +1858,7 @@ CONSOLE_WRAP_INDEX = 78
 CONSOLE_PROMPT = '\n> '
 CONSOLE_PROMPT_ANALYZE = '\nAnalayze> '
 CONSOLE_INTRO = ("""RPDB2 - The Remote Python Debugger, version %s,
-Copyright (C) 2005-2009 Nir Aides.
+Copyright (C) 2005-2009 Nir Aides, 2013-2017 Philippe Fremy
 Type "help", "copyright", "license", "credits" for more information.""" % (RPDB_VERSION))
 
 PRINT_NOTICE_PROMPT = "Hit Return for more, or q (and Return) to quit:"

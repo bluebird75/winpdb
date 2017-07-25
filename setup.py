@@ -3,6 +3,7 @@
 
     Setup script for winpdb
 
+    Copyright (C) 2013-2017 Philippe Fremy
     Copyright (C) 2005-2009 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 

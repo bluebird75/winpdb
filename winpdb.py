@@ -5,6 +5,7 @@
 
     A GUI for rpdb2.py
 
+    Copyright (C) 2013-2017 Philippe Fremy
     Copyright (C) 2005-2009 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
@@ -26,6 +27,7 @@ ABOUT_NOTICE = """Winpdb is a platform independent GPL Python debugger with supp
 multiple threads, namespace modification, embedded debugging, 
 encrypted communication and is up to 20 times faster than pdb.
 
+Copyright (C) 2013-2017 Philippe Fremy
 Copyright (C) 2005-2009 Nir Aides
 
 This program is free software; you can redistribute it and/or modify it 
@@ -536,9 +538,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-VERSION = (1, 4, 8, 0, 'Tychod')
-WINPDB_TITLE = "Winpdb 1.4.8 - Tychod"
-WINPDB_VERSION = "WINPDB_1_4_8"
+VERSION = (3, 0, 0, 0, 'Tychod')
+WINPDB_TITLE = "Winpdb Reborn 3.0.0"
+WINPDB_VERSION = "WINPDB_REBORN_3_0_0"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -4794,8 +4796,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_4_8":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_8", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_2_4_9":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_9", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient, WINPDB_TITLE)
