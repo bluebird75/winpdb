@@ -5,6 +5,8 @@ Winpdb*
 
 by Philippe Fremy, and Nir Aides as initial author
 
+Website: https://github.com/bluebird75/winpdb 
+
 Description
 ===========
 
@@ -43,7 +45,7 @@ Winpdb Reborn is NOT compatible with Jython or IronPython.
 Release history
 ===============
 
-Version 3.0
+Version 2.5
 -----------
 -  First official release by Philippe Fremy
 -  Add support for Python 3 GUI (using WxPython Phoenix)
@@ -56,8 +58,8 @@ Version 3.0
 -  Support drag’n drop of files to load source code
 -  Add unit-tests and a functional test suite
 -  Add a Continuous Integration server with travis CI
--  bump version of rpdb2 to 2.4.9 to support new break-on-exit option
--  fix for launching Gnome Terminal
+-  Can adjust behavior of debugger to activate/deactivate the breakpoint before exit
+-  fix for launching Gnome Terminal properly
 
 Installation
 ============
@@ -129,8 +131,7 @@ Community
 You can ask questions about Winpdb Reborn on the dedicated google group:
 https://groups.google.com/forum/#!forum/winpdb
 
-Feel free to raise issues or propose improvements on the Github
-repository.
+Feel free to raise issues or propose improvements on the Github repository: https://github.com/bluebird75/winpdb
 
 |stats|
 
