@@ -279,9 +279,8 @@ END OF TERMS AND CONDITIONS
 
 import sys
 
-
-
-WXVER = "2.6"
+WXVER_PYTHON2 = "2.6"
+WXVER_PYTHON3 = "4"
 
 STR_BAD_PYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_BAD_PYTHON_ERROR_MSG = """Unsupported Python version
@@ -332,34 +331,44 @@ def myErrorMsgDialog(title, msg):
 
     myTkMsgBox.showerror(title, msg )
 
-ALLOW_PYTHON3=True
+RUNNING_UNDER_PY2 = (sys.version_info[0] == 2)
+RUNNING_UNDER_PY3 = (sys.version_info[0] == 3)
 
-if not ALLOW_PYTHON3:
-    if platform.python_implementation()  != 'CPython' or int(platform.python_version_tuple()[0]) > 2:
-        # Only CPython 2.x supported
-        myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
+if RUNNING_UNDER_PY2 == RUNNING_UNDER_PY3:
+    # Houston, we have a problem!
+    raise ValueError('XXX')
+
+if platform.python_implementation()  != 'CPython':
+    # Only CPython 2.x and 3.x supported
+    myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
+    sys.exit(1)
+
+
+if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
+    # multi-install of Wx, correct version must be selected with wxversion
+    try:
+        import wxversion
+    except ImportError:
+        rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
+        myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
         sys.exit(1)
 
-
-if not ALLOW_PYTHON3:
-    if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
-        try:
-            import wx
-            version.ensureMinimal(WXVER)
-        except ImportError:
-            rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
-            myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
-            sys.exit(1)
+    global WXVER
+    if RUNNING_UNDER_PY2:
+        WXVER = WXVER_PYTHON2
+    else:
+        WXVER = WXVER_PYTHON3
+    wxversion.ensureMinimal(WXVER)
 
 import wx
 
 assert wx.VERSION_STRING >= WXVER
         
 import wx.lib.wxpTag
-if ALLOW_PYTHON3:
-    import wx.dataview
+if RUNNING_UNDER_PY3:
+    import wx.dataview as wx_dataview_or_gizmos
 else:
-    import wx.gizmos
+    import wx.gizmos as wx_dataview_or_gizmos
 
 import wx.html
 
@@ -370,7 +379,7 @@ import wx.stc as stc
 
 import webbrowser
 import traceback
-if not ALLOW_PYTHON3:
+if RUNNING_UNDER_PY2:
     from cStringIO import StringIO
     import xmlrpclib
     import Queue
@@ -2245,7 +2254,7 @@ class CWinpdbApp(wx.App):
 
 
     def OnInit(self):
-        wx.SystemOptions.SetOption("mac.window-plain-transition", 1)
+        wx.SystemOptions.SetOption("mac.window-plain-transition", '1')
 
         self.m_settings.load_settings()
         
@@ -3360,7 +3369,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         sizerv = wx.BoxSizer(wx.VERTICAL)
         
-        self.m_tree = wx.dataview.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
+        self.m_tree = wx_dataview_or_gizmos.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
 
         self.m_tree.AddColumn(TLC_HEADER_NAME)
         self.m_tree.AddColumn(TLC_HEADER_TYPE)
