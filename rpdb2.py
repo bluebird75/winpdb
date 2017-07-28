@@ -2252,8 +2252,7 @@ def parse_console_launch( arg ):
 
     Returns: (fchdir, intrepreter, arg)
     '''
-    fchdir = True
-    interpreter = None
+    (fchdir, interpreter) = (True, get_python_executable())
     if arg == '':
         return (fchdir, interpreter, arg)
 
