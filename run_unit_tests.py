@@ -279,9 +279,12 @@ class TestRpdb2( TestCase ):
 
     def testParseConsoleLaunchBackwardCompatibility( self ):
         # Positive tests
-        self.assertEqual( (False, None, 'titi' ), rpdb2.parse_console_launch( '-k titi' ) )
+        fchdir, interpreter, arg = rpdb2.parse_console_launch( '-k titi' )
+        self.assertEqual( (False, 'titi' ), (fchdir, arg) )
+        self.assertTrue( interpreter != None )
 
-        self.assertEqual( (True, None, 'titi -k' ), rpdb2.parse_console_launch( 'titi -k' ) )
+        fchdir, interpreter, arg = rpdb2.parse_console_launch( 'titi -k' )
+        self.assertEqual( (True, 'titi -k' ), (fchdir, arg) )
 
         # Negative tests
         self.assertEqual( '', rpdb2.parse_console_launch( '' )[2] )
@@ -295,8 +298,10 @@ class TestRpdb2( TestCase ):
         self.assertEqual( (True, 'toto', 'tutu titi' ), rpdb2.parse_console_launch( '-i toto tutu titi' ) )
 
 
-        self.assertEqual( (True, None, 'titi -k -i toto' ), rpdb2.parse_console_launch( 'titi -k -i toto' ) )
-        self.assertEqual( (True, None, 'titi -i toto' ), rpdb2.parse_console_launch( 'titi -i toto' ) )
+        fchdir, interpreter, arg = rpdb2.parse_console_launch( 'titi -k -i toto' )
+        self.assertEqual( (True, 'titi -k -i toto' ), (fchdir, arg) )
+        fchdir, interpreter, arg = rpdb2.parse_console_launch( 'titi -i toto' )
+        self.assertEqual( (True, 'titi -i toto' ), (fchdir, arg) )
 
 #
 # Tests related to Rpdb2 functional tests
