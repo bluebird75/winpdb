@@ -311,7 +311,7 @@ if sys.version_info[:2] == (2,6):
 
 try:
     import compiler
-    import sets
+#    import sets
 except:
     pass
 

@@ -279,13 +279,13 @@ END OF TERMS AND CONDITIONS
 
 import sys
 
-WXVER_PYTHON2 = "2.6"
+WXVER_PYTHON2 = "3"
 WXVER_PYTHON3 = "4"
 
 STR_BAD_PYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_BAD_PYTHON_ERROR_MSG = """Unsupported Python version
 Winpdb does not run with this version of Python. You need
-Python 2.x with at least WxPython 2.6 to run Winpdb.
+Python 2.6 or above with at least WxPython 3 to run Winpdb.
 
 To debug a program written for PyPy or Python 3.x , launch
 Winpdb with Python 2 and select the interpreter to use in 
@@ -344,21 +344,24 @@ if platform.python_implementation()  != 'CPython':
     sys.exit(1)
 
 
-if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
-    # multi-install of Wx, correct version must be selected with wxversion
-    try:
-        import wxversion
-    except ImportError:
-        rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
-        myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
-        sys.exit(1)
+if RUNNING_UNDER_PY2:
+    if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
+        # multi-install of Wx, correct version must be selected with wxversion
+        try:
+            import wxversion
+        except ImportError:
+            rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
+            myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
+            sys.exit(1)
 
-    global WXVER
-    if RUNNING_UNDER_PY2:
-        WXVER = WXVER_PYTHON2
-    else:
-        WXVER = WXVER_PYTHON3
-    wxversion.ensureMinimal(WXVER)
+        global WXVER
+        if RUNNING_UNDER_PY2:
+            WXVER = WXVER_PYTHON2
+        else:
+            WXVER = WXVER_PYTHON3
+        wxversion.ensureMinimal(WXVER)
+else:
+    WXVER = WXVER_PYTHON3
 
 import wx
 
@@ -381,7 +384,6 @@ import webbrowser
 import traceback
 if RUNNING_UNDER_PY2:
     from cStringIO import StringIO
-    import xmlrpclib
     import Queue
 else:
     from io import StringIO
@@ -927,8 +929,7 @@ class CMenuBar:
 
         self.m_cascades = {ML_ROOT: self.m_menubar}
         
-        k = resource.keys()
-        k.sort()
+        k = sorted( resource.keys() )
 
         for c in k:
             s = (ML_ROOT + c).split('/')

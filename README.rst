@@ -37,8 +37,8 @@ Platform supported:
 
 To run Winpdb Reborn:
 
--  Any version of CPython above 2.5: 2.5, 2.6, 2.7, 3.0 - 3.6
--  For the GUI: WxPython 2.6 or above, and WxPython 4.0
+-  Any version of CPython above 2.6: 2.6, 2.7, 3.0 - 3.6
+-  For the GUI: WxPython 2.6 or above, and WxPython 3 or 4
 
 Winpdb Reborn is NOT compatible with Jython or IronPython.
 
@@ -51,6 +51,7 @@ Version 2.5
 -  Add support for Python 3 GUI (using WxPython Phoenix)
 -  Allow installation of all dependencies with pip
 -  Add support for Python 2.7, 3.5 and 3.6
+-  Drop support for Python 2.5 and WxPython 2.6, min versions are now Python 2.6 and WxPython 3.0
 -  Add support for PyPy to Rpdb2
 -  Can now specify a different Python interpreter for the program under
    debug, allowing PyPy support
