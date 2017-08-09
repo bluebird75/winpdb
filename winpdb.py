@@ -344,8 +344,10 @@ if platform.python_implementation()  != 'CPython':
     sys.exit(1)
 
 
-if RUNNING_UNDER_PY2:
-    if 'wx' not in sys.modules and 'wxPython' not in sys.modules:
+if RUNNING_UNDER_PY3:
+    import wx
+    WXVER = WXVER_PYTHON3
+else:
         # multi-install of Wx, correct version must be selected with wxversion
         try:
             import wxversion
@@ -354,16 +356,13 @@ if RUNNING_UNDER_PY2:
             myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
             sys.exit(1)
 
-        global WXVER
-        if RUNNING_UNDER_PY2:
-            WXVER = WXVER_PYTHON2
-        else:
-            WXVER = WXVER_PYTHON3
+    WXVER = WXVER_PYTHON2
         wxversion.ensureMinimal(WXVER)
 else:
     WXVER = WXVER_PYTHON3
 
-import wx
+    import wx
+
 
 assert wx.VERSION_STRING >= WXVER
         
@@ -840,11 +839,12 @@ def open_new(url):
     webbrowser.open_new(url) 
 
 
+from io import BytesIO
 
 def image_from_base64(str_b64):
     b = rpdb2.as_bytes(str_b64)
     s = base64.decodestring(b)
-    stream = StringIO(s)
+    stream = BytesIO(s)
     image = wx.ImageFromStream(stream)
 
     return image
@@ -1130,7 +1130,7 @@ class CStatusBar:
         self.m_formats = [e.get(FORMAT, "") for e in resource]
         self.m_keys = [e.get(KEYS, []) for e in resource]
         
-        self.m_statusbar = self.CreateStatusBar(1, wx.ST_SIZEGRIP)
+        self.m_statusbar = self.CreateStatusBar(1, wx.STB_SIZEGRIP)
         self.m_statusbar.SetFieldsCount(len(self.m_widths))
         self.m_statusbar.SetStatusWidths(self.m_widths)
         
@@ -2285,8 +2285,8 @@ class CCaption(wx.Panel):
         
         wx.Panel.__init__(self, *args, **kwargs)
 
-        self.SetBackgroundColour(wx.SystemSettings_GetColour(wx.SYS_COLOUR_INACTIVECAPTION))
-        self.SetForegroundColour(wx.SystemSettings_GetColour(wx.SYS_COLOUR_CAPTIONTEXT))
+        self.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_INACTIVECAPTION))
+        self.SetForegroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_CAPTIONTEXT))
         
         sizerv = wx.BoxSizer(wx.VERTICAL)
 
@@ -2294,7 +2294,7 @@ class CCaption(wx.Panel):
         sizerv.Add(self.m_static_text, 0, wx.EXPAND | wx.ALL, 2)
 
         font = self.m_static_text.GetFont()
-        new_font = wx.Font(pointSize = font.GetPointSize(), family = font.GetFamily(), style = font.GetStyle(), weight = wx.BOLD, face = font.GetFaceName())
+        new_font = wx.Font(pointSize = font.GetPointSize(), family = font.GetFamily(), style = font.GetStyle(), weight = wx.BOLD, faceName = font.GetFaceName())
         self.m_static_text.SetFont(new_font)
 
         self.SetSizer(sizerv)
@@ -3372,11 +3372,11 @@ class CNamespacePanel(wx.Panel, CJobs):
         
         self.m_tree = wx_dataview_or_gizmos.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
 
-        self.m_tree.AddColumn(TLC_HEADER_NAME)
-        self.m_tree.AddColumn(TLC_HEADER_TYPE)
-        self.m_tree.AddColumn(TLC_HEADER_REPR)
+        self.m_tree.AppendColumn(TLC_HEADER_NAME)
+        self.m_tree.AppendColumn(TLC_HEADER_TYPE)
+        self.m_tree.AppendColumn(TLC_HEADER_REPR)
         self.m_tree.SetColumnWidth(2, 800)
-        self.m_tree.SetMainColumn(0) 
+        self.m_tree.SetSortColumn(0) 
         self.m_tree.SetLineSpacing(0)
         
         self.m_tree.Bind(wx.EVT_TREE_ITEM_EXPANDING, self.OnItemExpanding)
