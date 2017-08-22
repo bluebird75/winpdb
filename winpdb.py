@@ -279,8 +279,8 @@ END OF TERMS AND CONDITIONS
 
 import sys
 
-WXVER_PYTHON2 = "3"
-WXVER_PYTHON3 = "4"
+# Works only with WxPython 4, compatible with python 3.4+ and Python 2.7
+WXVER = "4"
 
 STR_BAD_PYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_BAD_PYTHON_ERROR_MSG = """Unsupported Python version
@@ -344,25 +344,19 @@ if platform.python_implementation()  != 'CPython':
     sys.exit(1)
 
 
-if RUNNING_UNDER_PY3:
+# multi-install of Wx, correct version must be selected with wxversion
+try:
+    import wxversion
+    wxversion.ensureMinimal(WXVER)
+except ImportError:
+    pass
+
+try:
     import wx
-    WXVER = WXVER_PYTHON3
-else:
-        # multi-install of Wx, correct version must be selected with wxversion
-        try:
-            import wxversion
-        except ImportError:
-            rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
-            myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
-            sys.exit(1)
-
-    WXVER = WXVER_PYTHON2
-        wxversion.ensureMinimal(WXVER)
-else:
-    WXVER = WXVER_PYTHON3
-
-    import wx
-
+except ImportError:
+    rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
+    myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
+    sys.exit(1)
 
 assert wx.VERSION_STRING >= WXVER
         
@@ -383,9 +377,10 @@ import webbrowser
 import traceback
 if RUNNING_UNDER_PY2:
     from cStringIO import StringIO
-    import Queue
+    from Queue import Queue
 else:
     from io import StringIO
+    from queue import Queue
 
 import threading
 import tempfile
@@ -845,8 +840,7 @@ def image_from_base64(str_b64):
     b = rpdb2.as_bytes(str_b64)
     s = base64.decodestring(b)
     stream = BytesIO(s)
-    image = wx.ImageFromStream(stream)
-
+    image = wx.Image(stream)
     return image
 
     
@@ -1020,26 +1014,28 @@ class CToolBar:
 
             if TEXT in e:
                 button = wx.Button(self.m_toolbar, id, e[TEXT], style = wx.NO_BORDER)
-                button.SetToolTipString(item_label)
+                button.SetToolTip(item_label)
                 self.m_toolbar.AddControl(button)
                 self.m_items[item_label] = {ID: id}
-                wx.EVT_BUTTON(self.m_toolbar, id, command)
+                # wx.EVT_BUTTON(self.m_toolbar, id, command)
+                self.Bind( wx.EVT_BUTTON, command, id = id)
                 continue
 
             if DATA in e:
                 image = image_from_base64(e[DATA])
-                bitmap = wx.BitmapFromImage(image)
+                bitmap = wx.Bitmap(image)
 
             if DATA2 in e:
                 image2 = image_from_base64(e[DATA2])
-                bitmap2 = wx.BitmapFromImage(image2)
-                self.m_toolbar.AddSimpleTool(id, bitmap, item_label, isToggle = True)
+                bitmap2 = wx.Bitmap(image2)
+                self.m_toolbar.AddTool(id, item_label, bitmap, '', wx.ITEM_CHECK )
+
                 self.m_items[item_label] = {ID: id, DATA: bitmap, DATA2: bitmap2}
                 self.Bind(wx.EVT_TOOL, command, id = id)
                 self.Bind(wx.EVT_TOOL, self.OnToggleTool, id = id)
 
             else:
-                self.m_toolbar.AddSimpleTool(id, bitmap, item_label)
+                self.m_toolbar.AddTool(id, item_label, bitmap, '', wx.ITEM_NORMAL )
                 self.m_items[item_label] = {ID: id}
                 self.Bind(wx.EVT_TOOL, command, id = id)
             
@@ -1157,7 +1153,7 @@ class CStatusBar:
                 return
                 
             image = image_from_base64(data)
-            bitmap = wx.BitmapFromImage(image)
+            bitmap = wx.Bitmap(image)
             p = wx.Panel(self.m_statusbar)
             sb = wx.StaticBitmap(p, -1, bitmap)
 
@@ -1168,7 +1164,7 @@ class CStatusBar:
                 self.m_bitmaps[i][0].Hide()
             else:
                 image = image_from_base64(data)
-                bitmap = wx.BitmapFromImage(image)
+                bitmap = wx.Bitmap(image)
                 
                 self.m_bitmaps[i][1].SetBitmap(bitmap)
                 self.m_bitmaps[i][0].Show()
@@ -1182,8 +1178,8 @@ class CStatusBar:
             p.SetPosition((rect.x + 2, rect.y + 2))
             s = sb.GetSize()
             sb.SetSize((s[0], rect.height - 4))
-            sb.SetToolTipString(tooltip)
-            p.SetToolTipString(tooltip)
+            sb.SetToolTip(tooltip)
+            p.SetToolTip(tooltip)
             p.SetClientSize(sb.GetSize())
             
         self.sizeChanged = False
@@ -1386,19 +1382,16 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             self.SetLayoutDirection(1)
         
         image = image_from_base64(BASE64_ICON_16)
-        bitmap = wx.BitmapFromImage(image)
-        icon16 = wx.EmptyIcon()
-        icon16.CopyFromBitmap(bitmap)
+        bitmap = wx.Bitmap(image)
+        icon16 = wx.Icon(bitmap)
 
         image = image_from_base64(BASE64_ICON_32)
-        bitmap = wx.BitmapFromImage(image)
-        icon32 = wx.EmptyIcon()
-        icon32.CopyFromBitmap(bitmap)
+        bitmap = wx.Bitmap(image)
+        icon32 = wx.Icon(bitmap)
 
         image = image_from_base64(BASE64_ICON_64)
-        bitmap = wx.BitmapFromImage(image)
-        icon64 = wx.EmptyIcon()
-        icon64.CopyFromBitmap(bitmap)
+        bitmap = wx.Bitmap(image)
+        icon64 = wx.Icon(bitmap)
 
         ibundle = wx.IconBundle()
         ibundle.AddIcon(icon16)
@@ -2312,7 +2305,7 @@ class CCaptionManager:
     def OnGainFocus(self, event):        
         self.m_n_focus += 1
         
-        self.m_caption.SetBackgroundColour(wx.SystemSettings_GetColour(wx.SYS_COLOUR_ACTIVECAPTION))
+        self.m_caption.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_ACTIVECAPTION))
         self.m_caption.Refresh()
         event.Skip()
 
@@ -2324,11 +2317,9 @@ class CCaptionManager:
         #
         # Event may get sent after the object has been deleted.
         #
-        try:
-            self.m_caption.SetBackgroundColour(wx.SystemSettings_GetColour(wx.SYS_COLOUR_INACTIVECAPTION))
+        if self.m_caption:
+            self.m_caption.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_INACTIVECAPTION))
             self.m_caption.Refresh()
-        except wx.PyDeadObjectError:
-            pass
 
         event.Skip()
 
@@ -2939,7 +2930,7 @@ class CConsole(wx.Panel, CCaptionManager):
         
         self.m_console = rpdb2.CConsole(self.m_session_manager, stdin = self, stdout = self, fSplit = True)
 
-        self.m_queue = Queue.Queue()
+        self.m_queue = Queue()
         
         _sizerv = wx.BoxSizer(wx.VERTICAL)
         sizerv = wx.BoxSizer(wx.VERTICAL)
@@ -3006,7 +2997,7 @@ class CConsole(wx.Panel, CCaptionManager):
             face = "Courier"
             point_size = font.GetPointSize()
             
-        new_font = wx.Font(pointSize = point_size, family = font.GetFamily(), style = font.GetStyle(), weight = font.GetWeight(), face = face)
+        new_font = wx.Font(point_size, font.GetFamily(), font.GetStyle(), font.GetWeight(), font.GetUnderlined(), face)
         ctrl.SetFont(new_font)
 
         
@@ -3038,7 +3029,7 @@ class CConsole(wx.Panel, CCaptionManager):
                 if len(s) == 0:
                     break
             
-        wx.CallAfter(self.m_console_out.write, _str[1:])    
+        wx.CallAfter(self.m_console_out.AppendText, _str[1:])    
 
 
     def flush(self):
@@ -3099,7 +3090,7 @@ class CConsole(wx.Panel, CCaptionManager):
             return
 
         if len(completions) > COMPLETIONS_WARNING_THRESHOLD and not fForce:
-            self.m_console_out.write(COMPLETIONS_WARNING % len(completions))
+            self.m_console_out.AppendText(COMPLETIONS_WARNING % len(completions))
             self.m_fcompletions_warning = True
             return
 
@@ -3129,7 +3120,7 @@ class CConsole(wx.Panel, CCaptionManager):
         lines = textwrap.wrap(out, 60)
         text = '\n'.join(lines) + '\n'
 
-        self.m_console_out.write(CONSOLE_COMPLETIONS % text)
+        self.m_console_out.AppendText(CONSOLE_COMPLETIONS % text)
 
         
     def OnSendText(self, event):
@@ -3138,7 +3129,7 @@ class CConsole(wx.Panel, CCaptionManager):
         value = self.m_console_in.GetValue()
         self.set_history(value)
 
-        self.m_console_out.write(CONSOLE_PROMPT + value + '\n') 
+        self.m_console_out.AppendText(CONSOLE_PROMPT + value + '\n') 
         self.m_console_in.Clear()
 
         if value in ['exit', 'EOF']:
@@ -3377,7 +3368,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.AppendColumn(TLC_HEADER_REPR)
         self.m_tree.SetColumnWidth(2, 800)
         self.m_tree.SetSortColumn(0) 
-        self.m_tree.SetLineSpacing(0)
+        # self.m_tree.SetLineSpacing(0)
         
         self.m_tree.Bind(wx.EVT_TREE_ITEM_EXPANDING, self.OnItemExpanding)
         self.m_tree.Bind(wx.EVT_TREE_ITEM_COLLAPSING, self.OnItemCollapsing)
@@ -3408,7 +3399,8 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         
     def bind_caption(self, caption_manager):
-        w = self.m_tree.GetMainWindow()
+        # w = self.m_tree.GetMainWindow()
+        w = self.m_tree.GetView()
         caption_manager.bind_caption(w)
 
         
@@ -4683,7 +4675,7 @@ class CLaunchDialog(wx.Dialog):
 
         cwd = rpdb2.getcwdu()
             
-        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.OPEN | wx.CHANGE_DIR)
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.FD_OPEN | wx.FD_CHANGE_DIR)
         r = dlg.ShowModal()
 
         os.chdir(cwd)
