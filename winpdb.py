@@ -3958,7 +3958,7 @@ class CHTMLDialog(wx.Dialog):
 
         sizerv = wx.BoxSizer(wx.VERTICAL)
 
-        self.m_html = wx.html.HtmlWindow(self, -1, size = (600, -1))
+        self.m_html = wx.html.HtmlWindow(self, wx.ID_ANY, size = (600, -1))
         sizerv.Add(self.m_html, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         if "gtk2" in wx.PlatformInfo:
@@ -3967,7 +3967,7 @@ class CHTMLDialog(wx.Dialog):
         self.m_html.SetPage(self.get_html_text(text))
         
         ir = self.m_html.GetInternalRepresentation()
-        self.m_html.SetSize((ir.GetWidth() + 25, min(500, ir.GetHeight() + 25)))
+        self.m_html.SetMinSize((ir.GetWidth() + 25, min(500, ir.GetHeight() + 25)))
 
         btnsizer = wx.StdDialogButtonSizer()
         sizerv.Add(btnsizer, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
