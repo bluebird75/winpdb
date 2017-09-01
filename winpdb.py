@@ -1028,14 +1028,14 @@ class CToolBar:
             if DATA2 in e:
                 image2 = image_from_base64(e[DATA2])
                 bitmap2 = wx.Bitmap(image2)
-                self.m_toolbar.AddTool(id, item_label, bitmap, '', wx.ITEM_CHECK )
+                self.m_toolbar.AddTool(id, '', bitmap, wx.NullBitmap, wx.ITEM_CHECK, item_label, '' )
 
                 self.m_items[item_label] = {ID: id, DATA: bitmap, DATA2: bitmap2}
                 self.Bind(wx.EVT_TOOL, command, id = id)
                 self.Bind(wx.EVT_TOOL, self.OnToggleTool, id = id)
 
             else:
-                self.m_toolbar.AddTool(id, item_label, bitmap, '', wx.ITEM_NORMAL )
+                self.m_toolbar.AddTool(id, '', bitmap, wx.NullBitmap, wx.ITEM_NORMAL, item_label )
                 self.m_items[item_label] = {ID: id}
                 self.Bind(wx.EVT_TOOL, command, id = id)
             
