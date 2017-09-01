@@ -2269,7 +2269,7 @@ class CWinpdbApp(wx.App):
 
     def OnExit(self):
         self.m_settings.save_settings()
-        
+        return super().OnExit()
 
 
 class CCaption(wx.Panel):
