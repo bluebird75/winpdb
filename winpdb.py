@@ -1269,7 +1269,7 @@ class CJobs:
 
 
     def set_cursor(self, id):
-        cursor = wx.StockCursor(id)
+        cursor = wx.Cursor(id)
         self.SetCursor(cursor)        
         
 
@@ -1883,7 +1883,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def set_cursor(self, id):
-        cursor = wx.StockCursor(id)
+        cursor = wx.Cursor(id)
         self.SetCursor(cursor)        
         self.m_code_viewer.set_cursor(id)        
         self.m_threads_viewer.set_cursor(id)        
@@ -2511,7 +2511,7 @@ class CSourceManager:
             _time = 0
             _filename = r[rpdb2.DICT_KEY_FILENAME]
             source_lines = r[rpdb2.DICT_KEY_LINES]
-            source = string.join(source_lines, '')
+            source = ''.join(source_lines)
             if not g_fUnicode:
                 source = rpdb2.as_string(source, wx.GetDefaultPyEncoding())
         
@@ -3261,7 +3261,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
 
 
     def set_cursor(self, id):
-        cursor = wx.StockCursor(id)
+        cursor = wx.Cursor(id)
         self.SetCursor(cursor)        
         self.m_threads.SetCursor(cursor)        
 
@@ -3293,8 +3293,8 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         if not g_fUnicode:
             thread_name = rpdb2.as_string(thread_name, wx.GetDefaultPyEncoding())
 
-        self.m_threads.SetStringItem(index, 1, thread_name)
-        self.m_threads.SetStringItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
+        self.m_threads.SetItem(index, 1, thread_name)
+        self.m_threads.SetItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
 
         return index
 
@@ -3314,9 +3314,9 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
                 name = rpdb2.as_string(name, wx.GetDefaultPyEncoding())
 
             fBroken = s[rpdb2.DICT_KEY_BROKEN]
-            index = self.m_threads.InsertStringItem(sys.maxint, repr(tid))
-            self.m_threads.SetStringItem(index, 1, name)
-            self.m_threads.SetStringItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
+            index = self.m_threads.InsertItem( 0, repr(tid))
+            self.m_threads.SetItem(index, 1, name)
+            self.m_threads.SetItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
             self.m_threads.SetItemData(index, tid)
             if tid == current_thread:
                 j = i
@@ -3406,7 +3406,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         
     def OnItemActivated(self, event):
         item = event.GetItem()
-        (expr, is_valid) = self.m_tree.GetPyData(item)
+        (expr, is_valid) = self.m_tree.GetItemData(item)
         if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK, rpdb2.STR_MAX_NAMESPACE_WARNING_TITLE]:
             return
 
@@ -3469,12 +3469,13 @@ class CNamespacePanel(wx.Panel, CJobs):
 
 
     def GetChildrenCount(self, item):
-        n = self.m_tree.GetChildrenCount(item)
+        # n = self.m_tree.GetChildrenCount(item)
+        n = self.m_tree.GetItemCount(item)
         if n != 1:
             return n 
 
         child = self.get_children(item)[0]
-        (expr, is_valid) = self.m_tree.GetPyData(child)
+        (expr, is_valid) = self.m_tree.GetItemData(child)
 
         if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK]:
             return 0
@@ -3492,7 +3493,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         if self.GetChildrenCount(item) > 0:
             return
         
-        (expr, is_valid) = self.m_tree.GetPyData(item)
+        (expr, is_valid) = self.m_tree.GetItemData(item)
 
         l = [e for e in _map if e.get(rpdb2.DICT_KEY_EXPR, None) == expr]
         if l == []:
@@ -3533,7 +3534,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             child = self.m_tree.AppendItem(item, identation + _name)
             self.m_tree.SetItemText(child, ' ' + _repr, 2)
             self.m_tree.SetItemText(child, ' ' + _type, 1)
-            self.m_tree.SetItemPyData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
+            self.m_tree.SetItemData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
             self.m_tree.SetItemHasChildren(child, (r[rpdb2.DICT_KEY_N_SUBNODES] > 0))
 
         self.m_tree.Expand(item)
@@ -3556,9 +3557,9 @@ class CNamespacePanel(wx.Panel, CJobs):
         child = self.m_tree.AppendItem(item, STR_NAMESPACE_LOADING)
         self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 2)
         self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 1)
-        self.m_tree.SetItemPyData(child, (STR_NAMESPACE_LOADING, False))
+        self.m_tree.SetItemData(child, (STR_NAMESPACE_LOADING, False))
 
-        (expr, is_valid) = self.m_tree.GetPyData(item)
+        (expr, is_valid) = self.m_tree.GetItemData(item)
 
         f = lambda r, exc_info: self.callback_ns(r, exc_info, expr)        
         self.m_async_sm.with_callback(f).get_namespace([(expr, True)], self.m_filter_level)
@@ -3587,7 +3588,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             child = self.m_tree.AppendItem(item, STR_NAMESPACE_DEADLOCK)
             self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 2)
             self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 1)
-            self.m_tree.SetItemPyData(child, (STR_NAMESPACE_DEADLOCK, False))
+            self.m_tree.SetItemData(child, (STR_NAMESPACE_DEADLOCK, False))
             self.m_tree.Expand(item)
 
             if freselect_child:
@@ -3607,7 +3608,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     def find_item(self, expr):
         item = self.m_tree.GetRootItem()
         while item:
-            (expr2, is_valid) = self.m_tree.GetPyData(item)
+            (expr2, is_valid) = self.m_tree.GetItemData(item)
             if expr2 == expr:
                 return item               
                 
@@ -3628,7 +3629,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
                              
     def get_expression_list(self):
-        if self.m_tree.GetCount() == 0:
+        if self.m_tree.GetItemCount() == 0:
             return None
 
         item = self.m_tree.GetRootItem()
@@ -3638,7 +3639,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         while len(s) > 0:
             item = s.pop(0)
-            (expr, is_valid) = self.m_tree.GetPyData(item)
+            (expr, is_valid) = self.m_tree.GetItemData(item)
             fExpand = self.m_tree.IsExpanded(item) and self.GetChildrenCount(item) > 0
             if not fExpand:
                 continue
@@ -3701,7 +3702,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         self.m_tree.DeleteAllItems()
 
         root = self.m_tree.AddRoot('root')
-        self.m_tree.SetItemPyData(root, (self.get_root_expr(), False))
+        self.m_tree.SetItemData(root, (self.get_root_expr(), False))
         self.m_tree.SetItemHasChildren(root, True)
 
         s = [root]
@@ -3872,7 +3873,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
 
 
     def set_cursor(self, id):
-        cursor = wx.StockCursor(id)
+        cursor = wx.Cursor(id)
         self.SetCursor(cursor)        
         self.m_stack.SetCursor(cursor)        
 
@@ -3910,11 +3911,11 @@ class CStackViewer(wx.Panel, CCaptionManager):
                 filename = rpdb2.as_string(filename, wx.GetDefaultPyEncoding())
                 function = rpdb2.as_string(function, wx.GetDefaultPyEncoding())
 
-            index = self.m_stack.InsertStringItem(sys.maxint, repr(i))
-            self.m_stack.SetStringItem(index, 1, os.path.basename(filename))
-            self.m_stack.SetStringItem(index, 2, repr(lineno))
-            self.m_stack.SetStringItem(index, 3, function)
-            self.m_stack.SetStringItem(index, 4, os.path.dirname(filename))
+            index = self.m_stack.InsertItem( 0, repr(i))
+            self.m_stack.SetItem(index, 1, os.path.basename(filename))
+            self.m_stack.SetItem(index, 2, repr(lineno))
+            self.m_stack.SetItem(index, 3, function)
+            self.m_stack.SetItem(index, 4, os.path.dirname(filename))
             self.m_stack.SetItemData(index, i)
 
             i += 1
@@ -4115,7 +4116,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
                 
     def set_cursor(self, id):
-        cursor = wx.StockCursor(id)
+        cursor = wx.Cursor(id)
         self.SetCursor(cursor)        
         self.m_listbox_scripts.SetCursor(cursor)        
 
@@ -4196,13 +4197,13 @@ class CAttachDialog(wx.Dialog, CJobs):
         self.m_listbox_scripts.DeleteAllItems()
 
         for i, s in enumerate(self.m_server_list):
-            index = self.m_listbox_scripts.InsertStringItem(sys.maxint, repr(s.m_pid))
+            index = self.m_listbox_scripts.InsertItem( 0, repr(s.m_pid))
             
             filename = s.m_filename
             if not g_fUnicode:
                 filename = rpdb2.as_string(filename, wx.GetDefaultPyEncoding())
 
-            self.m_listbox_scripts.SetStringItem(index, 1, filename)
+            self.m_listbox_scripts.SetItem(index, 1, filename)
             self.m_listbox_scripts.SetItemData(index, i)
 
         self.m_listbox_scripts.set_columns_width()
