@@ -361,10 +361,6 @@ except ImportError:
 assert wx.VERSION_STRING >= WXVER
         
 import wx.lib.wxpTag
-if RUNNING_UNDER_PY3:
-    import wx.dataview as wx_dataview_or_gizmos
-else:
-    import wx.gizmos as wx_dataview_or_gizmos
 
 import wx.html
 
@@ -3361,7 +3357,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         sizerv = wx.BoxSizer(wx.VERTICAL)
         
-        self.m_tree = wx_dataview_or_gizmos.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
+        self.m_tree = wx.dataview.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
 
         self.m_tree.AppendColumn(TLC_HEADER_NAME)
         self.m_tree.AppendColumn(TLC_HEADER_TYPE)
