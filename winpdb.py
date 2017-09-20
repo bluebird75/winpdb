@@ -3340,6 +3340,21 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
         event.Skip()
 
 
+# Support function for the porting to WxPython 4
+def ItemHasChildren(tree, item):
+    '''Return True if the _item_ of TreeListCtrl has children.'''
+    firstChild = tree.GetFirstChild(item)
+    if firstChild and firstChild.IsOk():
+        return True
+
+    return False
+
+def SetItemHasChildren(tree, item, state):
+    '''Stub function, not available in WxPython 4.
+    It used to display an expand symbol depending on _state_ so that the
+    children list can be lazily expanded.'''
+    pass
+
         
 class CNamespacePanel(wx.Panel, CJobs):
     def __init__(self, *args, **kwargs):
@@ -3484,7 +3499,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         
         
     def expand_item(self, item, _map, froot = False, fskip_expansion_check = False):
-        if not self.m_tree.ItemHasChildren(item):
+        if not ItemHasChildren(self.m_tree, item):
             return
         
         if not froot and not fskip_expansion_check and self.m_tree.IsExpanded(item):
@@ -3507,7 +3522,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             return
         
         if _r[rpdb2.DICT_KEY_N_SUBNODES] == 0:
-            self.m_tree.SetItemHasChildren(item, False)
+            SetItemHasChildren(self.m_tree, item, False)
             return
 
         #
@@ -3535,7 +3550,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             self.m_tree.SetItemText(child, ' ' + _repr, 2)
             self.m_tree.SetItemText(child, ' ' + _type, 1)
             self.m_tree.SetItemData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
-            self.m_tree.SetItemHasChildren(child, (r[rpdb2.DICT_KEY_N_SUBNODES] > 0))
+            SetItemHasChildren(self.m_tree, child, (r[rpdb2.DICT_KEY_N_SUBNODES] > 0))
 
         self.m_tree.Expand(item)
 
@@ -3543,7 +3558,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     def OnItemExpanding(self, event):
         item = event.GetItem()        
 
-        if not self.m_tree.ItemHasChildren(item):
+        if not ItemHasChildren(self.m_tree, item):
             event.Skip()
             return
         
@@ -3618,12 +3633,12 @@ class CNamespacePanel(wx.Panel, CJobs):
     
 
     def get_children(self, item):
-        (child, cookie) = self.m_tree.GetFirstChild(item)
+        (child, cookie) = self.m_tree.GetFirstChild(item), 'cookie'
         cl = []
         
         while child and child.IsOk():
             cl.append(child)
-            (child, cookie) = self.m_tree.GetNextChild(item, cookie)
+            child = self.m_tree.GetNextChild(item, cookie)
 
         return cl    
 
@@ -3704,7 +3719,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         # root = self.m_tree.AddRoot('root')
         root = self.m_tree.GetRootItem()
         self.m_tree.SetItemData(root, (self.get_root_expr(), False))
-        self.m_tree.SetItemHasChildren(root, True)
+        SetItemHasChildren(self.m_tree, root, True)
 
         s = [root]
 
