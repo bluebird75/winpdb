@@ -988,7 +988,7 @@ class CMenuBar:
 
         while parent.GetMenuItemCount() > 0:
             i = parent.FindItemByPosition(0)
-            parent.DeleteItem(i)
+            parent.DestroyItem(i)
 
         
 
@@ -3469,8 +3469,8 @@ class CNamespacePanel(wx.Panel, CJobs):
 
 
     def GetChildrenCount(self, item):
-        # n = self.m_tree.GetChildrenCount(item)
-        n = self.m_tree.GetItemCount(item)
+        n = self.m_tree.GetChildrenCount(item)
+        # n = self.m_tree.GetItemCount(item)
         if n != 1:
             return n 
 
@@ -3629,7 +3629,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
                              
     def get_expression_list(self):
-        if self.m_tree.GetItemCount() == 0:
+        if self.m_tree.GetFirstItem().IsOk() == False:
             return None
 
         item = self.m_tree.GetRootItem()
@@ -3701,7 +3701,8 @@ class CNamespacePanel(wx.Panel, CJobs):
     def do_update_namespace(self, rl):    
         self.m_tree.DeleteAllItems()
 
-        root = self.m_tree.AddRoot('root')
+        # root = self.m_tree.AddRoot('root')
+        root = self.m_tree.GetRootItem()
         self.m_tree.SetItemData(root, (self.get_root_expr(), False))
         self.m_tree.SetItemHasChildren(root, True)
 
