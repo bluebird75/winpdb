@@ -1697,11 +1697,17 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     #
     
     def update_stack(self, event):
+        '''Arguments:
+        - event: a CEventStack, containing a list of thread debugging states
+        '''
         self.m_stack = event.m_stack
         wx.CallAfter(self.do_update_stack, event.m_stack)
 
 
     def do_update_stack(self, _stack):
+        '''Arguments:
+        _stack: list of thread debugging states
+        '''
         self.m_stack = _stack
 
         self.m_stack_viewer.update_stack_list(self.m_stack)
@@ -3667,6 +3673,13 @@ class CNamespacePanel(wx.Panel, CJobs):
 
 
     def update_namespace(self, key, el):
+        '''Arguments:
+        - key: unique value identifying a namespace
+        - el: namespace content
+
+        Returns:
+        - (previous key, previous element)
+        '''
         old_key = self.m_key
         old_el = self.get_expression_list()
 
@@ -3821,6 +3834,9 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
 
 
     def get_local_key(self, _stack):
+        '''Arguments:
+        _stack: a dictionnary describing the current thread. See rpdb2.py:get_stack() for detailed information.
+        '''
         frame_index = self.m_session_manager.get_frame_index()
         c = _stack.get(rpdb2.DICT_KEY_CODE_LIST, [])
         key = c[-(1 + frame_index)]
@@ -3828,6 +3844,9 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
 
             
     def get_global_key(self, _stack):
+        '''Arguments:
+        _stack: a dictionnary describing the current thread. See rpdb2.py:get_stack() for detailed information.
+        '''
         frame_index = self.m_session_manager.get_frame_index()
         s = _stack.get(rpdb2.DICT_KEY_STACK, [])
         key = s[-(1 + frame_index)][0]
@@ -3835,6 +3854,9 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
 
             
     def update_namespace(self, _stack):
+        '''Arguments:
+        _stack: a dictionnary describing the current thread. See rpdb2.py:get_stack() for detailed information.
+        '''
         try:
             key = self.get_local_key(_stack)
             el = self.m_key_map.get(key, None)
