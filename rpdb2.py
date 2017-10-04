@@ -4341,6 +4341,11 @@ def calc_signame(signum):
 # Similar to traceback.extract_stack() but fixes path with calc_frame_path()
 #
 def my_extract_stack(f):
+    '''
+    :param f: frame object
+    :return: similar to traceback.extract_stack()
+        - list of : (filename, line number, function name, text of source code)
+    '''
     if f == None:
         return []
 
@@ -4375,6 +4380,11 @@ def my_extract_stack(f):
 # Similar to traceback.extract_tb() but fixes path with calc_frame_path()
 #
 def my_extract_tb(tb):
+    '''
+    :param tb: traceback object
+    :return: similar to traceback.extract_tb()
+        - list of : (filename, line number, function name, text of source code)
+    '''
     try:
         g_traceback_lock.acquire()
         _s = traceback.extract_tb(tb)
@@ -6655,6 +6665,15 @@ class CDebuggerCoreThread:
         Starting from base_frame return the index depth frame
         down the stack. If fException is True use the exception
         stack (traceback).
+
+        Arguments:
+            - base_frame: frame
+            - index: positive number, index of the targetted frame
+            - fException: boolean, look for frame of the current xception if True
+
+        Returns: (f, lineno)
+        - f: current frame object
+        - lineno: line number of the current code
         """
 
         if fException:
@@ -6704,6 +6723,11 @@ class CDebuggerCoreThread:
         Get globals and locals of frame.
         A copy scheme is used for locals to work around a bug in
         Python 2.3 and 2.4 that prevents modifying the local dictionary.
+
+        Returns: (gc, lc, olc):
+        - gc: copy of global ...
+        - lc: copy of local ...
+        - olc: copy of local ...
         """
 
         try:
@@ -8445,6 +8469,20 @@ class CDebuggerEngine(CDebuggerCore):
 
 
     def __get_stack(self, ctx, ctid, fException):
+        '''
+        Arguments:
+        :param ctx: a CDebuggerCoreThread of the current context
+        :param ctid: ???
+        :param fException: boolean, whether to get stack from exception frame or not
+
+        :return: dictionary with the following keys
+            - DICT_KEY_STACK: list of (filename, line number, function name, text of source code)
+            - DICT_KEY_CODE_LIST: list of code strings
+            - DICT_KEY_TID: thread identifier
+            - DICT_KEY_BROKEN: boolean, whether thread is currently in Break state or running
+            - DICT_KEY_EVENT: name of the event providing the stack: exception, call, return, ...
+            - DICT_KEY_CURRENT_TID: boolean, True if this is the current thread
+        '''
         tid = ctx.m_thread_id
 
         f = None
@@ -8512,8 +8550,23 @@ class CDebuggerEngine(CDebuggerCore):
 
 
     def get_stack(self, tid_list, fAll, fException):
+        '''
+        Return a list if dictionaries describing the stacks for each threads requested.
+
+        :param tid_list: empty list or list of threads id for which we want the stack, or an empty list for other argument to apply
+        :param fAll: boolean, True requests stacks for all threads (tid_list must be an empty list then)
+        :param fException: boolean, True request stack of current exception (tid_list must be [] and fAll must be False)
+
+        :return: list of dictionaries containing stack-frame information (see __get_stack() ) with following keys
+            - DICT_KEY_STACK: list of (filename, line number, function name, text of source code)
+            - DICT_KEY_CODE_LIST: list of code strings
+            - DICT_KEY_TID: thread identifier
+            - DICT_KEY_BROKEN: boolean, whether thread is currently in Break state or running
+            - DICT_KEY_EVENT: name of the event providing the stack: exception, call, return, ...
+            - DICT_KEY_CURRENT_TID: boolean, True if this is the current thread
+        '''
         if fException and (fAll or (len(tid_list) != 0)):
-            raise BadArgument
+            raise BadArgument( "You shall request either Exception, or list of tid, or all")
 
         ctx = self.get_current_ctx()
         ctid = ctx.m_thread_id
@@ -11358,6 +11411,16 @@ class CSessionManagerInternal:
 
 
     def get_namespace(self, nl, filter_level, repr_limit):
+        ''' See CSessionManager.get_namespace() for more details.
+        Arguments:
+        :param nl: list of (expr, boolean) with:
+                    expr: expression to be computed
+                    boolean: tells whether subnodes of the expression should be returned as well (class content,
+                             list content, ...)
+        :param filter_level: int, 0 1 or 2
+        :param repr_limit: max length of the expression to return
+        :return: a list of dictionnaries, where each item of the list represent an item in nl
+        '''
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE)
 

@@ -3499,9 +3499,17 @@ class CNamespacePanel(wx.Panel, CJobs):
         
         
     def expand_item(self, item, _map, froot = False, fskip_expansion_check = False):
+        '''Arguments:
+        :param item: python expression
+        :param _map: list of dictionnary of expression content, see CSessionManager.get_namespace() for details
+        :param froot: boolen, True if it is the root item
+        :param fskip_expansion_check:
+        :return:
+        '''
         if not ItemHasChildren(self.m_tree, item):
             return
         
+        # skip expansion if item is already expanded
         if not froot and not fskip_expansion_check and self.m_tree.IsExpanded(item):
             return
 
@@ -3714,6 +3722,10 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         
     def do_update_namespace(self, rl):    
+        '''Arguments:
+        rl: list of dictionnaries, each element of the list describes a python expression
+
+        See CSessionManager.get_namespace() for more details'''
         self.m_tree.DeleteAllItems()
 
         # root = self.m_tree.AddRoot('root')
