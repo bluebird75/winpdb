@@ -3349,17 +3349,25 @@ def ItemHasChildren(tree, item):
 
     firstChild = tree.GetFirstChild(item)
     if firstChild and firstChild.IsOk():
+        print('ItemHasChildren( %s) -> True' % (ItemToStr(tree, item)))
         return True
 
+    print('ItemHasChildren( %s) -> False' % (ItemToStr(tree, item)))
     return False
 
 def SetItemHasChildren(tree, item, state):
     '''Stub function, not available in WxPython 4.
     It used to display an expand symbol depending on _state_ so that the
     children list can be lazily expanded.'''
+    print('SetItemHasChildren( %s, %s)' % (ItemToStr(tree, item), state ))
     gItemsWithChildren[item] = state
     pass
 
+def ItemToStr(tree, item):
+    s = 'Item<"%s","%s",%s>' % (tree.GetItemText(item,1), tree.GetItemText(item,2), tree.GetItemData(item))
+    return s
+
+import pprint
         
 class CNamespacePanel(wx.Panel, CJobs):
     def __init__(self, *args, **kwargs):
@@ -3453,6 +3461,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
 
     def callback_execute(self, r, exc_info):
+        print('callback_execute(%s, %s)'  % (r, exc_info) )
         (t, v, tb) = exc_info
 
         if t != None:
@@ -3503,8 +3512,10 @@ class CNamespacePanel(wx.Panel, CJobs):
         (expr, is_valid) = self.m_tree.GetItemData(child)
 
         if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK]:
+            print('GetChildrenCount(item=%s) -> %d' % (ItemToStr(self.m_tree, item), 0) )
             return 0
 
+        print('GetChildrenCount(item=%s) -> %d' % (ItemToStr(self.m_tree, item), 1))
         return 1
         
         
@@ -3516,14 +3527,19 @@ class CNamespacePanel(wx.Panel, CJobs):
         :param fskip_expansion_check:
         :return:
         '''
+        print('expand_item(item=%s, _map=%s, froot=%s, fskip_expansion=%s)' %
+              (ItemToStr(self.m_tree, item), pprint.pformat(_map, 4), froot, fskip_expansion_check))
         if not ItemHasChildren(self.m_tree, item):
+            print('expand_item() -> no action')
             return
         
         # skip expansion if item is already expanded
         if not froot and not fskip_expansion_check and self.m_tree.IsExpanded(item):
+            print('expand_item() -> no action')
             return
 
         if self.GetChildrenCount(item) > 0:
+            print('expand_item() -> no action')
             return
         
         (expr, is_valid) = self.m_tree.GetItemData(item)
@@ -3537,9 +3553,11 @@ class CNamespacePanel(wx.Panel, CJobs):
             return   
 
         if rpdb2.DICT_KEY_ERROR in _r:
+            print('expand_item() -> no action due to error')
             return
         
         if _r[rpdb2.DICT_KEY_N_SUBNODES] == 0:
+            print('expand_item() -> no subnodes, setting HasChildren to false')
             SetItemHasChildren(self.m_tree, item, False)
             return
 
@@ -3549,6 +3567,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         # In case of a list, no sorting is needed.
         #
 
+        print('expand_item() -> filling subnodes, setting HasChildren to true & expand item')
         snl = _r[rpdb2.DICT_KEY_SUBNODES] 
        
         for r in snl:
@@ -3575,6 +3594,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     
     def OnItemExpanding(self, event):
         item = event.GetItem()        
+        print('OnItemExpanding(item=%s)' % ItemToStr(item))
 
         if not ItemHasChildren(self.m_tree, item):
             event.Skip()
@@ -3585,6 +3605,7 @@ class CNamespacePanel(wx.Panel, CJobs):
             self.m_tree.Refresh()
             return
             
+        print('OnItemExpanding() - repopulathing children')
         self.m_tree.DeleteChildren(item)
         
         child = self.m_tree.AppendItem(item, STR_NAMESPACE_LOADING)
@@ -3651,6 +3672,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     
 
     def get_children(self, item):
+        print('get_children(%s)' % (ItemToStr(self.m_tree, item)))
         (child, cookie) = self.m_tree.GetFirstChild(item), 'cookie'
         cl = []
         
@@ -3662,6 +3684,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
                              
     def get_expression_list(self):
+        print('get_expession_list()')
         if self.m_tree.GetFirstItem().IsOk() == False:
             return None
 
@@ -3681,10 +3704,12 @@ class CNamespacePanel(wx.Panel, CJobs):
             items = self.get_children(item)
             s = items + s
 
+        print('get_expession_list() -> el=%s, s=%s' % (el, s))
         return el    
 
 
     def update_namespace(self, key, el):
+        print('update_namespace(key=%s, el=%s)' % (key, el))
         old_key = self.m_key
         old_el = self.get_expression_list()
 
@@ -3736,6 +3761,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         rl: list of dictionnaries, each element of the list describes a python expression
 
         See CSessionManager.get_namespace() for more details'''
+        print('do_update_namespace(rl=%s)' % pprint.pformat(rl, 4) )
         self.m_tree.DeleteAllItems()
 
         # root = self.m_tree.AddRoot('root')
@@ -3747,11 +3773,12 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         while len(s) > 0:
             item = s.pop(0)
+            print('do_update_namespace() - populating item %s' % ItemToStr(self.m_tree, item))
             self.expand_item(item, rl, item is root)
             
             items = self.get_children(item)
             s = items + s
-
+        print('s="%s"' % s)
         self.m_tree.Refresh()
 
 
