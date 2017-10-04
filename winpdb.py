@@ -3339,10 +3339,14 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
 
         event.Skip()
 
+gItemsWithChildren = {}
 
 # Support function for the porting to WxPython 4
 def ItemHasChildren(tree, item):
     '''Return True if the _item_ of TreeListCtrl has children.'''
+    if item in gItemsWithChildren:
+        return gItemsWithChildren[item]
+
     firstChild = tree.GetFirstChild(item)
     if firstChild and firstChild.IsOk():
         return True
@@ -3353,6 +3357,7 @@ def SetItemHasChildren(tree, item, state):
     '''Stub function, not available in WxPython 4.
     It used to display an expand symbol depending on _state_ so that the
     children list can be lazily expanded.'''
+    gItemsWithChildren[item] = state
     pass
 
         
@@ -3484,12 +3489,17 @@ class CNamespacePanel(wx.Panel, CJobs):
 
 
     def GetChildrenCount(self, item):
-        n = self.m_tree.GetChildrenCount(item)
+        # n = self.m_tree.GetChildrenCount(item)
         # n = self.m_tree.GetItemCount(item)
-        if n != 1:
-            return n 
+        # if n != 1:
+        #    print('GetChildrenCount(item=%s) -> %d' % (ItemToStr(self.m_tree, item), n) )
+        #    return n
 
-        child = self.get_children(item)[0]
+        children = self.get_children(item)
+        if len(children) == 0 or len(children) > 1:
+            return len(children)
+
+        child = children[0]
         (expr, is_valid) = self.m_tree.GetItemData(child)
 
         if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK]:
@@ -3555,8 +3565,8 @@ class CNamespacePanel(wx.Panel, CJobs):
             #identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
 
             child = self.m_tree.AppendItem(item, identation + _name)
-            self.m_tree.SetItemText(child, ' ' + _repr, 2)
-            self.m_tree.SetItemText(child, ' ' + _type, 1)
+            self.m_tree.SetItemText(child, 2, ' ' + _repr)
+            self.m_tree.SetItemText(child, 1, ' ' + _type)
             self.m_tree.SetItemData(child, (r[rpdb2.DICT_KEY_EXPR], r[rpdb2.DICT_KEY_IS_VALID]))
             SetItemHasChildren(self.m_tree, child, (r[rpdb2.DICT_KEY_N_SUBNODES] > 0))
 
@@ -3572,14 +3582,14 @@ class CNamespacePanel(wx.Panel, CJobs):
         
         if self.GetChildrenCount(item) > 0:
             event.Skip()
-            self.m_tree.Refresh();
+            self.m_tree.Refresh()
             return
             
         self.m_tree.DeleteChildren(item)
         
         child = self.m_tree.AppendItem(item, STR_NAMESPACE_LOADING)
-        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 2)
-        self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_LOADING, 1)
+        self.m_tree.SetItemText(child, 2, ' ' + STR_NAMESPACE_LOADING)
+        self.m_tree.SetItemText(child, 1, ' ' + STR_NAMESPACE_LOADING)
         self.m_tree.SetItemData(child, (STR_NAMESPACE_LOADING, False))
 
         (expr, is_valid) = self.m_tree.GetItemData(item)
@@ -3609,8 +3619,8 @@ class CNamespacePanel(wx.Panel, CJobs):
     
         if t != None or r is None or len(r) == 0:
             child = self.m_tree.AppendItem(item, STR_NAMESPACE_DEADLOCK)
-            self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 2)
-            self.m_tree.SetItemText(child, ' ' + STR_NAMESPACE_DEADLOCK, 1)
+            self.m_tree.SetItemText(child, 2, ' ' + STR_NAMESPACE_DEADLOCK)
+            self.m_tree.SetItemText(child, 1, ' ' + STR_NAMESPACE_DEADLOCK)
             self.m_tree.SetItemData(child, (STR_NAMESPACE_DEADLOCK, False))
             self.m_tree.Expand(item)
 
