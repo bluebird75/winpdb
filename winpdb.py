@@ -279,8 +279,9 @@ END OF TERMS AND CONDITIONS
 
 import sys
 
-# Works only with WxPython 4, compatible with python 3.4+ and Python 2.7
-WXVER = "4"
+# Winpdb Works only with WxPython 4, compatible with python 3.4+ and Python 2.7
+# version 4 is not yet released, keep working with version 3+ at the moment
+WXVER = "3.0.3"
 
 STR_BAD_PYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_BAD_PYTHON_ERROR_MSG = """Unsupported Python version
@@ -296,10 +297,9 @@ of Python."""
 
 STR_WXPYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_WXPYTHON_ERROR_MSG = """wxPython was not found.
-wxPython 2.6 or higher is required to run the winpdb GUI.
+wxPython 4.0 or higher is required to run the Winpdb GUI.
 wxPython is the graphical user interface toolkit used by Winpdb.
 You can find more information on wxPython at http://www.wxpython.org/
-The Unicode version of wxPython is recommended for Winpdb.
 To use the debugger without a GUI, run rpdb2."""
 
 STR_X_ERROR_MSG = """It was not possible to start Winpdb. 
@@ -343,13 +343,6 @@ if platform.python_implementation()  != 'CPython':
     myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
     sys.exit(1)
 
-
-# multi-install of Wx, correct version must be selected with wxversion
-try:
-    import wxversion
-    wxversion.ensureMinimal(WXVER)
-except ImportError:
-    pass
 
 try:
     import wx
