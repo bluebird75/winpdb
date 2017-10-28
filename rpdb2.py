@@ -11412,6 +11412,16 @@ class CSessionManagerInternal:
 
 
     def get_namespace(self, nl, filter_level, repr_limit):
+        ''' See CSessionManager.get_namespace() for more details.
+        Arguments:
+        :param nl: list of (expr, boolean) with:
+                    expr: expression to be computed
+                    boolean: tells whether subnodes of the expression should be returned as well (class content,
+                             list content, ...)
+        :param filter_level: int, 0 1 or 2
+        :param repr_limit: max length of the expression to return
+        :return: a list of dictionnaries, where each item of the list represent an item in nl
+        '''
         frame_index = self.get_frame_index()
         fAnalyzeMode = (self.m_state_manager.get_state() == STATE_ANALYZE)
 

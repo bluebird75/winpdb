@@ -46,8 +46,8 @@ Winpdb Reborn is NOT compatible with Jython or IronPython.
 Release history
 ===============
 
-Version 2.5
------------
+Version 2.5 - dev in progress
+-----------------------------
 -  First official release by Philippe Fremy
 -  Add support for Python 3 GUI (using WxPython Phoenix)
 -  Allow installation of all dependencies with pip
@@ -65,6 +65,8 @@ Version 2.5
 
 Installation
 ============
+
+(not working yet until the new version is released).
 
 The standard way to install Winpdb Reborn is with pip, as administrator/root::
 
