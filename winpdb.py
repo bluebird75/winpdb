@@ -3724,7 +3724,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         self.m_key = key
 
-        if el is None:
+        if not el:
             el = [(self.get_root_expr(), True)]
 
         self.post(el, self.m_filter_level)
