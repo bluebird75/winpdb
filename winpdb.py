@@ -4277,7 +4277,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         self.m_listbox_scripts.DeleteAllItems()
 
         for i, s in enumerate(self.m_server_list):
-            index = self.m_listbox_scripts.InsertItem( 0, repr(s.m_pid))
+            index = self.m_listbox_scripts.InsertItem( i, repr(s.m_pid))
             
             filename = s.m_filename
             if not g_fUnicode:
