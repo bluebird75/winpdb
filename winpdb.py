@@ -3313,7 +3313,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
                 name = rpdb2.as_string(name, wx.GetDefaultPyEncoding())
 
             fBroken = s[rpdb2.DICT_KEY_BROKEN]
-            index = self.m_threads.InsertItem( 0, repr(tid))
+            index = self.m_threads.InsertItem( i, repr(tid))
             self.m_threads.SetItem(index, 1, name)
             self.m_threads.SetItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
             self.m_threads.SetItemData(index, tid)
@@ -3991,7 +3991,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
                 filename = rpdb2.as_string(filename, wx.GetDefaultPyEncoding())
                 function = rpdb2.as_string(function, wx.GetDefaultPyEncoding())
 
-            index = self.m_stack.InsertItem( 0, repr(i))
+            index = self.m_stack.InsertItem( i, repr(i))
             self.m_stack.SetItem(index, 1, os.path.basename(filename))
             self.m_stack.SetItem(index, 2, repr(lineno))
             self.m_stack.SetItem(index, 3, function)
