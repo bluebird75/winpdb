@@ -3388,7 +3388,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         sizerv = wx.BoxSizer(wx.VERTICAL)
         
-        self.m_tree = wx_dataview_or_gizmos.TreeListCtrl(self, -1, style = wx.TR_HIDE_ROOT | wx.TR_DEFAULT_STYLE | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
+        self.m_tree = wx_dataview_or_gizmos.TreeListCtrl(self, -1 ) # note: default style is perfect for us
 
         self.m_tree.AppendColumn(TLC_HEADER_NAME)
         self.m_tree.AppendColumn(TLC_HEADER_TYPE)
