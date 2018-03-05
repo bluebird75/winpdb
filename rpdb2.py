@@ -2539,7 +2539,7 @@ def detect_encoding(file):
 
 
 def detect_locale():
-    encoding = locale.getdefaultlocale()[1]
+    encoding = locale.getpreferredencoding()
 
     if encoding == None:
         return 'ascii'
