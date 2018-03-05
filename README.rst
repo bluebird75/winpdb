@@ -11,6 +11,8 @@ Website: https://github.com/bluebird75/winpdb
 Description
 ===========
 
+*This version is under development, no package exist yet !*
+
 *Winpdb Reborn* is a portable (Windows / Linux) standalone graphical debugger for Python. It focuses on making debugging
 easy and does not include any IDE features. It works on both Python 2 and 3 and has very little dependencies (only WxPython for the GUI).
 
