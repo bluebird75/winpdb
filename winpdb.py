@@ -909,8 +909,8 @@ class CMenuBar:
         self.m_cascades = {}
         
     def init_menubar(self, resource):
-        if 'wxMac' in wx.PlatformInfo:
-             wx.MenuBar.SetAutoWindowMenu(False)
+        # if 'wxMac' in wx.PlatformInfo:
+        #      wx.MenuBar.SetAutoWindowMenu(False)
 
         self.m_menubar = wx.MenuBar()
 
@@ -2286,7 +2286,7 @@ class CCaption(wx.Panel):
         sizerv.Add(self.m_static_text, 0, wx.EXPAND | wx.ALL, 2)
 
         font = self.m_static_text.GetFont()
-        new_font = wx.Font(pointSize = font.GetPointSize(), family = font.GetFamily(), style = font.GetStyle(), weight = wx.BOLD, faceName = font.GetFaceName())
+        new_font = wx.Font(font.GetPointSize(), font.GetFamily(), font.GetStyle(), wx.BOLD, font.GetUnderlined(), font.GetFaceName())
         self.m_static_text.SetFont(new_font)
 
         self.SetSizer(sizerv)
