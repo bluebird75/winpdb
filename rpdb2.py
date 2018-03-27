@@ -540,10 +540,10 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 5, 0, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.5.0 - Tychod"
-RPDB_VERSION = "RPDB_2_5_0"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_5_0"
+VERSION = (2, 4, 9, 0, 'Tychod')
+RPDB_TITLE = "RPDB 2.4.9 - Tychod"
+RPDB_VERSION = "RPDB_2_4_9"
+RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_9"
 
 
 

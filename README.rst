@@ -3,7 +3,7 @@
 *Winpdb Reborn - A GPL Python Debugger, reborn from the unmaintained
 Winpdb*
 
-by Philippe Fremy, and Nir Aides as initial author
+by Philippe Fremy as maintainer, and Nir Aides as initial author
 
 Website: https://github.com/bluebird75/winpdb 
 
@@ -37,20 +37,20 @@ Platform supported:
 
 To run Winpdb Reborn:
 
--  Any version of CPython above 2.6: 2.6, 2.7, 3.0 - 3.6
--  For the GUI: WxPython 2.6 or above, and WxPython 3 or 4
+-  CPython 2.6 or 2.7
+-  For the GUI: WxPython 3
+
+Note that running Winpdb with PyPy is possible, by launching rpdb2.py with pypy and using the winpdb GUI to connect to it.
 
 Winpdb Reborn is NOT compatible with Jython or IronPython.
 
 Release history
 ===============
 
-Version 2.5
------------
+Version 2.4.9
+-------------
 -  First official release by Philippe Fremy
--  Add support for Python 3 GUI (using WxPython Phoenix)
--  Allow installation of all dependencies with pip
--  Add support for Python 2.7, 3.5 and 3.6
+-  Fix support for Python 2.7
 -  Drop support for Python 2.5 and WxPython 2.6, min versions are now Python 2.6 and WxPython 3.0
 -  Add support for PyPy to Rpdb2
 -  Can now specify a different Python interpreter for the program under
@@ -69,8 +69,9 @@ The standard way to install Winpdb Reborn is with pip, as administrator/root::
 
     # python -m pip install winpdb-reborn
 
-This will install Winpdb Reborn and the only dependency WxPython automatically. On Windows,
-shortcuts for the start menu are created. 
+This will install Winpdb Reborn. 
+
+You must also install the wxPython 3 for your version of Python. See: https://sourceforge.net/projects/wxpython/files/wxPython/
 
 *Winpdb Reborn* is not packaged yet by any linux distro. If your package manager proposes
 to install Winpdb, that’s the old unmaintained Winpdb which works neither with Python 2.7 nor with Python 3.

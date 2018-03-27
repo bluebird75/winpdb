@@ -543,9 +543,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-VERSION = (2, 5, 0, 0, 'Tychod')
-WINPDB_TITLE = "Winpdb Reborn 2.5.0"
-WINPDB_VERSION = "WINPDB_REBORN_2_5_0"
+VERSION = (2, 4, 9, 0, 'Tychod')
+WINPDB_TITLE = "Winpdb Reborn 2.4.9"
+WINPDB_VERSION = "WINPDB_REBORN_2_4_9"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -756,11 +756,11 @@ ABOUT_HTML_SUFFIX = """
 </html>
 """
 
-WEBSITE_URL = "http://www.winpdb.org/"
-SUPPORT_URL = "http://www.winpdb.org/?page_id=4"
-DOCS_URL = "http://www.winpdb.org/?page_id=5"
+WEBSITE_URL  = "https://github.com/bluebird75/winpdb"
+SUPPORT_URL  = "https://github.com/bluebird75/winpdb"
+DOCS_URL     = "http://www.winpdb.org/?page_id=5"
 EXT_DOCS_URL = "http://www.winpdb.org/?page_id=17"
-UPDATES_URL = "http://www.winpdb.org/?page_id=3"
+UPDATES_URL  = "https://github.com/bluebird75/winpdb"
 
 STR_ERROR_INTERFACE_COMPATIBILITY = "The rpdb2 module which was found by Winpdb is of unexpected version (version expected: %s, version found: %s). Please upgrade to the latest versions of winpdb.py and rpdb2.py."
 STR_NAMESPACE_DEADLOCK = 'Data Retrieval Timeout'
@@ -4789,7 +4789,7 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
         raise
         
     if not 'unicode' in wx.PlatformInfo:
-        dlg = wx.MessageDialog(None, STR_WXPYTHON_ANSI_WARNING_MSG, STR_WXPYTHON_ANSI_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg = wx.Mes8ageDialog(None, STR_WXPYTHON_ANSI_WARNING_MSG, STR_WXPYTHON_ANSI_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
         dlg.ShowModal()
         dlg.Destroy()
     
@@ -4800,8 +4800,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_5_0":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_5_0", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_2_4_9":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_9", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient, WINPDB_TITLE)
