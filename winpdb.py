@@ -285,9 +285,9 @@ WXVER_PYTHON3 = "4"
 STR_BAD_PYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_BAD_PYTHON_ERROR_MSG = """Unsupported Python version
 Winpdb does not run with this version of Python. You need
-Python 2.6 or above with at least WxPython 3 to run Winpdb.
+Python 2.6 or 2.7 with WxPython 3 from sourceforge to run Winpdb.
 
-To debug a program written for PyPy or Python 3.x , launch
+To debug a program written for PyPy, launch
 Winpdb with Python 2 and select the interpreter to use in 
 the launch dialog.
 
@@ -296,10 +296,12 @@ of Python."""
 
 STR_WXPYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_WXPYTHON_ERROR_MSG = """wxPython was not found.
-wxPython 2.6 or higher is required to run the winpdb GUI.
-wxPython is the graphical user interface toolkit used by Winpdb.
-You can find more information on wxPython at http://www.wxpython.org/
-The Unicode version of wxPython is recommended for Winpdb.
+wxPython 3 is required to run the winpdb GUI. 
+Download it from sourceforge: https://sourceforge.net/projects/wxpython/files/wxPython/
+
+Note that wxPython 4 only support Python 3 and above. There is a dedicated version
+of winpdb-reborn for Python 3 and wxPython 4.
+
 To use the debugger without a GUI, run rpdb2."""
 
 STR_X_ERROR_MSG = """It was not possible to start Winpdb. 
@@ -334,11 +336,7 @@ def myErrorMsgDialog(title, msg):
 RUNNING_UNDER_PY2 = (sys.version_info[0] == 2)
 RUNNING_UNDER_PY3 = (sys.version_info[0] == 3)
 
-if RUNNING_UNDER_PY2 == RUNNING_UNDER_PY3:
-    # Houston, we have a problem!
-    raise ValueError('XXX')
-
-if platform.python_implementation()  != 'CPython':
+if platform.python_implementation()  != 'CPython' or RUNNING_UNDER_PY3:
     # Only CPython 2.x and 3.x supported
     myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
     sys.exit(1)
@@ -361,17 +359,15 @@ if RUNNING_UNDER_PY2:
             WXVER = WXVER_PYTHON3
         wxversion.ensureMinimal(WXVER)
 else:
-    WXVER = WXVER_PYTHON3
+    myErrorMsgDialog( STR_BAD_PYTHON_ERROR_TITLE, STR_BAD_PYTHON_ERROR_MSG )
+    sys.exit(1)
 
 import wx
 
 assert wx.VERSION_STRING >= WXVER
         
 import wx.lib.wxpTag
-if RUNNING_UNDER_PY3:
-    import wx.dataview as wx_dataview_or_gizmos
-else:
-    import wx.gizmos as wx_dataview_or_gizmos
+import wx.gizmos as wx_dataview_or_gizmos
 
 import wx.html
 
@@ -382,11 +378,8 @@ import wx.stc as stc
 
 import webbrowser
 import traceback
-if RUNNING_UNDER_PY2:
-    from cStringIO import StringIO
-    import Queue
-else:
-    from io import StringIO
+from cStringIO import StringIO
+import Queue
 
 import threading
 import tempfile
