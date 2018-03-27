@@ -2127,6 +2127,7 @@ g_fDefaultStd = True
 
 #
 # In debug mode errors and tracebacks are printed to stdout
+# and frames of rpdb2 are visible to the user in the debugger
 #
 g_fDebug = False
 
@@ -6689,7 +6690,7 @@ class CDebuggerCoreThread:
             f = base_frame
 
         while f is not None:
-            if not g_fDebug and f.f_code.co_name == 'rpdb2_import_wrapper':
+            if is_func_hidden( f.f_code.co_name ):
                 f = f.f_back
                 continue
 
@@ -7713,7 +7714,7 @@ class CDebuggerCore:
             #print_debug('state: %s' % self.m_state_manager.get_state())
             self.request_go_quiet()
 
-        elif step_tid == ctx.m_thread_id and frame.f_code.co_name == 'rpdb2_import_wrapper':
+        elif step_tid == ctx.m_thread_id and is_func_hidden( frame.f_code.co_name ):
             self.request_step_quiet()
 
         else:
@@ -8391,7 +8392,7 @@ class CDebuggerEngine(CDebuggerCore):
                 return
 
             s = my_extract_stack(f)
-            s = [1 for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
+            s = [1 for (a, b, c, d) in s if not is_func_hidden( c ) ]
 
             stack_depth = len(s)
 
@@ -8402,7 +8403,7 @@ class CDebuggerEngine(CDebuggerCore):
             else:
                 s = my_extract_stack(tb.tb_frame.f_back)
                 s += my_extract_tb(tb)
-                s = [1 for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
+                s = [1 for (a, b, c, d) in s if is_func_hidden( c ) ]
 
                 stack_depth_exception = len(s)
 
@@ -8530,7 +8531,7 @@ class CDebuggerEngine(CDebuggerCore):
 
         #print code_list
 
-        __s = [(a, b, c, d) for (a, b, c, d) in s if g_fDebug or c != 'rpdb2_import_wrapper']
+        __s = [(a, b, c, d) for (a, b, c, d) in s if not is_func_hidden( c ) ]
 
         if (ctx.m_uef_lineno is not None) and (len(__s) > 0):
             (a, b, c, d) = __s[0]
@@ -13748,6 +13749,14 @@ def rpdb2_import_wrapper(*args, **kwargs):
 
     return m
 
+
+def is_func_hidden( name ):
+    '''Return whether we should hide this function and frame from display'''
+    # in debug mode, we hide nothing
+    if g_fDebug: 
+        return False
+    # currently, only rpdb2 import wrapper is hidden
+    return name in ['rpdb2_import_wrapper']
 
 
 g_import = None
