@@ -14685,9 +14685,7 @@ def main(StartClient_func = StartClient, version = RPDB_TITLE):
 
     return 0
 
-
-
-if __name__ == '__main__':
+def run_rpdb2():
     import rpdb2
 
     #
@@ -14708,5 +14706,7 @@ if __name__ == '__main__':
         rpdb2.print_debug( 'Breaking before exit')
         rpdb2.setbreak()
 
+if __name__ == '__main__':
+    run_rpdb2()
 
 

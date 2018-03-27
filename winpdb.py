@@ -4811,9 +4811,7 @@ def main():
 def get_version():
     return WINPDB_VERSION
 
-
-
-if __name__=='__main__':
+def run_winpdb():
     ret = main()
 
     #
@@ -4825,4 +4823,8 @@ if __name__=='__main__':
     rpdb2.setbreak()
 
     
+if __name__=='__main__':
+    run_winpdb()
+
+
     
