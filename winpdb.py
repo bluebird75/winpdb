@@ -23,11 +23,11 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 
-ABOUT_NOTICE = """*Winpdb Reborn* is a platform independent lightweight
+ABOUT_NOTICE = """*Winpdb Reborn* 1.5 is a platform independent lightweight
 standalone graphical debugger for Python 2 and 3. It supports
 conditional breakpoints, multi-threaded debugging, smart 
 handling of forks, remote debugging and more.
-'''
+
 Copyright (C) 2013-2017 Philippe Fremy
 Copyright (C) 2005-2009 Nir Aides
 
