@@ -14,13 +14,14 @@ Description
 easy and does not include any IDE features. It works on both Python 2 and 3 and has very little dependencies (only WxPython for the GUI).
 
 **Features**:
-- graphical interface with stack/variable inspection, breakpoints and more
-- breakpoints: on lines or functions, with possible conditions, load/save breakpoint info
-- multi-threaded debugging
-- smart handling of fork, follow parent or child
-- remote debugging: GUI on one computer, program to debug on another computer with encrypted communication
-- up to 20 times quicker than pdb, the default Python debugger (on which many other debuggers are built)
-- debug PyPy scripts
+
+-  graphical interface with stack/variable inspection, breakpoints and more
+-  breakpoints: on lines or functions, with possible conditions, load/save breakpoint info
+-  multi-threaded debugging
+-  smart handling of fork, follow parent or child
+-  remote debugging: GUI on one computer, program to debug on another computer with encrypted communication
+-  up to 20 times quicker than pdb, the default Python debugger (on which many other debuggers are built)
+-  debug PyPy scripts
 
 **Note:** The original Winpdb was no longer maintained since the release v1.4.8 in
 2010. I (Philippe Fremy) am providing a maintained version with new
@@ -30,11 +31,13 @@ Requirements
 ============
 
 Platform supported:
+
 -  Linux
 -  Windows XP and above
 -  MacOs is probably working but not tested
 
 To run Winpdb Reborn:
+
 - CPython 2.6 or 2.7 and WxPython 3
 - or CPython 3.2 or above and WxPython 4
 
@@ -47,6 +50,7 @@ Release history
 
 Version 1.5.0
 -------------
+
 -  First official release by Philippe Fremy
 -  Fix support for Python 2.7
 -  Drop support for Python 2.5 and WxPython 2.6, min versions are now Python 2.6 and WxPython 3.0
@@ -69,6 +73,7 @@ The standard way to install Winpdb Reborn is with pip, as administrator/root::
     # python -m pip install winpdb-reborn
 
 You must also install the wxPython for your version of Python: 
+
 -  for Python 2, check https://sourceforge.net/projects/wxpython/files/wxPython/
 -  for Python 3, wxPython is automatically installed as a dependency with pip
 
@@ -133,7 +138,7 @@ Community
 You can ask questions about Winpdb Reborn on the dedicated google group:
 https://groups.google.com/forum/#!forum/winpdb
 
-Feel free to raise issues or propose improvements on the Github repository: https://github.com/bluebird75/winpdb
+Feel free to raise issues or propose improvements on the Github repository: https://github.com/bluebird75/winpdb/issues
 
 |stats|
 
