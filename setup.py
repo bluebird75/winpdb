@@ -3,7 +3,7 @@
 
     Setup script for winpdb
 
-    Copyright (C) 2013-2017 Philippe Fremy
+    Copyright (C) 2013-2018 Philippe Fremy
     Copyright (C) 2005-2009 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
@@ -23,9 +23,7 @@
 
 
 
-from distutils.file_util import write_file
-from distutils.file_util import copy_file
-from distutils.core import setup
+from setuptools import setup
 
 import os
 
@@ -37,32 +35,71 @@ conditional breakpoints, multi-threaded debugging, smart
 handling of forks, remote debugging and more.
 '''
 
-
-if os.name == 'nt':
-    write_file('rpdb2.bat', ['@python -c "import rpdb2;rpdb2.main()" %*'])
-    write_file('winpdb.bat', ['@python -c "import winpdb;winpdb.main()" %*'])
-    copy_file('winpdb', 'winpdb_.pyw')
-    
-    _scripts = ['winpdb_inst.py', 'winpdb_.pyw', 'winpdb.bat', 'rpdb2.bat']
-
-else:
-    _scripts = ['winpdb', 'rpdb2']
-
-
-
 setup(
     name = 'winpdb-reborn',
-    version = '1.5.0',
+    version = '1.4.9-rc1',
     description = 'A platform independent GPL Python debugger.',
     long_description = LONG_DESC,
     author = 'Philippe Fremy, Nir Aides',
     author_email = 'phil.fremy@free.fr',
     url = 'https://github.com/bluebird75/winpdb',
     license = 'GNU GPL',
-    platforms = ["any"],
+    keywords = 'debugger',
+    classifiers=[
+        # How mature is this project? Common values are
+        #   3 - Alpha
+        #   4 - Beta
+        'Development Status :: 5 - Production/Stable',
+
+        # Runs in different environments
+        'Environment :: Console',
+        'Environment :: Win32 (MS Windows)',
+        'Environment :: MacOS X',
+        'Environment :: X11 Applications',
+
+        # GNU GPL v2 or above
+        'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+
+        # Runs on Windows, unix and MacOs 
+        'Operating System :: MacOS',
+        'Operating System :: Microsoft :: Windows',
+        'Operating System :: POSIX',
+
+        # This version is for python 2 only
+        'Programming Language :: Python :: 2 :: Only',
+
+
+        'Topic :: Software Development :: Debuggers',
+        'Topic :: Utilities',
+        'Topic :: Education',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Software Development :: Debuggers',
+
+        # Indicate who your project is intended for
+        'Intended Audience :: Developers',
+        'Intended Audience :: Education',
+        'Intended Audience :: Science/Research',
+    ],
+
+    project_urls={
+        'Source': 'https://github.com/bluebird75/winpdb/',
+        'Documentation': "http://www.winpdb.org/?page_id=5",
+        'Tracker': 'https://github.com/bluebird75/winpdb/issues',
+    },
+
+    python_requires='>=2.6,  <3',
     py_modules = ['winpdb', 'rpdb2'],
-    scripts = _scripts
-    )
+
+    entry_points={
+        'console_scripts': [
+            'rpdb2=rpdb2:run_rpdb2',
+        ],
+        'gui_scripts': [
+            'winpdb=winpdb:run_winpdb',
+        ],
+    },
+
+)
 
 
 
