@@ -27,17 +27,13 @@ from setuptools import setup
 
 import os
 
+# strip out build status
+LONG_DESC = ''.join( open('README.rst').readlines()[1:-8] )
 
-
-LONG_DESC = '''*Winpdb Reborn* is a platform independent lightweight 
-standalone graphical debugger for Python 2 and 3. It supports
-conditional breakpoints, multi-threaded debugging, smart 
-handling of forks, remote debugging and more.
-'''
 
 setup(
     name = 'winpdb-reborn',
-    version = '1.4.9-rc1',
+    version = '1.5.0',
     description = 'A platform independent GPL Python debugger.',
     long_description = LONG_DESC,
     author = 'Philippe Fremy, Nir Aides',
