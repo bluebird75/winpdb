@@ -23,11 +23,11 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 
-ABOUT_NOTICE = """*Winpdb Reborn* is a platform independent lightweight
+ABOUT_NOTICE = """*Winpdb Reborn* 1.5 is a platform independent lightweight
 standalone graphical debugger for Python 2 and 3. It supports
 conditional breakpoints, multi-threaded debugging, smart 
 handling of forks, remote debugging and more.
-'''
+
 Copyright (C) 2013-2017 Philippe Fremy
 Copyright (C) 2005-2009 Nir Aides
 
@@ -537,9 +537,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-VERSION = (2, 5, 0, 0, 'Tychod')
-WINPDB_TITLE = "Winpdb Reborn 2.5.0"
-WINPDB_VERSION = "WINPDB_REBORN_2_5_0"
+VERSION = (1, 5, 0, 0, 'Tychod')
+WINPDB_TITLE = "Winpdb Reborn 1.5.0"
+WINPDB_VERSION = "WINPDB_REBORN_1_5_0"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -609,7 +609,7 @@ ML_WINDOW = "&Window"
 
 ML_HELP = "&Help"
 ML_WEBSITE = "&Website"
-ML_SUPPORT = "&Support"
+ML_SUPPORT = "&Report issues"
 ML_DOCS = "&Online Docs"
 ML_EXT_DOCS = "&External Docs"
 ML_UPDATES = "&Check for Updates"
@@ -661,7 +661,7 @@ GOTO_TIP = "Continue to the line under the cursor."
 RETURN_TIP = "Continue to the end of the current scope."
 JUMP_TIP = "Jump to another line in the current scope."
 WEBSITE_TIP = "Open the Winpdb homepage."
-SUPPORT_TIP = "Open the Winpdb support web page."
+SUPPORT_TIP = "Open the Winpdb issue reporting web page."
 DOCS_TIP = "Open the Winpdb online documentation web page."
 EXT_DOCS_TIP = "Open the Winpdb external documentation web page."
 UPDATES_TIP = "Check for updates in the Winpdb website."
@@ -750,11 +750,11 @@ ABOUT_HTML_SUFFIX = """
 </html>
 """
 
-WEBSITE_URL = "http://www.winpdb.org/"
-SUPPORT_URL = "http://www.winpdb.org/?page_id=4"
+WEBSITE_URL  = "https://github.com/bluebird75/winpdb"
+SUPPORT_URL  = "https://github.com/bluebird75/winpdb/issues"
 DOCS_URL = "http://www.winpdb.org/?page_id=5"
 EXT_DOCS_URL = "http://www.winpdb.org/?page_id=17"
-UPDATES_URL = "http://www.winpdb.org/?page_id=3"
+UPDATES_URL  = "https://github.com/bluebird75/winpdb"
 
 STR_ERROR_INTERFACE_COMPATIBILITY = "The rpdb2 module which was found by Winpdb is of unexpected version (version expected: %s, version found: %s). Please upgrade to the latest versions of winpdb.py and rpdb2.py."
 STR_NAMESPACE_DEADLOCK = 'Data Retrieval Timeout'
@@ -1444,7 +1444,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/4/" + ML_HELP +   "/1/" + ML_SUPPORT: {COMMAND: self.do_support, TOOLTIP: SUPPORT_TIP}, 
             "/4/" + ML_HELP +   "/2/" + ML_DOCS: {COMMAND: self.do_docs, TOOLTIP: DOCS_TIP}, 
             "/4/" + ML_HELP +   "/3/" + ML_EXT_DOCS: {COMMAND: self.do_ext_docs, TOOLTIP: EXT_DOCS_TIP}, 
-            "/4/" + ML_HELP +   "/4/" + ML_UPDATES: {COMMAND: self.do_updates, TOOLTIP: UPDATES_TIP}, 
+            # "/4/" + ML_HELP +   "/4/" + ML_UPDATES: {COMMAND: self.do_updates, TOOLTIP: UPDATES_TIP}, 
             "/4/" + ML_HELP +   "/5/" + ML_ABOUT: {COMMAND: self.do_about}, 
             "/4/" + ML_HELP +   "/6/" + ML_LICENSE: {COMMAND: self.do_license}
         }
@@ -4880,8 +4880,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_5_0":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_5_0", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_1_5_0":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("0PDB_1_5_0", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient, WINPDB_TITLE)
@@ -4891,9 +4891,7 @@ def main():
 def get_version():
     return WINPDB_VERSION
 
-
-
-if __name__=='__main__':
+def run_winpdb():
     ret = main()
 
     #
@@ -4905,4 +4903,8 @@ if __name__=='__main__':
     rpdb2.setbreak()
 
     
+if __name__=='__main__':
+    run_winpdb()
+
+
     

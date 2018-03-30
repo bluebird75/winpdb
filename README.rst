@@ -3,10 +3,9 @@
 *Winpdb Reborn - A GPL Python Debugger, reborn from the unmaintained
 Winpdb*
 
-by Philippe Fremy, and Nir Aides as initial author
+by Philippe Fremy as maintainer, and Nir Aides as initial author
 
 Website: https://github.com/bluebird75/winpdb 
-
 
 Description
 ===========
@@ -17,6 +16,7 @@ Description
 easy and does not include any IDE features. It works on both Python 2 and 3 and has very little dependencies (only WxPython for the GUI).
 
 **Features**:
+
 - graphical interface with stack/variable inspection, breakpoints and more
 - breakpoints: on lines or functions, with possible conditions, load/save breakpoint info
 - multi-threaded debugging
@@ -40,21 +40,25 @@ Platform supported:
 
 To run Winpdb Reborn:
 
--  Any version of CPython above 2.6: 2.6, 2.7, 3.0 - 3.6
--  For the GUI: WxPython 2.6 or above, and WxPython 3 or 4
+- CPython 2.6 or 2.7 and WxPython 3
+- or CPython 3.2 or above and WxPython 4
+
+Note that running Winpdb with PyPy is possible, by launching rpdb2.py with pypy and using the winpdb GUI to connect to it.
 
 Winpdb Reborn is NOT compatible with Jython or IronPython.
 
 Release history
 ===============
 
-Version 2.5 - dev in progress
------------------------------
+Version 1.5.0
+-------------
+
 -  First official release by Philippe Fremy
 -  Add support for Python 3 GUI (using WxPython Phoenix)
 -  Allow installation of all dependencies with pip
 -  Add support for Python 2.7, 3.5 and 3.6
 -  Drop support for Python 2.5 and WxPython 2.6, min versions are now Python 2.6 and WxPython 3.0
+-  rpdb2.py is now compatible with Python 3
 -  Add support for PyPy to Rpdb2
 -  Can now specify a different Python interpreter for the program under
    debug, allowing PyPy support
@@ -74,8 +78,10 @@ The standard way to install Winpdb Reborn is with pip, as administrator/root::
 
     # python -m pip install winpdb-reborn
 
-This will install Winpdb Reborn and the only dependency WxPython automatically. On Windows,
-shortcuts for the start menu are created. 
+You must also install the wxPython for your version of Python: 
+
+-  for Python 2, check https://sourceforge.net/projects/wxpython/files/wxPython/
+-  for Python 3, wxPython is automatically installed as a dependency with pip
 
 *Winpdb Reborn* is not packaged yet by any linux distro. If your package manager proposes
 to install Winpdb, that’s the old unmaintained Winpdb which works neither with Python 2.7 nor with Python 3.
@@ -101,8 +107,9 @@ Where do the files go ?
 The setup script copies rpdb2.py and winpdb.py modules to the Python
 site-packages folder. The scripts rpdb2, winpdb are copied to the
 Python binaries (scripts) folder. On Linux this folder is usually ``/usr/bin`` 
-and is in the path by default. On Windows this folder is ``%PYTHONHOME%\Scripts`` and is not in the path
-by default.
+and is in the path by default. On Windows this folder is ``%PYTHONHOME%\Scripts``,
+where you should see a winpdb.exe and rpdb2.exe .
+
 
 Usage
 =====
@@ -137,7 +144,7 @@ Community
 You can ask questions about Winpdb Reborn on the dedicated google group:
 https://groups.google.com/forum/#!forum/winpdb
 
-Feel free to raise issues or propose improvements on the Github repository: https://github.com/bluebird75/winpdb
+Feel free to raise issues or propose improvements on the Github repository: https://github.com/bluebird75/winpdb/issues
 
 |stats|
 

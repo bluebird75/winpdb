@@ -6,3 +6,5 @@ tests/f*
 tests/start
 tests/atexit
 tests/done
+dist/
+winpdb_reborn.egg-info/
