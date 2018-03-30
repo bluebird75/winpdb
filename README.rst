@@ -36,9 +36,8 @@ Platform supported:
 -  MacOs is probably working but not tested
 
 To run Winpdb Reborn:
-
--  CPython 2.6 or 2.7
--  For the GUI: WxPython 3
+- CPython 2.6 or 2.7 and WxPython 3
+- or CPython 3.2 or above and WxPython 4
 
 Note that running Winpdb with PyPy is possible, by launching rpdb2.py with pypy and using the winpdb GUI to connect to it.
 
@@ -52,6 +51,7 @@ Version 2.4.9
 -  First official release by Philippe Fremy
 -  Fix support for Python 2.7
 -  Drop support for Python 2.5 and WxPython 2.6, min versions are now Python 2.6 and WxPython 3.0
+-  rpdb2.py is now compatible with Python 3
 -  Add support for PyPy to Rpdb2
 -  Can now specify a different Python interpreter for the program under
    debug, allowing PyPy support
@@ -69,9 +69,9 @@ The standard way to install Winpdb Reborn is with pip, as administrator/root::
 
     # python -m pip install winpdb-reborn
 
-This will install Winpdb Reborn. 
-
-You must also install the wxPython 3 for your version of Python. See: https://sourceforge.net/projects/wxpython/files/wxPython/
+You must also install the wxPython for your version of Python: 
+-  for Python 2, check https://sourceforge.net/projects/wxpython/files/wxPython/
+-  for Python 3, wxPython is automatically installed as a dependency with pip
 
 *Winpdb Reborn* is not packaged yet by any linux distro. If your package manager proposes
 to install Winpdb, that’s the old unmaintained Winpdb which works neither with Python 2.7 nor with Python 3.
@@ -97,8 +97,9 @@ Where do the files go ?
 The setup script copies rpdb2.py and winpdb.py modules to the Python
 site-packages folder. The scripts rpdb2, winpdb are copied to the
 Python binaries (scripts) folder. On Linux this folder is usually ``/usr/bin`` 
-and is in the path by default. On Windows this folder is ``%PYTHONHOME%\Scripts`` and is not in the path
-by default.
+and is in the path by default. On Windows this folder is ``%PYTHONHOME%\Scripts``,
+where you should see a winpdb.exe and rpdb2.exe .
+
 
 Usage
 =====
