@@ -615,7 +615,7 @@ ML_WINDOW = "&Window"
 
 ML_HELP = "&Help"
 ML_WEBSITE = "&Website"
-ML_SUPPORT = "&Support"
+ML_SUPPORT = "&Report issues"
 ML_DOCS = "&Online Docs"
 ML_EXT_DOCS = "&External Docs"
 ML_UPDATES = "&Check for Updates"
@@ -667,7 +667,7 @@ GOTO_TIP = "Continue to the line under the cursor."
 RETURN_TIP = "Continue to the end of the current scope."
 JUMP_TIP = "Jump to another line in the current scope."
 WEBSITE_TIP = "Open the Winpdb homepage."
-SUPPORT_TIP = "Open the Winpdb support web page."
+SUPPORT_TIP = "Open the Winpdb issue reporting web page."
 DOCS_TIP = "Open the Winpdb online documentation web page."
 EXT_DOCS_TIP = "Open the Winpdb external documentation web page."
 UPDATES_TIP = "Check for updates in the Winpdb website."
@@ -757,7 +757,7 @@ ABOUT_HTML_SUFFIX = """
 """
 
 WEBSITE_URL  = "https://github.com/bluebird75/winpdb"
-SUPPORT_URL  = "https://github.com/bluebird75/winpdb"
+SUPPORT_URL  = "https://github.com/bluebird75/winpdb/issues"
 DOCS_URL     = "http://www.winpdb.org/?page_id=5"
 EXT_DOCS_URL = "http://www.winpdb.org/?page_id=17"
 UPDATES_URL  = "https://github.com/bluebird75/winpdb"
@@ -1451,7 +1451,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             "/4/" + ML_HELP +   "/1/" + ML_SUPPORT: {COMMAND: self.do_support, TOOLTIP: SUPPORT_TIP}, 
             "/4/" + ML_HELP +   "/2/" + ML_DOCS: {COMMAND: self.do_docs, TOOLTIP: DOCS_TIP}, 
             "/4/" + ML_HELP +   "/3/" + ML_EXT_DOCS: {COMMAND: self.do_ext_docs, TOOLTIP: EXT_DOCS_TIP}, 
-            "/4/" + ML_HELP +   "/4/" + ML_UPDATES: {COMMAND: self.do_updates, TOOLTIP: UPDATES_TIP}, 
+            # "/4/" + ML_HELP +   "/4/" + ML_UPDATES: {COMMAND: self.do_updates, TOOLTIP: UPDATES_TIP}, 
             "/4/" + ML_HELP +   "/5/" + ML_ABOUT: {COMMAND: self.do_about}, 
             "/4/" + ML_HELP +   "/6/" + ML_LICENSE: {COMMAND: self.do_license}
         }
