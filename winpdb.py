@@ -543,9 +543,9 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-VERSION = (2, 4, 9, 0, 'Tychod')
-WINPDB_TITLE = "Winpdb Reborn 2.4.9"
-WINPDB_VERSION = "WINPDB_REBORN_2_4_9"
+VERSION = (1, 5, 0, 0, 'Tychod')
+WINPDB_TITLE = "Winpdb Reborn 1.5.0"
+WINPDB_VERSION = "WINPDB_REBORN_1_5_0"
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
@@ -4800,8 +4800,8 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_2_4_9":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("RPDB_2_4_9", rpdb2.get_version()))
+    if rpdb2.get_version() != "RPDB_1_5_0":
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("0PDB_1_5_0", rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient, WINPDB_TITLE)

@@ -25,7 +25,7 @@
 
 COPYRIGHT_NOTICE = """Copyright (C) 2013-2017 Philippe Fremy, 2005-2009 Nir Aides"""
 
-CREDITS_NOTICE = """Work on version 2.4.8 was sponsored by Investortools, Inc."""
+CREDITS_NOTICE = """Work on version 1.4.8 was sponsored by Investortools, Inc."""
 
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it
@@ -540,10 +540,10 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 
 
 
-VERSION = (2, 4, 9, 0, 'Tychod')
-RPDB_TITLE = "RPDB 2.4.9 - Tychod"
-RPDB_VERSION = "RPDB_2_4_9"
-RPDB_COMPATIBILITY_VERSION = "RPDB_2_4_9"
+VERSION = (1, 5, 0, 0, 'Tychod')
+RPDB_TITLE = "RPDB 1.5.0 - Tychod"
+RPDB_VERSION = "RPDB_1_5_0"
+RPDB_COMPATIBILITY_VERSION = "RPDB_1_5_0"
 
 
 

@@ -30,7 +30,6 @@ Requirements
 ============
 
 Platform supported:
-
 -  Linux
 -  Windows XP and above
 -  MacOs is probably working but not tested
@@ -46,7 +45,7 @@ Winpdb Reborn is NOT compatible with Jython or IronPython.
 Release history
 ===============
 
-Version 2.4.9
+Version 1.5.0
 -------------
 -  First official release by Philippe Fremy
 -  Fix support for Python 2.7
