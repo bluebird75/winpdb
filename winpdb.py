@@ -4881,16 +4881,13 @@ def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, 
 
 
 def main():
-    if rpdb2.get_version() != "RPDB_1_5_0":
-        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ("0PDB_1_5_0", rpdb2.get_version()))
+    if rpdb2.get_version() != RPDB2_EXPECTED_VERSION:
+        rpdb2._print(STR_ERROR_INTERFACE_COMPATIBILITY % ( RPDB2_EXPECTED_VERSION, rpdb2.get_version()))
         return
         
     return rpdb2.main(StartClient, WINPDB_TITLE)
 
 
-
-def get_version():
-    return WINPDB_VERSION
 
 def run_winpdb():
     ret = main()
