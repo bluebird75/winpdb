@@ -7,10 +7,10 @@ by Philippe Fremy as maintainer, and Nir Aides as initial author
 
 Website: https://github.com/bluebird75/winpdb 
 
+**This version is under development, it is alpha quality. Use it at your own risks !**
+
 Description
 ===========
-
-*This version is under development, no package exist yet !*
 
 *Winpdb Reborn* is a portable (Windows / Linux) standalone graphical debugger for Python. It focuses on making debugging
 easy and does not include any IDE features. It works on both Python 2 and 3 and has very little dependencies (only WxPython for the GUI).
@@ -41,7 +41,7 @@ Platform supported:
 To run Winpdb Reborn:
 
 - CPython 2.6 or 2.7 and WxPython 3
-- or CPython 3.2 or above and WxPython 4
+- or CPython 3.4 or above and WxPython 4
 
 Note that running Winpdb with PyPy is possible, by launching rpdb2.py with pypy and using the winpdb GUI to connect to it.
 
@@ -49,6 +49,14 @@ Winpdb Reborn is NOT compatible with Jython or IronPython.
 
 Release history
 ===============
+
+Version 2.0.0 - in development
+------------------------------
+
+(version in progress)
+
+- port winpdb to WxPython 4 / Python 3
+
 
 Version 1.5.0
 -------------
@@ -69,6 +77,11 @@ Version 1.5.0
 -  Can adjust behavior of debugger to activate/deactivate the breakpoint before exit
 -  fix for launching Gnome Terminal properly
 
+
+Version 1.4.8
+-------------
+Last stable version released by Nir Aides.
+
 Installation
 ============
 
@@ -80,8 +93,8 @@ The standard way to install Winpdb Reborn is with pip, as administrator/root::
 
 You must also install the wxPython for your version of Python: 
 
--  for Python 2, check https://sourceforge.net/projects/wxpython/files/wxPython/
 -  for Python 3, wxPython is automatically installed as a dependency with pip
+-  for Python 2, check https://sourceforge.net/projects/wxpython/files/wxPython/
 
 *Winpdb Reborn* is not packaged yet by any linux distro. If your package manager proposes
 to install Winpdb, that’s the old unmaintained Winpdb which works neither with Python 2.7 nor with Python 3.
