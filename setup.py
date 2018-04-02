@@ -25,15 +25,17 @@
 
 from setuptools import setup
 
-import os
+import os, re
 
 # strip out build status
 LONG_DESC = ''.join( open('README.rst').readlines()[1:-8] )
 
+WINPDB_VERSION = re.search( r'WINPDB_VERSION\s*=\s*"(.*)"', open('winpdb.py').read() ).group(1).replace('-alpha', 'a')
+print( 'Packaging winpdb version: "%s"' % WINPDB_VERSION )
 
 setup(
     name = 'winpdb-reborn',
-    version = '1.5.0',
+    version = WINPDB_VERSION,
     description = 'A platform independent GPL Python debugger.',
     long_description = LONG_DESC,
     author = 'Philippe Fremy, Nir Aides',
@@ -45,7 +47,9 @@ setup(
         # How mature is this project? Common values are
         #   3 - Alpha
         #   4 - Beta
-        'Development Status :: 5 - Production/Stable',
+        #   5 - Production/Stable',
+        'Development Status :: 3 - Alpha',
+        # 'Development Status :: 5 - Production/Stable',
 
         # Runs in different environments
         'Environment :: Console',
@@ -62,7 +66,7 @@ setup(
         'Operating System :: POSIX',
 
         # This version is for python 2 only
-        'Programming Language :: Python :: 2 :: Only',
+        'Programming Language :: Python :: 3 :: Only',
 
 
         'Topic :: Software Development :: Debuggers',
@@ -83,7 +87,7 @@ setup(
         'Tracker': 'https://github.com/bluebird75/winpdb/issues',
     },
 
-    python_requires='>=2.6,  <3',
+    python_requires='>=3.4',
     py_modules = ['winpdb', 'rpdb2'],
 
     entry_points={
