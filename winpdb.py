@@ -537,9 +537,10 @@ TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
 
-VERSION = (1, 5, 0, 0, 'Tychod')
-WINPDB_TITLE = "Winpdb Reborn 1.5.0"
-WINPDB_VERSION = "WINPDB_REBORN_1_5_0"
+VERSION = (2, 0, 0, 1, 'Tychod')
+WINPDB_VERSION = "2.0.0-alpha1"
+WINPDB_TITLE = "Winpdb Reborn %s" % WINPDB_VERSION
+RPDB2_EXPECTED_VERSION = 'RPDB_1_5_0'
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
