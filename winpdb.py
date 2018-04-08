@@ -23,7 +23,12 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 
-ABOUT_NOTICE = """*Winpdb Reborn* 1.5 is a platform independent lightweight
+VERSION = (2, 0, 0, 5, 'Tychod')
+WINPDB_VERSION = "2.0.0.dev5"
+WINPDB_TITLE = "Winpdb Reborn %s" % WINPDB_VERSION
+RPDB2_EXPECTED_VERSION = 'RPDB_1_5_0'
+
+ABOUT_NOTICE = """*Winpdb Reborn* %s is a platform independent lightweight
 standalone graphical debugger for Python 2 and 3. It supports
 conditional breakpoints, multi-threaded debugging, smart 
 handling of forks, remote debugging and more.
@@ -536,11 +541,6 @@ HLIST_HEADER_PATH = "Path"
 TLC_HEADER_NAME = "Name"
 TLC_HEADER_REPR = "Repr"
 TLC_HEADER_TYPE = "Type"
-
-VERSION = (2, 0, 0, 1, 'Tychod')
-WINPDB_VERSION = "2.0.0-alpha1"
-WINPDB_TITLE = "Winpdb Reborn %s" % WINPDB_VERSION
-RPDB2_EXPECTED_VERSION = 'RPDB_1_5_0'
 
 WINPDB_SIZE = "winpdb_size"
 WINPDB_MAXIMIZE = "winpdb_maximize"
