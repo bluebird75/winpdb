@@ -7,7 +7,9 @@ by Philippe Fremy as maintainer, and Nir Aides as initial author
 
 Website: https://github.com/bluebird75/winpdb 
 
-**This version is under development, it is alpha quality. Use it at your own risks !**
+**This version of Winpdb is for Python 3 only. It is under development. Use it at your own risks !**
+
+A stable version of Winpdb for Python 2 is available on PyPi: https://pypi.org/project/winpdb-reborn/1.5.0/
 
 Description
 ===========
