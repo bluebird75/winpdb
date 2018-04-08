@@ -48,7 +48,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU General Public License for more details.
 
 Credits:
-Work on version 1.4.8 was sponsored by Investortools, Inc."""
+Work on version 1.4.8 was sponsored by Investortools, Inc.""" % WINPDB_VERSION
 
 LICENSE_NOTICE = """
 This program is free software; you can redistribute it and/or modify it 
@@ -284,9 +284,8 @@ END OF TERMS AND CONDITIONS
 
 import sys
 
-# Winpdb Works only with WxPython 4, compatible with python 3.4+ and Python 2.7
-# version 4 is not yet released, keep working with version 3+ at the moment
-WXVER = "3.0.3"
+# Winpdb Works only with WxPython 4, compatible with python 3.4+
+MIN_WXVER = "4.0.0"
 
 STR_BAD_PYTHON_ERROR_TITLE = 'Winpdb Error'
 STR_BAD_PYTHON_ERROR_MSG = """Unsupported Python version
@@ -356,7 +355,7 @@ except ImportError:
     myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
     sys.exit(1)
 
-assert wx.VERSION_STRING >= WXVER
+assert wx.VERSION_STRING >= MIN_WXVER
         
 import wx.lib.wxpTag
 if RUNNING_UNDER_PY3:
