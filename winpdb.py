@@ -970,7 +970,7 @@ class CMenuBar:
 
     def add_menu_item(self, menu_label, item_label, command):
         if not g_fUnicode:
-            item_label = rpdb2.as_string(item_label, wx.GetDefaultPyEncoding())
+            item_label = rpdb2.as_string(item_label)
 
         parent = self.m_cascades[menu_label]
         item = parent.Append(-1, item_label)
@@ -1811,7 +1811,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def notify_conflicting_modules(self, event):
         s = ', '.join(event.m_modules_list)
         if not g_fUnicode:
-            s = rpdb2.as_string(s, wx.GetDefaultPyEncoding())
+            s = rpdb2.as_string(s)
 
         dlg = wx.MessageDialog(self, rpdb2.STR_CONFLICTING_MODULES % s, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
         dlg.ShowModal()
@@ -2512,7 +2512,7 @@ class CSourceManager:
             source_lines = r[rpdb2.DICT_KEY_LINES]
             source = ''.join(source_lines)
             if not g_fUnicode:
-                source = rpdb2.as_string(source, wx.GetDefaultPyEncoding())
+                source = rpdb2.as_string(source)
         
         elif t == rpdb2.NotPythonSource and fComplain:
             dlg = wx.MessageDialog(None, MSG_ERROR_FILE_NOT_PYTHON % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
@@ -2536,7 +2536,7 @@ class CSourceManager:
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
             if not g_fUnicode:
-                source = rpdb2.as_string(source, wx.GetDefaultPyEncoding())
+                source = rpdb2.as_string(source)
         
         else:
             rpdb2.print_debug('get_source_file() returned the following error: %s' % repr(t))
@@ -2545,7 +2545,7 @@ class CSourceManager:
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
             if not g_fUnicode:
-                source = rpdb2.as_string(source, wx.GetDefaultPyEncoding())
+                source = rpdb2.as_string(source)
                     
         try:    
             self.m_lock.acquire()
@@ -2793,7 +2793,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
       
         displayed_filename = _filename
         if not g_fUnicode:
-            displayed_filename = rpdb2.as_string(displayed_filename, wx.GetDefaultPyEncoding())
+            displayed_filename = rpdb2.as_string(displayed_filename)
 
         label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(displayed_filename)
         self.m_caption.m_static_text.SetLabel(label)
@@ -2836,7 +2836,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
         
         displayed_filename = filename
         if not g_fUnicode:
-            displayed_filename = rpdb2.as_string(displayed_filename, wx.GetDefaultPyEncoding())
+            displayed_filename = rpdb2.as_string(displayed_filename)
 
         label = CAPTION_SOURCE + ' ' + rpdb2.clip_filename(displayed_filename)
         self.m_caption.m_static_text.SetLabel(label)
@@ -3013,7 +3013,7 @@ class CConsole(wx.Panel, CCaptionManager):
 
     def write(self, _str):
         if not g_fUnicode:
-            _str = rpdb2.as_string(_str, wx.GetDefaultPyEncoding())
+            _str = rpdb2.as_string(_str)
         else:
             _str = rpdb2.as_unicode(_str, self.encoding)
 
@@ -3135,7 +3135,7 @@ class CConsole(wx.Panel, CCaptionManager):
             self.m_exit_command()
             return
 
-        value = rpdb2.as_unicode(value, wx.GetDefaultPyEncoding())
+        value = rpdb2.as_unicode(value)
         
         self.m_queue.put(value + '\n')
 
@@ -3290,7 +3290,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
             return -1
 
         if not g_fUnicode:
-            thread_name = rpdb2.as_string(thread_name, wx.GetDefaultPyEncoding())
+            thread_name = rpdb2.as_string(thread_name)
 
         self.m_threads.SetItem(index, 1, thread_name)
         self.m_threads.SetItem(index, 2, [rpdb2.STATE_RUNNING, rpdb2.STR_STATE_BROKEN][fBroken])
@@ -3310,7 +3310,7 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
             tid = s[rpdb2.DICT_KEY_TID]
             name = s[rpdb2.DICT_KEY_NAME]
             if not g_fUnicode:
-                name = rpdb2.as_string(name, wx.GetDefaultPyEncoding())
+                name = rpdb2.as_string(name)
 
             fBroken = s[rpdb2.DICT_KEY_BROKEN]
             index = self.m_threads.InsertItem( i, repr(tid))
@@ -3575,9 +3575,9 @@ class CNamespacePanel(wx.Panel, CJobs):
                 _type = r[rpdb2.DICT_KEY_TYPE]
                 _repr = r[rpdb2.DICT_KEY_REPR]
             else:
-                _name = rpdb2.as_string(r[rpdb2.DICT_KEY_NAME], wx.GetDefaultPyEncoding())
-                _type = rpdb2.as_string(r[rpdb2.DICT_KEY_TYPE], wx.GetDefaultPyEncoding())
-                _repr = rpdb2.as_string(r[rpdb2.DICT_KEY_REPR], wx.GetDefaultPyEncoding())
+                _name = rpdb2.as_string(r[rpdb2.DICT_KEY_NAME])
+                _type = rpdb2.as_string(r[rpdb2.DICT_KEY_TYPE])
+                _repr = rpdb2.as_string(r[rpdb2.DICT_KEY_REPR])
 
             identation = '' 
             #identation = ['', '  '][os.name == rpdb2.POSIX and r[rpdb2.DICT_KEY_N_SUBNODES] == 0]
@@ -3988,8 +3988,8 @@ class CStackViewer(wx.Panel, CCaptionManager):
             function = e[2]
 
             if not g_fUnicode:
-                filename = rpdb2.as_string(filename, wx.GetDefaultPyEncoding())
-                function = rpdb2.as_string(function, wx.GetDefaultPyEncoding())
+                filename = rpdb2.as_string(filename)
+                function = rpdb2.as_string(function)
 
             index = self.m_stack.InsertItem( i, repr(i))
             self.m_stack.SetItem(index, 1, os.path.basename(filename))
@@ -4215,7 +4215,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         if host == '':
             host = 'localhost'
 
-        host = rpdb2.as_unicode(host, wx.GetDefaultPyEncoding())
+        host = rpdb2.as_unicode(host)
 
         f = lambda r, exc_info: self.callback_sethost(r, exc_info, host)
         self.m_async_sm.with_callback(f).set_host(host)
@@ -4281,7 +4281,7 @@ class CAttachDialog(wx.Dialog, CJobs):
             
             filename = s.m_filename
             if not g_fUnicode:
-                filename = rpdb2.as_string(filename, wx.GetDefaultPyEncoding())
+                filename = rpdb2.as_string(filename)
 
             self.m_listbox_scripts.SetItem(index, 1, filename)
             self.m_listbox_scripts.SetItemData(index, i)
@@ -4332,7 +4332,7 @@ class CExpressionDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         if not g_fUnicode:
-            default_value = rpdb2.as_string(default_value, wx.GetDefaultPyEncoding())
+            default_value = rpdb2.as_string(default_value)
 
         self.m_entry_expr = wx.TextCtrl(self, value = default_value, size = (200, -1))
         self.m_entry_expr.SetFocus()
@@ -4366,7 +4366,7 @@ class CExpressionDialog(wx.Dialog):
                    
     def get_expression(self):
         expr = self.m_entry_expr.GetValue()
-        expr = rpdb2.as_unicode(expr, wx.GetDefaultPyEncoding())
+        expr = rpdb2.as_unicode(expr)
 
         return expr
 
@@ -4393,7 +4393,7 @@ class CEncodingDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         encoding = [current_encoding, ''][current_encoding is None]
         if not g_fUnicode:
-            encoding = rpdb2.as_string(encoding, wx.GetDefaultPyEncoding())
+            encoding = rpdb2.as_string(encoding)
 
         self.m_entry_encoding = wx.TextCtrl(self, value = encoding, size = (200, -1))
         self.m_entry_encoding.SetFocus()
@@ -4433,7 +4433,7 @@ class CEncodingDialog(wx.Dialog):
                    
     def get_encoding(self):
         encoding = self.m_entry_encoding.GetValue()
-        encoding = rpdb2.as_unicode(encoding, wx.GetDefaultPyEncoding())
+        encoding = rpdb2.as_unicode(encoding)
 
         return encoding, self.m_cb.GetValue()
 
@@ -4526,7 +4526,7 @@ class CPwdDialog(wx.Dialog):
         pwd = [current_password, ''][current_password is None]
 
         if not g_fUnicode:
-            pwd = rpdb2.as_string(pwd, wx.GetDefaultPyEncoding())
+            pwd = rpdb2.as_string(pwd)
 
         self.m_entry_pwd = wx.TextCtrl(self, value = pwd, size = (200, -1))
         self.m_entry_pwd.SetFocus()
@@ -4562,7 +4562,7 @@ class CPwdDialog(wx.Dialog):
                    
     def get_password(self):
         pwd = self.m_entry_pwd.GetValue()
-        pwd = rpdb2.as_unicode(pwd, wx.GetDefaultPyEncoding())
+        pwd = rpdb2.as_unicode(pwd)
 
         return pwd
 
@@ -4659,7 +4659,7 @@ class COpenDialog(wx.Dialog):
 
     def get_file_name(self):
         filename = self.m_entry.GetValue()
-        filename = rpdb2.as_unicode(filename, wx.GetDefaultPyEncoding())
+        filename = rpdb2.as_unicode(filename)
 
         return filename
 
@@ -4683,7 +4683,7 @@ class CLaunchDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         if not g_fUnicode:
-            command_line = rpdb2.as_string(command_line, wx.GetDefaultPyEncoding())
+            command_line = rpdb2.as_string(command_line)
 
         self.m_entry_commandline = wx.TextCtrl(self, value = command_line, size = (200, -1))
         self.m_entry_commandline.SetFocus()
@@ -4806,7 +4806,7 @@ class CLaunchDialog(wx.Dialog):
         
     def do_validate(self):
         command_line = self.m_entry_commandline.GetValue()
-        command_line = rpdb2.as_unicode(command_line, wx.GetDefaultPyEncoding())
+        command_line = rpdb2.as_unicode(command_line)
         
         (_path, filename, args)  = rpdb2.split_command_line_path_filename_args(command_line)
         
@@ -4849,7 +4849,7 @@ class CLaunchDialog(wx.Dialog):
         
     def get_command_line(self):
         command_line = self.m_entry_commandline.GetValue()
-        command_line = rpdb2.as_unicode(command_line, wx.GetDefaultPyEncoding())
+        command_line = rpdb2.as_unicode(command_line)
         interpreter = self.m_entry_interpreter.GetValue()
         return (command_line, self.m_cb.GetValue(), interpreter)
 
