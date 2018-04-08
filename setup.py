@@ -88,6 +88,7 @@ setup(
     },
 
     python_requires='>=3.4',
+    install_requires='wxpython>=4',
     py_modules = ['winpdb', 'rpdb2'],
 
     entry_points={
