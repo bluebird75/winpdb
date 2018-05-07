@@ -298,10 +298,16 @@ import os
 import re
 import warnings
 
+
+def is_py3k():
+    return sys.version_info[0] >= 3
+
 try:
+    # python 2.7 and 3+
     import hashlib
     _md5 = hashlib.md5
 except:
+    # python 2.6-
     import md5
     _md5 = md5
 
@@ -310,8 +316,9 @@ if sys.version_info[:2] == (2,6):
     warnings.filterwarnings( 'ignore', 'the sets module.*', DeprecationWarning, 'rpdb2' )
 
 try:
+    # Python 2.7-
     import compiler
-#    import sets
+    import sets
 except:
     pass
 
@@ -1695,11 +1702,6 @@ class AuthenticationBadIndex(CSecurityException):
 
 
 
-def is_py3k():
-    return sys.version_info[0] >= 3
-
-
-
 def is_unicode(s):
     if is_py3k() and type(s) == str:
         return True
@@ -1708,8 +1710,6 @@ def is_unicode(s):
         return True
 
     return False
-
-
 
 def as_unicode(s, encoding = 'utf-8', fstrict = False):
     '''Return an unicode string, corresponding to s, encoding it if necessary'''
