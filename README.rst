@@ -1,16 +1,19 @@
+--------------------
+
+**Note from Philippe Fremy**
+
+*I started porting winpdb-reborn to Python 3 / Phoenix but the amount of effort exceeds my availability. So: WINPDB ON PYTHON 3 IS BUGGY AND NOT WORKING.*
+
+*If you like winpdb and want it on python 3 please contribute a bit of your time to fix one or two bugs. With the help of everybody, we can make it work !*
+
+--------------------
+
 |Build Status Linux| |Build status Windows|
 
 *Winpdb Reborn - A GPL Python Debugger, reborn from the unmaintained
 Winpdb*
 
 by Philippe Fremy as maintainer, and Nir Aides as initial author
-
---------------------
-*Note from Philippe Fremy*
-
-*I started porting winpdb-reborn to Python 3 / Phoenix but the amount of effort exceeds my availability. So, *winpdb on python 3 is buggy and not working*. If you like winpdb and want it on python 3 please contribute a bit of your time to fix one or two bugs. With the help of everybody, we can make it work !*
-
---------------------
 
 Website: https://github.com/bluebird75/winpdb 
 
