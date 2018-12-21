@@ -577,13 +577,13 @@ ML_SEPARATOR = "<separator>"
 ML_ROOT = "<root>"
 
 ML_FILE = "&File"
-ML_PWD = "&Password"
+ML_PWD = "&Password\tCtrl-P"
 ML_LAUNCH = "&Launch"
-ML_ATTACH = "&Attach"
+ML_ATTACH = "&Attach\tCtrl-A"
 ML_DETACH = "&Detach"
 ML_STOP = "&Stop"
 ML_RESTART = "&Restart"
-ML_OPEN = "&Open Source"
+ML_OPEN = "&Open Source\tCtrl-O"
 ML_EXIT = "E&xit" + AC_CHAR + AC_EXIT
 
 ML_BREAKPOINTS = "&Breakpoints"
