@@ -562,7 +562,14 @@ WINPDB_SETTINGS_DEFAULT = {
 }
 
 AC_CHAR = "\t"
-AC_EXIT = "Alt-X"
+AC_PWD = "Ctrl-P"
+AC_LAUNCH = "Ctrl-L"
+AC_ATTACH = "Ctrl-A"
+AC_DETACH = "Ctrl-D"
+AC_STOP = "Ctrl-S"
+AC_RESTART = "Ctrl-R"
+AC_OPEN = "Ctrl-O"
+AC_EXIT = "Ctrl-X"
 AC_ANALYZE = "F3"
 AC_BREAK = "F4"
 AC_GO = "F5"
@@ -577,13 +584,13 @@ ML_SEPARATOR = "<separator>"
 ML_ROOT = "<root>"
 
 ML_FILE = "&File"
-ML_PWD = "&Password\tCtrl-P"
-ML_LAUNCH = "&Launch"
-ML_ATTACH = "&Attach\tCtrl-A"
-ML_DETACH = "&Detach"
-ML_STOP = "&Stop"
-ML_RESTART = "&Restart"
-ML_OPEN = "&Open Source\tCtrl-O"
+ML_PWD = "&Password" + AC_CHAR + AC_PWD
+ML_LAUNCH = "&Launch" + AC_CHAR + AC_LAUNCH
+ML_ATTACH = "&Attach" + AC_CHAR + AC_ATTACH
+ML_DETACH = "&Detach" + AC_CHAR + AC_DETACH
+ML_STOP = "&Stop" + AC_CHAR + AC_STOP
+ML_RESTART = "&Restart" + AC_CHAR + AC_RESTART
+ML_OPEN = "&Open Source" + AC_CHAR + AC_OPEN
 ML_EXIT = "E&xit" + AC_CHAR + AC_EXIT
 
 ML_BREAKPOINTS = "&Breakpoints"
