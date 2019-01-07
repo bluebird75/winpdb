@@ -13586,7 +13586,7 @@ Execute the current line, stop at the first possible occasion
 
 
     def help_return(self):
-        _print("""next
+        _print("""return
 
 (shorthand - r)
 
