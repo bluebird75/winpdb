@@ -4649,7 +4649,7 @@ class COpenDialog(wx.Dialog):
         (_path, filename, args) = rpdb2.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
-        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.OPEN | wx.CHANGE_DIR)
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.FD_OPEN | wx.FD_CHANGE_DIR)
         r = dlg.ShowModal()
         if r == wx.ID_OK:
             path = dlg.GetPaths()[0]
@@ -4792,7 +4792,7 @@ class CLaunchDialog(wx.Dialog):
         else:
             wildcard = WILDCARD_EXECUTABLES
             
-        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = wildcard, style = wx.OPEN | wx.CHANGE_DIR)
+        dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = wildcard, style = wx.FD_OPEN | wx.FD_CHANGE_DIR)
         r = dlg.ShowModal()
 
         os.chdir(cwd)
