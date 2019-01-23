@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """
     winpdb.py
@@ -1522,7 +1523,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         
         self.m_code_viewer = CCodeViewer(self.m_splitterh3, style = wx.NO_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, source_manager = self.m_source_manager, notify_filename = self.do_notify_filename)        
 
-        self.m_console = CConsole(self.m_splitterh3, style = wx.NO_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, exit_command = self.do_exit)
+        self.m_console = CConsole(self.m_splitterh3, style = wx.NO_BORDER | wx.TAB_TRAVERSAL, session_manager = self.m_session_manager, exit_command = self.do_exit, name = 'console')
         
         self.m_splitterh2.SplitHorizontally(self.m_namespace_viewer, self.m_threads_viewer)
         self.m_splitterh1.SplitHorizontally(self.m_splitterh2, self.m_stack_viewer)
@@ -2449,6 +2450,20 @@ class CStyledViewer(stc.StyledTextCtrl):
             self.GetParent().GetEventHandler().ProcessEvent(ne)
             event.Skip()
             return
+        elif key_code == 74: # J
+            (_, col_no, line_no) = self.PositionToXY(self.GetInsertionPoint())
+            console = wx.FindWindowByName('console')
+            value = rpdb2.as_unicode('jump %s' % (line_no + 1))
+            console.m_queue.put(value + '\n')
+        elif key_code == 86: # V
+            value = self.GetSelectedText()
+            if value:
+                value = 'eval ' + value
+                console = wx.FindWindowByName('console')
+                console.m_console_out.AppendText(CONSOLE_PROMPT + value + '\n')
+                # console.set_history(value)
+                value = rpdb2.as_unicode(value)
+                console.m_queue.put(value + '\n')
             
         event.Skip()
 
