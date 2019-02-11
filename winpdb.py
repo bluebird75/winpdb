@@ -2987,17 +2987,18 @@ class CConsole(wx.Panel, CCaptionManager):
     def OnConsoleOutKeyPressed(self, event):
         key_code = event.GetKeyCode()
 
-        if key_code != wx.WXK_TAB:
-            return
-            
-        forward = not event.ShiftDown()            
-        ne = wx.NavigationKeyEvent()
-        ne.SetDirection(forward)
-        ne.SetCurrentFocus(self.m_console_out)
-        ne.SetEventObject(self.m_console_out)
-        self.GetEventHandler().ProcessEvent(ne)
+        if key_code == wx.WXK_TAB:
+            forward = not event.ShiftDown()            
+            ne = wx.NavigationKeyEvent()
+            ne.SetDirection(forward)
+            ne.SetCurrentFocus(self.m_console_out)
+            ne.SetEventObject(self.m_console_out)
+            self.GetEventHandler().ProcessEvent(ne)
 
-        event.Skip()
+            event.Skip()
+
+        elif (key_code == 67) and event.ControlDown(): # Ctrl+C
+            value = self.m_console_out.Copy()
     
 
     def set_focus(self):
