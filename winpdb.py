@@ -839,7 +839,7 @@ from io import BytesIO
 
 def image_from_base64(str_b64):
     b = rpdb2.as_bytes(str_b64)
-    s = base64.decodestring(b)
+    s = base64.decodebytes(b)
     stream = BytesIO(s)
     image = wx.Image(stream)
     return image
@@ -938,7 +938,7 @@ class CMenuBar:
                     if parent_label == ML_ROOT:
                         parent.Append(child, e)
                     else:
-                        parent.AppendMenu(wx.NewId(), e, child)
+                        parent.AppendMenu(wx.ID_ANY, e, child)
                         self.m_encapsulating_menu_items[e] = parent
 
                     self.m_cascades[e] = child
@@ -1011,7 +1011,7 @@ class CToolBar:
                 continue
 
             command = e[COMMAND]
-            id = wx.NewId()
+            id = wx.Window.NewControlId()
 
             if TEXT in e:
                 button = wx.Button(self.m_toolbar, id, e[TEXT], style = wx.NO_BORDER)
