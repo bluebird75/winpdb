@@ -17,15 +17,15 @@ by Philippe Fremy as maintainer, and Nir Aides as initial author
 
 Website: https://github.com/bluebird75/winpdb 
 
-**This version of Winpdb is for Python 3 only. It is under development. Use it at your own risks !**
+**This version of Winpdb is for Python 3 only. It is under development. Use it at your own risk !**
 
 A stable version of Winpdb for Python 2 is available on PyPi: https://pypi.org/project/winpdb-reborn/1.5.0/
 
 Description
 ===========
 
-*Winpdb Reborn* is a portable (Windows / Linux) standalone graphical debugger for Python. It focuses on making debugging
-easy and does not include any IDE features. It works on both Python 2 and 3 and has very little dependencies (only WxPython for the GUI).
+*Winpdb Reborn* is a portable (Windows / Linux / macOS) standalone graphical debugger for Python. It focuses on making debugging
+easy and does not include any IDE features. It works on both Python 2 and 3 and has very little dependencies (only wxPython for the GUI).
 
 **Features**:
 
@@ -37,7 +37,7 @@ easy and does not include any IDE features. It works on both Python 2 and 3 and 
 - up to 20 times quicker than pdb, the default Python debugger (on which many other debuggers are built)
 - debug PyPy scripts
 
-**Note:** The original Winpdb was no longer maintained since the release v1.4.8 in
+**Note:** The original Winpdb was no longer maintained since the v1.4.8 release in
 2010. I (Philippe Fremy) am providing a maintained version with new
 functionality under the *Winpdb Reborn* name.
 
@@ -48,14 +48,14 @@ Platform supported:
 
 -  Linux
 -  Windows XP and above
--  MacOs is probably working but not tested
+-  macOS is probably working but not tested
 
 To run Winpdb Reborn:
 
-- CPython 2.6 or 2.7 and WxPython 3
-- or CPython 3.4 or above and WxPython 4
+- CPython 2.6 or 2.7 and wxPython 3
+- or CPython 3.4 or above and wxPython 4
 
-Note that running Winpdb with PyPy is possible, by launching rpdb2.py with pypy and using the winpdb GUI to connect to it.
+Note that running Winpdb with PyPy is possible, by launching rpdb2.py with ``pypy`` and using the Winpdb GUI to connect to it.
 
 Winpdb Reborn is NOT compatible with Jython or IronPython.
 
@@ -67,17 +67,17 @@ Version 2.0.0 - in development
 
 (version in progress)
 
-- port winpdb to WxPython 4 / Python 3
+- port Winpdb to wxPython 4 / Python 3
 
 
 Version 1.5.0
 -------------
 
 -  First official release by Philippe Fremy
--  Add support for Python 3 GUI (using WxPython Phoenix)
+-  Add support for Python 3 GUI (using wxPython Phoenix)
 -  Allow installation of all dependencies with pip
 -  Add support for Python 2.7, 3.5 and 3.6
--  Drop support for Python 2.5 and WxPython 2.6, min versions are now Python 2.6 and WxPython 3.0
+-  Drop support for Python 2.5 and wxPython 2.6, min versions are now Python 2.6 and wxPython 3.0
 -  rpdb2.py is now compatible with Python 3
 -  Add support for PyPy to Rpdb2
 -  Can now specify a different Python interpreter for the program under
@@ -108,7 +108,7 @@ You must also install the wxPython for your version of Python:
 -  for Python 3, wxPython is automatically installed as a dependency with pip
 -  for Python 2, check https://sourceforge.net/projects/wxpython/files/wxPython/
 
-*Winpdb Reborn* is not packaged yet by any linux distro. If your package manager proposes
+*Winpdb Reborn* is not packaged yet by any Linux distro. If your package manager proposes
 to install Winpdb, that’s the old unmaintained Winpdb which works neither with Python 2.7 nor with Python 3.
 
 Additional installation methods
@@ -121,7 +121,7 @@ To install from a checkout or from an archive::
 No install mode
 ---------------
 
-If you don’t want to install Winpdb Reborn, you can still try it by calling it explicitely with
+If you don’t want to install Winpdb Reborn, you can still try it by calling it explicitly with
 your program to debug::
 
     $ python /the/path/to/winpdb.py my_program.py 
@@ -130,9 +130,9 @@ Where do the files go ?
 -----------------------
 
 The setup script copies rpdb2.py and winpdb.py modules to the Python
-site-packages folder. The scripts rpdb2, winpdb are copied to the
-Python binaries (scripts) folder. On Linux this folder is usually ``/usr/bin`` 
-and is in the path by default. On Windows this folder is ``%PYTHONHOME%\Scripts``,
+site-packages folder. The scripts rpdb2 and winpdb are copied to the
+Python binaries (scripts) folder. On Linux, this folder is usually ``/usr/bin`` 
+and is in the path by default. On Windows, this folder is ``%PYTHONHOME%\Scripts``,
 where you should see a winpdb.exe and rpdb2.exe .
 
 
@@ -166,10 +166,10 @@ A detailed Winpdb tutorial is also available at: https://code.google.com/archive
 Community
 =========
 
-You can ask questions about Winpdb Reborn on the dedicated google group:
+You can ask questions about Winpdb Reborn on the dedicated Google group:
 https://groups.google.com/forum/#!forum/winpdb
 
-Feel free to raise issues or propose improvements on the Github repository: https://github.com/bluebird75/winpdb/issues
+Feel free to raise issues or propose improvements on the GitHub repository: https://github.com/bluebird75/winpdb/issues
 
 |stats|
 
