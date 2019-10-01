@@ -4828,7 +4828,7 @@ class CCrypto:
         s_padded = s + as_bytes('\x00') * (DES.block_size - (len(s) % DES.block_size))
 
         key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
-        iv = '0' * DES.block_size
+        iv = as_bytes('0') * DES.block_size
 
         d = DES.new(key_padded, DES.MODE_CBC, iv)
         r = d.encrypt(s_padded)
@@ -4839,7 +4839,7 @@ class CCrypto:
     def __decrypt(self, s):
         try:
             key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
-            iv = '0' * DES.block_size
+            iv = as_bytes('0') * DES.block_size
 
             d = DES.new(key_padded, DES.MODE_CBC, iv)
             _s = d.decrypt(s).strip(as_bytes('\x00'))
