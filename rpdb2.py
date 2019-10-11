@@ -336,6 +336,7 @@ except ImportError:
     pass
 
 try:
+    # Python 2
     import SimpleXMLRPCServer
     import xmlrpclib
     import SocketServer
@@ -1924,7 +1925,7 @@ STR_ACCESS_DENIED2 = "Communication is denied because of un-matching passwords."
 STR_ENCRYPTION_EXPECTED = "While attempting to find debuggee, at least one debuggee denied connection since it accepts encrypted connections only."
 STR_ENCRYPTION_EXPECTED2 = "Debuggee will only talk over an encrypted channel."
 STR_DECRYPTION_FAILURE = "Bad packet was received by the debuggee."
-STR_DEBUGGEE_NO_ENCRYPTION = "Debuggee does not support encrypted mode. Either install the python-crypto package on the debuggee machine or allow unencrypted connections."
+STR_DEBUGGEE_NO_ENCRYPTION = "Debuggee does not support encrypted mode. Either install the pycryptodome package on the debuggee machine or allow unencrypted connections."
 STR_RANDOM_PASSWORD = "Password has been set to a random password."
 STR_PASSWORD_INPUT = "Please type a password:"
 STR_PASSWORD_CONFIRM = "Password has been set."
@@ -1972,7 +1973,7 @@ STR_BREAKPOINTS_TEMPLATE = """ %2d  %-8s  %5d  %s
                       %s
                       %s"""
 
-STR_ENCRYPTION_SUPPORT_ERROR = "Encryption is not supported since the python-crypto package was not found. Either install the python-crypto package or allow unencrypted connections."
+STR_ENCRYPTION_SUPPORT_ERROR = "Encryption is not supported since the pycryptodome package was not found. Either install the pycryptodome package or allow unencrypted connections."
 STR_PASSWORD_NOT_SET = 'Password is not set.'
 STR_PASSWORD_SET = 'Password is set to: "%s"'
 STR_PASSWORD_BAD = 'The password should begin with a letter and continue with any combination of digits, letters or underscores (\'_\'). Only English characters are accepted for letters.'
@@ -2447,8 +2448,6 @@ def current_thread():
 class _stub_type:
     pass
 
-
-
 def _rpdb2_bytes(s, e):
     return s.encode(e)
 
@@ -2481,12 +2480,6 @@ if is_py3k():
         Set = _stub_type
         BaseSet = _stub_type
         ImmutableSet = _stub_type
-
-
-
-if sys.version_info[:2] <= (2, 3):
-    set = sets.Set
-
 
 
 def _raw_input(s):
@@ -2589,16 +2582,12 @@ def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
 def safe_str(x):
     try:
         return str(x)
-
     except:
         return 'N/A'
-
-
 
 def safe_repr(x):
     try:
         return repr(x)
-
     except:
         return 'N/A'
 
@@ -4280,16 +4269,7 @@ class _RPDB2_FindRepr:
 # before all other types.
 #
 def sort(s):
-    if sys.version_info[:2] == (2, 3):
-        #
-        # On Python 2.3 the key parameter is not supported.
-        #
-        s.sort(sort_cmp)
-        return
-
     s.sort(key = sort_key)
-
-
 
 def sort_key(e):
     if is_py3k() and isinstance(e, numbers.Number):
@@ -4299,16 +4279,6 @@ def sort_key(e):
         return (0, e)
 
     return (1, repr_ltd(e, 256, encoding = ENCODING_RAW_I))
-
-
-
-def sort_cmp(x, y):
-    skx = sort_key(x)
-    sky = sort_key(y)
-
-    return cmp(skx, sky)
-
-
 
 def recalc_sys_path(old_pythonpath):
     opl = old_pythonpath.split(os.path.pathsep)
