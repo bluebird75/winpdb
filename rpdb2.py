@@ -3526,7 +3526,7 @@ def CalcTerminalCommand():
 
     if COLORTERM in os.environ:
         term = os.environ[COLORTERM]
-        if IsFileInPath(term):
+        if term != 'yes' and IsFileInPath(term):
             return term
 
     if IsPrefixInEnviron(KDE_PREFIX):
