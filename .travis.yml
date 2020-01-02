@@ -1,14 +1,11 @@
 language: python
 python:
-# - "2.5"    Python 2.5 no longer supported by Travis CI
-  - "2.6"
   - "2.7"
-#  - "3.1"   Python 3.1 no longer supported by Travic CI
-  - "3.2"
-  - "3.3"
   - "3.4"
   - "3.5"
   - "3.6"  
+  - "3.7"
+  - "3.8"
   - "pypy"
 #  - "pypy3" # Disabling pypy3 on Travis until bug is resolved.
 
