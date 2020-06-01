@@ -4913,13 +4913,8 @@ def run_winpdb():
     #
     rpdb2.setbreak()
 
-from pyannotate_runtime import collect_types
-
 if __name__=='__main__':
-    collect_types.init_types_collection()
-    with collect_types.collect():
-        run_winpdb()
-    collect_types.dump_stats("winpdb-typeinfo.json")
+    run_winpdb()
 
 
     
