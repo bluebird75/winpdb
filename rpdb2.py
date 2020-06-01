@@ -298,16 +298,13 @@ import os
 import re
 import warnings
 
-try:
-    import hashlib
-    _md5 = hashlib.md5
-except:
-    import md5
-    _md5 = md5
+# TODO py3k
+import hashlib
+_md5 = hashlib.md5
 
-if sys.version_info[:2] == (2,6):
-    # disable warning about sets being deprecated for Python 2.6
-    warnings.filterwarnings( 'ignore', 'the sets module.*', DeprecationWarning, 'rpdb2' )
+if sys.version_info[:2] < (3,2):
+    print(STR_BAD_PYTHON_VERSION)
+    sys.exit(-1)
 
 try:
     import compiler
@@ -328,32 +325,14 @@ try:
 except ImportError:
     pass
 
-try:
-    import SimpleXMLRPCServer
-    import xmlrpclib
-    import SocketServer
-    import commands
-    import copy_reg
-    import httplib
-    import thread
-
-except:
-    #
-    # The above modules were renamed in Python 3 so try to import them 'as'
-    #
-    import xmlrpc.server as SimpleXMLRPCServer
-    import xmlrpc.client as xmlrpclib
-    import socketserver as SocketServer
-    import subprocess as commands
-    import copyreg as copy_reg
-    import http.client as httplib
-    import _thread as thread
-
-    #
-    # Needed in py3k path.
-    #
-    import numbers
-
+import xmlrpc.server as SimpleXMLRPCServer
+import xmlrpc.client as xmlrpclib
+import socketserver as SocketServer
+import subprocess as commands
+import copyreg as copy_reg
+import http.client as httplib
+import _thread as thread
+import numbers
 
 
 #
@@ -1701,14 +1680,9 @@ def is_py3k():
 
 
 def is_unicode(s):
-    if is_py3k() and type(s) == str:
+    if type(s) == str:
         return True
-
-    if type(s) == unicode:
-        return True
-
     return False
-
 
 
 def as_unicode(s, encoding = 'utf-8', fstrict = False):
@@ -1726,27 +1700,15 @@ def as_unicode(s, encoding = 'utf-8', fstrict = False):
 
 
 def as_string(s, encoding = 'utf-8', fstrict = False):
-    if is_py3k():
-        if is_unicode(s):
-            return s
-
-        if fstrict:
-            e = s.decode(encoding)
-        else:
-            e = s.decode(encoding, 'replace')
-
-        return e
-
-    if not is_unicode(s):
+    if is_unicode(s):
         return s
 
     if fstrict:
-        e = s.encode(encoding)
+        e = s.decode(encoding)
     else:
-        e = s.encode(encoding, 'replace')
+        e = s.decode(encoding, 'replace')
 
     return e
-
 
 
 def as_bytes(s, encoding = 'utf-8', fstrict = True):
@@ -1864,6 +1826,7 @@ Type "help", "copyright", "license", "credits" for more information.""" % (RPDB_
 PRINT_NOTICE_PROMPT = "Hit Return for more, or q (and Return) to quit:"
 PRINT_NOTICE_LINES_PER_SECTION = 20
 
+STR_BAD_PYTHON_VERSION = "Rpdb2/winpdb requires at least Python 3.2 to work. Exiting"
 STR_NO_THREADS = "Operation failed since no traced threads were found."
 STR_STARTUP_NOTICE = "Attaching to debuggee..."
 STR_SPAWN_UNSUPPORTED = "The debugger does not know how to open a new console on this system. You can start the debuggee manually with the -d flag on a separate console and then use the 'attach' command to attach to it."
@@ -2129,7 +2092,7 @@ g_fDefaultStd = True
 # In debug mode errors and tracebacks are printed to stdout
 # and frames of rpdb2 are visible to the user in the debugger
 #
-g_fDebug = False
+g_fDebug = True
 
 #
 # Lock for the traceback module to prevent it from interleaving
@@ -2212,13 +2175,8 @@ g_fbreakonexit = False
 
 
 
-if is_py3k() and sys.version_info[:2] > (3,0):
-    g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
-    g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
-else:
-    g_safe_base64_to = string.maketrans(as_bytes('/+='), as_bytes('_-#'))
-    g_safe_base64_from = string.maketrans(as_bytes('_-#'), as_bytes('/+='))
-
+g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
+g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
 
 
 g_alertable_waiters = {}
@@ -2356,103 +2314,34 @@ def safe_wait(lock, timeout = None):
 
 
 
-#
-# The following code is related to the ability of the debugger
-# to work both on Python 2.5 and 3.0.
-#
-
+# TODO: remove these compatibility functions and change the code using them directly
 def lock_notify_all(lock):
-    try:
-        if is_py3k():
-            return lock.notify_all()
-
-    except AttributeError:
-        pass
-
-    return lock.notifyAll()
-
-
+    return lock.notify_all()
 
 def event_is_set(event):
-    try:
-        if is_py3k():
-            return event.is_set()
-
-    except AttributeError:
-        pass
-
-    return event.isSet()
-
-
+    return event.is_set()
 
 def thread_set_daemon(thread, fdaemon):
-    try:
-        if is_py3k():
-            return thread.set_daemon(fdaemon)
-
-    except AttributeError:
-        pass
-
-    return thread.setDaemon(fdaemon)
-
-
+    thread.daemon = fdaemon
 
 def thread_is_alive(thread):
-    try:
-        if is_py3k():
-            return thread.is_alive()
-
-    except AttributeError:
-        pass
-
-    return thread.isAlive()
-
-
+    return thread.is_alive()
 
 def thread_set_name(thread, name):
-    try:
-        if is_py3k():
-            return thread.set_name(name)
-
-    except AttributeError:
-        pass
-
-    return thread.setName(name)
-
-
+    thread.name = name
 
 def thread_get_name(thread):
-    try:
-        if is_py3k():
-            return thread.get_name()
-
-    except AttributeError:
-        pass
-
-    return thread.getName()
-
-
+    return thread.name
 
 def current_thread():
-    try:
-        if is_py3k():
-            return threading.current_thread()
-
-    except AttributeError:
-        pass
-
-    return threading.currentThread()
-
-
+    return threading.current_thread()
 
 class _stub_type:
     pass
 
 
-
 def _rpdb2_bytes(s, e):
     return s.encode(e)
-
 
 
 if not hasattr(g_builtins_module, 'unicode'):
@@ -2485,21 +2374,9 @@ if is_py3k():
 
 
 
-if sys.version_info[:2] <= (2, 3):
-    set = sets.Set
-
-
-
+# TODO: adjust
 def _raw_input(s):
-    if is_py3k():
-        return input(s)
-
-    i = raw_input(s)
-    i = as_unicode(i, detect_encoding(sys.stdin), fstrict = True)
-
-    return i
-
-
+    return input(s)
 
 def _print(s, f = sys.stdout, feol = True):
     s = as_unicode(s)
@@ -3217,20 +3094,9 @@ def IsPythonSourceFile(path):
         if line.startswith('#!') and 'python' in line:
             return True
 
-    if is_py3k():
-        #
-        # py3k does not have compiler.parseFile, so return
-        # True anyway...
-        #
-        return True
-
-    try:
-        compiler.parseFile(path)
-        return True
-
-    except:
-        return False
-
+    # In doubt, return True
+    # in the past, we would try to parse the file successfully but
+    # this is too complicated in Python 3
 
 
 def CalcModuleName(filename):
@@ -13761,7 +13627,7 @@ def is_func_hidden( name ):
 
 g_import = None
 
-if __name__ == 'rpdb2' and g_builtins_module.__import__ != rpdb2_import_wrapper:
+if 0 and __name__ == 'rpdb2' and g_builtins_module.__import__ != rpdb2_import_wrapper:
     g_import = g_builtins_module.__import__
     g_builtins_module.__import__ = rpdb2_import_wrapper
 
