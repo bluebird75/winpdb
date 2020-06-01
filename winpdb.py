@@ -23,6 +23,7 @@
     with this program; if not, write to the Free Software Foundation, Inc., 
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
+import src.const
 
 VERSION = (2, 0, 0, 5, 'Tychod')
 WINPDB_VERSION = "2.0.0.dev5"
@@ -1294,7 +1295,7 @@ class CAsyncSessionManagerCall:
         except rpdb2.FirewallBlock:
             self.m_session_manager.report_exception(*sys.exc_info())
 
-            dlg = wx.MessageDialog(self.m_job_manager, rpdb2.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+            dlg = wx.MessageDialog(self.m_job_manager, src.const.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
             dlg.ShowModal()
             dlg.Destroy()
 
@@ -1804,7 +1805,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         if not g_fUnicode:
             s = rpdb2.as_string(s)
 
-        dlg = wx.MessageDialog(self, rpdb2.STR_CONFLICTING_MODULES % s, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg = wx.MessageDialog(self, src.const.STR_CONFLICTING_MODULES % s, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
         dlg.ShowModal()
         dlg.Destroy()
         
@@ -2084,7 +2085,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def do_open(self, event):
         host = self.m_session_manager.get_host().lower()
-        flocal = (host in [rpdb2.LOCALHOST, rpdb2.LOOPBACK])
+        flocal = (host in [src.const.LOCALHOST, src.const.LOOPBACK])
         
         open_dialog = COpenDialog(self, flocal)
         r = open_dialog.ShowModal()
@@ -2152,9 +2153,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         (t, v, tb) = exc_info
            
         if t == socket.error or isinstance(v, rpdb2.CException):    
-            error = rpdb2.STR_BREAKPOINTS_LOAD_PROBLEM
+            error = src.const.STR_BREAKPOINTS_LOAD_PROBLEM
         elif t == IOError:     
-            error = rpdb2.STR_BREAKPOINTS_NOT_FOUND
+            error = src.const.STR_BREAKPOINTS_NOT_FOUND
         else:
             return
 
@@ -2183,7 +2184,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         (t, v, tb) = exc_info
            
         if t in (socket.error, IOError) or isinstance(v, rpdb2.CException):    
-            error = rpdb2.STR_BREAKPOINTS_SAVE_PROBLEM
+            error = src.const.STR_BREAKPOINTS_SAVE_PROBLEM
         else:
             return
             
@@ -2243,7 +2244,7 @@ class CWinpdbApp(wx.App):
         self.m_settings.load_settings()
         
         if (not self.m_fAllowUnencrypted) and not rpdb2.is_encryption_supported():
-            dlg = wx.MessageDialog(None, rpdb2.STR_ENCRYPTION_SUPPORT_ERROR, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+            dlg = wx.MessageDialog(None, src.const.STR_ENCRYPTION_SUPPORT_ERROR, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
             return True
@@ -2360,7 +2361,7 @@ class CStyledViewer(stc.StyledTextCtrl):
             self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:Courier')
 
         self.StyleClearAll()
-        self.SetTabWidth(rpdb2.PYTHON_TAB_WIDTH)
+        self.SetTabWidth(src.const.PYTHON_TAB_WIDTH)
         
         self.StyleSetSpec(stc.STC_STYLE_LINENUMBER, 'fore:#000000,back:#99A9C2')    
         self.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, 'fore:#00009D,back:#FFFF00')
@@ -3440,7 +3441,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     def OnItemActivated(self, event):
         item = event.GetItem()
         (expr, is_valid) = self.m_tree.GetItemData(item)
-        if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK, rpdb2.STR_MAX_NAMESPACE_WARNING_TITLE]:
+        if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK, src.const.STR_MAX_NAMESPACE_WARNING_TITLE]:
             return
 
         if is_valid:
@@ -4231,7 +4232,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         (t, v, tb) = exc_info
 
         if t == socket.gaierror:
-            dlg = wx.MessageDialog(self, rpdb2.MSG_ERROR_HOST_TEXT % (host, v), MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+            dlg = wx.MessageDialog(self, src.const.MSG_ERROR_HOST_TEXT % (host, v), MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
             
@@ -4251,7 +4252,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         if t != None:
             if t == rpdb2.FirewallBlock:
-                dlg = wx.MessageDialog(self, rpdb2.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+                dlg = wx.MessageDialog(self, src.const.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
                 dlg.Destroy()
 
@@ -4263,17 +4264,17 @@ class CAttachDialog(wx.Dialog, CJobs):
         if len(self.m_errors) > 0:
             for k, el in self.m_errors.items():
                 if k in [rpdb2.AuthenticationBadData, rpdb2.AuthenticationFailure]:
-                    self.report_attach_warning(rpdb2.STR_ACCESS_DENIED)
+                    self.report_attach_warning(src.const.STR_ACCESS_DENIED)
 
                 elif k == rpdb2.EncryptionNotSupported:
-                    self.report_attach_warning(rpdb2.STR_DEBUGGEE_NO_ENCRYPTION)
+                    self.report_attach_warning(src.const.STR_DEBUGGEE_NO_ENCRYPTION)
                     
                 elif k == rpdb2.EncryptionExpected:
-                    self.report_attach_warning(rpdb2.STR_ENCRYPTION_EXPECTED)
+                    self.report_attach_warning(src.const.STR_ENCRYPTION_EXPECTED)
 
                 elif k == rpdb2.BadVersion:
                     for (t, v, tb) in el:
-                        self.report_attach_warning(rpdb2.STR_BAD_VERSION % {'value': v})
+                        self.report_attach_warning(src.const.STR_BAD_VERSION % {'value': v})
             
         self.m_ok.Disable()
 
@@ -4456,7 +4457,7 @@ class CEncodingDialog(wx.Dialog):
         except:
             pass
 
-        dlg = wx.MessageDialog(self, rpdb2.STR_ENCODING_BAD, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg = wx.MessageDialog(self, src.const.STR_ENCODING_BAD, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
         dlg.ShowModal()
         dlg.Destroy()
         
@@ -4577,7 +4578,7 @@ class CPwdDialog(wx.Dialog):
         if rpdb2.is_valid_pwd(self.get_password()):
             return True
 
-        dlg = wx.MessageDialog(self, rpdb2.STR_PASSWORD_BAD, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+        dlg = wx.MessageDialog(self, src.const.STR_PASSWORD_BAD, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
         dlg.ShowModal()
         dlg.Destroy()
         
