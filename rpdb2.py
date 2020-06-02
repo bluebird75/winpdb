@@ -22,13 +22,19 @@
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA
 """
+import src.source_provider
+from src.breakinfo import CScopeBreakInfo, CalcValidLines
+from src.breakpoint import CBreakPointsManagerProxy, CBreakPointsManager
 from src.const import *
 from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, CEventSignalIntercepted, \
     CEventSignalException, CEventEncoding, CEventPsycoWarning, CEventConflictingModules, CEventSyncReceivers, \
     CEventForkSwitch, CEventExecSwitch, CEventExit, CEventState, CEventSynchronicity, CEventBreakOnExit, CEventTrap, \
     CEventForkMode, CEventUnhandledException, CEventNamespace, CEventNoThreads, CEventThreads, CEventThreadBroken, \
     CEventStack, CEventStackFrameChange, CEventStackDepth, CEventBreakpoint, CEventSync, breakpoint_copy
-from src.utils import is_unicode, as_unicode, as_string, as_bytes
+from src.exceptions import InvalidScopeName
+from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower
+from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
+    is_provider_filesystem, g_found_unicode_files, myisfile
 
 if '.' in __name__:
     raise ImportError('rpdb2 must not be imported as part of a package!')
@@ -37,13 +43,11 @@ if '.' in __name__:
 import subprocess
 import threading
 import traceback
-import zipimport
 import tempfile
 import platform
 import operator
 import weakref
 import os.path
-import zipfile
 import pickle
 import socket
 import getopt
@@ -1255,16 +1259,6 @@ class NotPythonSource(CException):
     """
 
 
-
-class InvalidScopeName(CException):
-    """
-    Invalid scope name.
-    This exception might be thrown when a request was made to set a breakpoint
-    to an unknown scope.
-    """
-
-
-
 class BadArgument(CException):
     """
     Bad Argument.
@@ -1493,14 +1487,6 @@ PYTHONW_FILE_EXTENSION = '.pyw'
 PYTHONW_SO_EXTENSION = '.so'
 PYTHON_EXT_LIST = ['.py', '.pyw', '.pyc', '.pyd', '.pyo', '.so']
 
-MODULE_SCOPE = '?'
-MODULE_SCOPE2 = '<module>'
-
-BLENDER_SOURCE_NOT_AVAILABLE = as_unicode('Blender script source code is not available.')
-SOURCE_NOT_AVAILABLE = as_unicode('Source code is not available.')
-
-SCOPE_SEP = '.'
-
 BP_FILENAME_SEP = ':'
 BP_EVAL_SEP = ','
 
@@ -1545,8 +1531,6 @@ RPDB_EXEC_INFO = as_unicode('rpdb_exception_info')
 MODE_ON = 'ON'
 MODE_OFF = 'OFF'
 
-ENCODING_UTF8_PREFIX_1 = '\xef\xbb\xbf'
-ENCODING_SOURCE = '# -*- coding: %s -*-\n'
 ENCODING_AUTO = as_unicode('auto')
 ENCODING_RAW = as_unicode('raw')
 ENCODING_RAW_I = as_unicode('__raw')
@@ -1615,9 +1599,6 @@ g_fDebug = True
 #
 g_traceback_lock = threading.RLock()
 
-g_source_provider_aux = None
-g_lines_cache = {}
-
 g_initial_cwd = []
 
 g_error_mapping = {
@@ -1670,12 +1651,6 @@ g_fignore_atexit = False
 g_ignore_broken_pipe = 0
 
 
-#
-# Unicode version of path names that do not encode well witn the windows
-# 'mbcs' encoding. This dict is used to work with such path names on
-# windows.
-#
-g_found_unicode_files = {}
 
 g_frames_path = {}
 
@@ -2275,43 +2250,6 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
         return as_unicode('N/A')
 
 
-
-def print_debug(_str):
-    if not g_fDebug:
-        return
-
-    t = time.time()
-    l = time.localtime(t)
-    s = time.strftime('%H:%M:%S', l) + '.%03d' % ((t - int(t)) * 1000)
-
-    f = sys._getframe(1)
-
-    tid = thread.get_ident()
-    tname = thread_get_name( current_thread() )
-    threadinfo = '%s/%d' % ( tname, tid )
-    filename = os.path.basename(f.f_code.co_filename)
-    lineno = f.f_lineno
-    name = f.f_code.co_name
-
-    str = '%s %s:%d %s %s(): %s' % (s, filename, lineno, threadinfo, name, _str)
-
-    _print(str, sys.__stderr__)
-
-
-
-def print_debug_exception(fForce = False):
-    """
-    Print exceptions to stdout when in debug mode.
-    """
-
-    if not g_fDebug and not fForce:
-        return
-
-    (t, v, tb) = sys.exc_info()
-    print_exception(t, v, tb, fForce)
-
-
-
 class CFileWrapper:
     def __init__(self, f):
         self.m_f = f
@@ -2356,66 +2294,6 @@ def print_stack():
         finally:
             g_traceback_lock.release()
 
-
-
-#
-# myisfile() is similar to os.path.isfile() but also works with
-# Python eggs.
-#
-def myisfile(path):
-    try:
-        mygetfile(path, False)
-        return True
-
-    except:
-        return False
-
-
-
-#
-# Read a file even if inside a Python egg.
-#
-def mygetfile(path, fread_file = True):
-    if os.path.isfile(path):
-        if not fread_file:
-            return
-
-        if sys.platform == 'OpenVMS':
-            #
-            # OpenVMS filesystem does not support byte stream.
-            #
-            mode = 'r'
-        else:
-            mode = 'rb'
-
-        f = open(path, mode)
-        data = f.read()
-        f.close()
-        return data
-
-    d = os.path.dirname(path)
-
-    while True:
-        if os.path.exists(d):
-            break
-
-        _d = os.path.dirname(d)
-        if _d in [d, '']:
-            raise IOError
-
-        d = _d
-
-    if not zipfile.is_zipfile(d):
-        raise IOError
-
-    z = zipimport.zipimporter(d)
-
-    try:
-        data = z.get_data(path[len(d) + 1:])
-        return data
-
-    except:
-        raise IOError
 
 
 
@@ -2966,207 +2844,12 @@ def CalcMacTerminalCommand(command):
     return "osascript -e '%s'" % command
 
 
-
-def winlower(path):
-    """
-    return lowercase version of 'path' on NT systems.
-
-    On NT filenames are case insensitive so lowercase filenames
-    for comparison purposes on NT.
-    """
-
-    if os.name == 'nt':
-        return path.lower()
-
-    return path
-
-
-
-
-def source_provider_blender(filename):
-    """
-    Return source code of the file referred by filename.
-
-    Support for debugging of Blender Python scripts.
-    Blender scripts are not always saved on disk, and their
-    source has to be queried directly from the Blender API.
-    http://www.blender.org
-    """
-
-    if not 'Blender.Text' in sys.modules:
-        raise IOError
-
-    if filename.startswith('<'):
-        #
-        # This specifies blender source whose source is not
-        # available.
-        #
-        raise IOError(BLENDER_SOURCE_NOT_AVAILABLE)
-
-    _filename = os.path.basename(filename)
-
-    try:
-        t = sys.modules['Blender.Text'].get(_filename)
-        lines = t.asLines()
-        return '\n'.join(lines) + '\n'
-
-    except NameError:
-        f = winlower(_filename)
-        tlist = sys.modules['Blender.Text'].get()
-
-        t = None
-        for _t in tlist:
-            n = winlower(_t.getName())
-            if n == f:
-                t = _t
-                break
-
-        if t == None:
-            #
-            # filename does not specify a blender file. Raise IOError
-            # so that search can continue on file system.
-            #
-            raise IOError
-
-        lines = t.asLines()
-        return '\n'.join(lines) + '\n'
-
-
-
-def source_provider_filesystem(filename):
-    l = mygetfile(filename)
-
-    if l[:3] == as_bytes(ENCODING_UTF8_PREFIX_1):
-        l = l[3:]
-
-    return l
-
-
-
-def source_provider(filename):
-    source = None
-    ffilesystem = False
-
-    try:
-        if g_source_provider_aux != None:
-            source = g_source_provider_aux(filename)
-
-    except IOError:
-        v = sys.exc_info()[1]
-        if SOURCE_NOT_AVAILABLE in v.args:
-            raise
-
-    try:
-        if source == None:
-            source = source_provider_blender(filename)
-
-    except IOError:
-        v = sys.exc_info()[1]
-        if BLENDER_SOURCE_NOT_AVAILABLE in v.args:
-            raise
-
-    if source == None:
-        source = source_provider_filesystem(filename)
-        ffilesystem = True
-
-    encoding = ParseEncoding(source)
-
-    if not is_unicode(source):
-        source = as_unicode(source, encoding)
-
-    return source, encoding, ffilesystem
-
-
-
-def lines_cache(filename):
-    filename = g_found_unicode_files.get(filename, filename)
-
-    if filename in g_lines_cache:
-        return g_lines_cache[filename]
-
-    (source, encoding, ffilesystem) = source_provider(filename)
-    source = source.replace(as_unicode('\r\n'), as_unicode('\n'))
-
-    lines = source.split(as_unicode('\n'))
-
-    g_lines_cache[filename] = (lines, encoding, ffilesystem)
-
-    return (lines, encoding, ffilesystem)
-
-
-
-def get_source(filename):
-    (lines, encoding, ffilesystem) = lines_cache(filename)
-    source = as_unicode('\n').join(lines)
-
-    return (source, encoding)
-
-
-
-def get_source_line(filename, lineno):
-    (lines, encoding, ffilesystem) = lines_cache(filename)
-
-    if lineno > len(lines):
-        return as_unicode('')
-
-    return lines[lineno - 1] + as_unicode('\n')
-
-
-
-def is_provider_filesystem(filename):
-    try:
-        (lines, encoding, ffilesystem) = lines_cache(filename)
-        return ffilesystem
-
-    except IOError:
-        v = sys.exc_info()[1]
-        return not (BLENDER_SOURCE_NOT_AVAILABLE in v.args or SOURCE_NOT_AVAILABLE in v.args)
-
-
-
 def get_file_encoding(filename):
     (lines, encoding, ffilesystem) = lines_cache(filename)
     return encoding
 
 
 
-def ParseLineEncoding(l):
-    if l.startswith('# -*- coding: '):
-        e = l[len('# -*- coding: '):].split()[0]
-        return e
-
-    if l.startswith('# vim:fileencoding='):
-        e = l[len('# vim:fileencoding='):].strip()
-        return e
-
-    return None
-
-
-
-def ParseEncoding(txt):
-    """
-    Parse document encoding according to:
-    http://docs.python.org/ref/encodings.html
-    """
-
-    eol = '\n'
-    if not is_unicode(txt):
-        eol = as_bytes('\n')
-
-    l = txt.split(eol, 20)[:-1]
-
-    for line in l:
-        line = as_unicode(line)
-        encoding = ParseLineEncoding(line)
-        if encoding is not None:
-            try:
-                codecs.lookup(encoding)
-                return encoding
-
-            except:
-                return 'utf-8'
-
-    return 'utf-8'
 
 
 
@@ -4789,698 +4472,9 @@ class CStateManager:
 
 
 
-def myord(c):
-    try:
-        return ord(c)
-    except:
-        return c
-
-
-
-def CalcValidLines(code):
-    l = code.co_firstlineno
-    vl = [l]
-
-    bl = [myord(c) for c in code.co_lnotab[2::2]]
-    sl = [myord(c) for c in code.co_lnotab[1::2]]
-
-    for (bi, si) in zip(bl, sl):
-        l += si
-
-        if bi == 0:
-            continue
-
-        if l != vl[-1]:
-            vl.append(l)
-
-    if len(sl) > 0:
-        l += sl[-1]
-
-        if l != vl[-1]:
-            vl.append(l)
-
-    return vl
-
-
-
-class CScopeBreakInfo:
-    def __init__(self, fqn, valid_lines):
-        self.m_fqn = fqn
-        self.m_first_line = valid_lines[0]
-        self.m_last_line = valid_lines[-1]
-        self.m_valid_lines = valid_lines
-
-
-    def CalcScopeLine(self, lineno):
-        rvl = copy.copy(self.m_valid_lines)
-        rvl.reverse()
-
-        for l in rvl:
-            if lineno >= l:
-                break
-
-        return l
-
-
-    def __str__(self):
-        return "('" + self.m_fqn + "', " + str(self.m_valid_lines) + ')'
-
-
-
-class CFileBreakInfo:
-    """
-    Break info structure for a source file.
-    """
-
-    def __init__(self, filename):
-        self.m_filename = filename
-        self.m_first_line = 0
-        self.m_last_line = 0
-        self.m_scope_break_info = []
-
-
-    def CalcBreakInfo(self):
-        (source, encoding) = get_source(self.m_filename)
-        _source = as_string(source + as_unicode('\n'), encoding)
-
-        code = compile(_source, self.m_filename, "exec")
-
-        self.m_scope_break_info = []
-        self.m_first_line = code.co_firstlineno
-        self.m_last_line = 0
-
-        fqn = []
-        t = [code]
-
-        while len(t) > 0:
-            c = t.pop(0)
-
-            if type(c) == tuple:
-                self.m_scope_break_info.append(CScopeBreakInfo(*c))
-                fqn.pop()
-                continue
-
-            fqn = fqn + [c.co_name]
-            valid_lines = CalcValidLines(c)
-            self.m_last_line = max(self.m_last_line, valid_lines[-1])
-            _fqn = as_unicode('.'.join(fqn), encoding)
-            si = (_fqn, valid_lines)
-            subcodeslist = self.__CalcSubCodesList(c)
-            t = subcodeslist + [si] + t
-
-
-    def __CalcSubCodesList(self, code):
-        tc = type(code)
-        t = [(c.co_firstlineno, c) for c in code.co_consts if type(c) == tc]
-        t.sort()
-        scl = [c[1] for c in t]
-        return scl
-
-
-    def FindScopeByLineno(self, lineno):
-        lineno = max(min(lineno, self.m_last_line), self.m_first_line)
-
-        smaller_element = None
-        exact_element = None
-
-        for sbi in self.m_scope_break_info:
-            if lineno > sbi.m_last_line:
-                if (smaller_element is None) or (sbi.m_last_line >= smaller_element.m_last_line):
-                    smaller_element = sbi
-                continue
-
-            if (lineno >= sbi.m_first_line) and (lineno <= sbi.m_last_line):
-                exact_element = sbi
-                break
-
-        assert(exact_element is not None)
-
-        scope = exact_element
-        l = exact_element.CalcScopeLine(lineno)
-
-        if (smaller_element is not None) and (l <= smaller_element.m_last_line):
-            scope = smaller_element
-            l = smaller_element.CalcScopeLine(lineno)
-
-        return (scope, l)
-
-
-    def FindScopeByName(self, name, offset):
-        if name.startswith(MODULE_SCOPE):
-            alt_scope = MODULE_SCOPE2 + name[len(MODULE_SCOPE):]
-        elif name.startswith(MODULE_SCOPE2):
-            alt_scope = MODULE_SCOPE + name[len(MODULE_SCOPE2):]
-        else:
-            return self.FindScopeByName(MODULE_SCOPE2 + SCOPE_SEP + name, offset)
-
-        for sbi in self.m_scope_break_info:
-            if sbi.m_fqn in [name, alt_scope]:
-                l = sbi.CalcScopeLine(sbi.m_first_line + offset)
-                return (sbi, l)
-
-        print_debug('Invalid scope: %s' % repr(name))
-
-        raise InvalidScopeName
-
-
-
-class CBreakInfoManager:
-    """
-    Manage break info dictionary per filename.
-    """
-
-    def __init__(self):
-        self.m_file_info_dic = {}
-
-
-    def addFile(self, filename):
-        mbi = CFileBreakInfo(filename)
-        mbi.CalcBreakInfo()
-        self.m_file_info_dic[filename] = mbi
-
-
-    def getFile(self, filename):
-        if not filename in self.m_file_info_dic:
-            self.addFile(filename)
-
-        return self.m_file_info_dic[filename]
-
-
-
 #
 # -------------------------------- Break Point Manager -----------------------------
 #
-
-
-class CBreakPoint(object):
-    def __init__(self, filename, scope_fqn, scope_first_line, lineno, fEnabled, expr, encoding, fTemporary = False):
-        """
-        Breakpoint constructor.
-
-        scope_fqn - scope fully qualified name. e.g: module.class.method
-        """
-
-        self.m_id = None
-        self.m_fEnabled = fEnabled
-        self.m_filename = filename
-        self.m_scope_fqn = scope_fqn
-        self.m_scope_name = scope_fqn.split(SCOPE_SEP)[-1]
-        self.m_scope_first_line = scope_first_line
-        self.m_scope_offset = lineno - scope_first_line
-        self.m_lineno = lineno
-        self.m_expr = expr
-        self.m_encoding = encoding
-        self.m_code = None
-        self.m_fTemporary = fTemporary
-
-        if (expr is not None) and (expr != ''):
-            _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding)
-            print_debug('Breakpoint expression: %s' % repr(_expr))
-            self.m_code = compile(_expr, '<string>', 'eval')
-
-
-    def __reduce__(self):
-        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
-        return rv
-
-
-    def calc_enclosing_scope_name(self):
-        if self.m_scope_offset != 0:
-            return None
-
-        if self.m_scope_fqn in [MODULE_SCOPE, MODULE_SCOPE2]:
-            return None
-
-        scope_name_list = self.m_scope_fqn.split(SCOPE_SEP)
-        enclosing_scope_name = scope_name_list[-2]
-
-        return enclosing_scope_name
-
-
-    def enable(self):
-        self.m_fEnabled = True
-
-
-    def disable(self):
-        self.m_fEnabled = False
-
-
-    def isEnabled(self):
-        return self.m_fEnabled
-
-
-    def __str__(self):
-        return "('" + self.m_filename + "', '" + self.m_scope_fqn + "', " + str(self.m_scope_first_line) + ', ' + str(self.m_scope_offset) + ', ' + str(self.m_lineno) + ')'
-
-
-
-class CBreakPointsManagerProxy:
-    """
-    A proxy for the breakpoint manager.
-    While the breakpoint manager resides on the debuggee (the server),
-    the proxy resides in the debugger (the client - session manager)
-    """
-
-    def __init__(self, session_manager):
-        self.m_session_manager = session_manager
-
-        self.m_break_points_by_file = {}
-        self.m_break_points_by_id = {}
-
-        self.m_lock = threading.Lock()
-
-        #
-        # The breakpoint proxy inserts itself between the two chained
-        # event dispatchers in the session manager.
-        #
-
-        event_type_dict = {CEventBreakpoint: {}}
-
-        self.m_session_manager.m_event_dispatcher_proxy.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
-        self.m_session_manager.m_event_dispatcher.register_chain_override(event_type_dict)
-
-
-    def update_bp(self, event):
-        """
-        Handle breakpoint updates that arrive via the event dispatcher.
-        """
-
-        try:
-            self.m_lock.acquire()
-
-            if event.m_fAll:
-                id_list = list(self.m_break_points_by_id.keys())
-            else:
-                id_list = event.m_id_list
-
-            if event.m_action == CEventBreakpoint.REMOVE:
-                for id in id_list:
-                    try:
-                        bp = self.m_break_points_by_id.pop(id)
-                        bpm = self.m_break_points_by_file[bp.m_filename]
-                        del bpm[bp.m_lineno]
-                        if len(bpm) == 0:
-                            del self.m_break_points_by_file[bp.m_filename]
-                    except KeyError:
-                        pass
-                return
-
-            if event.m_action == CEventBreakpoint.DISABLE:
-                for id in id_list:
-                    try:
-                        bp = self.m_break_points_by_id[id]
-                        bp.disable()
-                    except KeyError:
-                        pass
-                return
-
-            if event.m_action == CEventBreakpoint.ENABLE:
-                for id in id_list:
-                    try:
-                        bp = self.m_break_points_by_id[id]
-                        bp.enable()
-                    except KeyError:
-                        pass
-                return
-
-            bpm = self.m_break_points_by_file.get(event.m_bp.m_filename, {})
-            bpm[event.m_bp.m_lineno] = event.m_bp
-
-            self.m_break_points_by_id[event.m_bp.m_id] = event.m_bp
-
-        finally:
-            self.m_lock.release()
-
-            self.m_session_manager.m_event_dispatcher.fire_event(event)
-
-
-    def sync(self):
-        try:
-            self.m_lock.acquire()
-
-            self.m_break_points_by_file = {}
-            self.m_break_points_by_id = {}
-
-        finally:
-            self.m_lock.release()
-
-        break_points_by_id = self.m_session_manager.getSession().getProxy().get_breakpoints()
-
-        try:
-            self.m_lock.acquire()
-
-            self.m_break_points_by_id.update(break_points_by_id)
-
-            for bp in list(self.m_break_points_by_id.values()):
-                bpm = self.m_break_points_by_file.get(bp.m_filename, {})
-                bpm[bp.m_lineno] = bp
-
-        finally:
-            self.m_lock.release()
-
-
-    def clear(self):
-        try:
-            self.m_lock.acquire()
-
-            self.m_break_points_by_file = {}
-            self.m_break_points_by_id = {}
-
-        finally:
-            self.m_lock.release()
-
-
-    def get_breakpoints(self):
-        return self.m_break_points_by_id
-
-
-    def get_breakpoint(self, filename, lineno):
-        bpm = self.m_break_points_by_file[filename]
-        bp = bpm[lineno]
-        return bp
-
-
-
-class CBreakPointsManager:
-    def __init__(self):
-        self.m_break_info_manager = CBreakInfoManager()
-        self.m_active_break_points_by_file = {}
-        self.m_break_points_by_function = {}
-        self.m_break_points_by_file = {}
-        self.m_break_points_by_id = {}
-        self.m_lock = threading.Lock()
-
-        self.m_temp_bp = None
-        self.m_fhard_tbp = False
-
-
-    def get_active_break_points_by_file(self, filename):
-        """
-        Get active breakpoints for file.
-        """
-
-        _filename = winlower(filename)
-
-        return self.m_active_break_points_by_file.setdefault(_filename, {})
-
-
-    def __calc_active_break_points_by_file(self, filename):
-        bpmpt = self.m_active_break_points_by_file.setdefault(filename, {})
-        bpmpt.clear()
-
-        bpm = self.m_break_points_by_file.get(filename, {})
-        for bp in list(bpm.values()):
-            if bp.m_fEnabled:
-                bpmpt[bp.m_lineno] = bp
-
-        tbp = self.m_temp_bp
-        if (tbp is not None) and (tbp.m_filename == filename):
-            bpmpt[tbp.m_lineno] = tbp
-
-
-    def __remove_from_function_list(self, bp):
-        function_name = bp.m_scope_name
-
-        try:
-            bpf = self.m_break_points_by_function[function_name]
-            del bpf[bp]
-            if len(bpf) == 0:
-                del self.m_break_points_by_function[function_name]
-        except KeyError:
-            pass
-
-        #
-        # In some cases a breakpoint belongs to two scopes at the
-        # same time. For example a breakpoint on the declaration line
-        # of a function.
-        #
-
-        _function_name = bp.calc_enclosing_scope_name()
-        if _function_name is None:
-            return
-
-        try:
-            _bpf = self.m_break_points_by_function[_function_name]
-            del _bpf[bp]
-            if len(_bpf) == 0:
-                del self.m_break_points_by_function[_function_name]
-        except KeyError:
-            pass
-
-
-    def __add_to_function_list(self, bp):
-        function_name = bp.m_scope_name
-
-        bpf = self.m_break_points_by_function.setdefault(function_name, {})
-        bpf[bp] = True
-
-        #
-        # In some cases a breakpoint belongs to two scopes at the
-        # same time. For example a breakpoint on the declaration line
-        # of a function.
-        #
-
-        _function_name = bp.calc_enclosing_scope_name()
-        if _function_name is None:
-            return
-
-        _bpf = self.m_break_points_by_function.setdefault(_function_name, {})
-        _bpf[bp] = True
-
-
-    def get_breakpoint(self, filename, lineno):
-        """
-        Get breakpoint by file and line number.
-        """
-
-        bpm = self.m_break_points_by_file[filename]
-        bp = bpm[lineno]
-        return bp
-
-
-    def del_temp_breakpoint(self, fLock = True, breakpoint = None):
-        """
-        Delete a temoporary breakpoint.
-        A temporary breakpoint is used when the debugger is asked to
-        run-to a particular line.
-        Hard temporary breakpoints are deleted only when actually hit.
-        """
-        if self.m_temp_bp is None:
-            return
-
-        try:
-            if fLock:
-                self.m_lock.acquire()
-
-            if self.m_temp_bp is None:
-                return
-
-            if self.m_fhard_tbp and not breakpoint is self.m_temp_bp:
-                return
-
-            bp = self.m_temp_bp
-            self.m_temp_bp = None
-            self.m_fhard_tbp = False
-
-            self.__remove_from_function_list(bp)
-            self.__calc_active_break_points_by_file(bp.m_filename)
-
-        finally:
-            if fLock:
-                self.m_lock.release()
-
-
-    def set_temp_breakpoint(self, filename, scope, lineno, fhard = False):
-        """
-        Set a temoporary breakpoint.
-        A temporary breakpoint is used when the debugger is asked to
-        run-to a particular line.
-        Hard temporary breakpoints are deleted only when actually hit.
-        """
-
-        _filename = winlower(filename)
-
-        mbi = self.m_break_info_manager.getFile(_filename)
-
-        if scope != '':
-            (s, l) = mbi.FindScopeByName(scope, lineno)
-        else:
-            (s, l) = mbi.FindScopeByLineno(lineno)
-
-        bp = CBreakPoint(_filename, s.m_fqn, s.m_first_line, l, fEnabled = True, expr = as_unicode(''), encoding = as_unicode('utf-8'), fTemporary = True)
-
-        try:
-            self.m_lock.acquire()
-
-            self.m_fhard_tbp = False
-            self.del_temp_breakpoint(fLock = False)
-            self.m_fhard_tbp = fhard
-            self.m_temp_bp = bp
-
-            self.__add_to_function_list(bp)
-            self.__calc_active_break_points_by_file(bp.m_filename)
-
-        finally:
-            self.m_lock.release()
-
-
-    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr, encoding):
-        """
-        Set breakpoint.
-
-        scope - a string (possibly empty) with the dotted scope of the
-                breakpoint. eg. 'my_module.my_class.foo'
-
-        expr - a string (possibly empty) with a python expression
-               that will be evaluated at the scope of the breakpoint.
-               The breakpoint will be hit if the expression evaluates
-               to True.
-        """
-
-        _filename = winlower(filename)
-
-        mbi = self.m_break_info_manager.getFile(_filename)
-
-        if scope != '':
-            (s, l) = mbi.FindScopeByName(scope, lineno)
-        else:
-            (s, l) = mbi.FindScopeByLineno(lineno)
-
-        bp = CBreakPoint(_filename, s.m_fqn, s.m_first_line, l, fEnabled, expr, encoding)
-
-        try:
-            self.m_lock.acquire()
-
-            bpm = self.m_break_points_by_file.setdefault(_filename, {})
-
-            #
-            # If a breakpoint on the same line is found we use its ID.
-            # Since the debugger lists breakpoints by IDs, this has
-            # a similar effect to modifying the breakpoint.
-            #
-
-            try:
-                old_bp = bpm[l]
-                id = old_bp.m_id
-                self.__remove_from_function_list(old_bp)
-            except KeyError:
-                #
-                # Find the smallest available ID.
-                #
-
-                bpids = list(self.m_break_points_by_id.keys())
-                bpids.sort()
-
-                id = 0
-                while id < len(bpids):
-                    if bpids[id] != id:
-                        break
-                    id += 1
-
-            bp.m_id = id
-
-            self.m_break_points_by_id[id] = bp
-            bpm[l] = bp
-            if fEnabled:
-                self.__add_to_function_list(bp)
-
-            self.__calc_active_break_points_by_file(bp.m_filename)
-
-            return bp
-
-        finally:
-            self.m_lock.release()
-
-
-    def disable_breakpoint(self, id_list, fAll):
-        """
-        Disable breakpoint.
-        """
-
-        try:
-            self.m_lock.acquire()
-
-            if fAll:
-                id_list = list(self.m_break_points_by_id.keys())
-
-            for id in id_list:
-                try:
-                    bp = self.m_break_points_by_id[id]
-                except KeyError:
-                    continue
-
-                bp.disable()
-                self.__remove_from_function_list(bp)
-                self.__calc_active_break_points_by_file(bp.m_filename)
-
-        finally:
-            self.m_lock.release()
-
-
-    def enable_breakpoint(self, id_list, fAll):
-        """
-        Enable breakpoint.
-        """
-
-        try:
-            self.m_lock.acquire()
-
-            if fAll:
-                id_list = list(self.m_break_points_by_id.keys())
-
-            for id in id_list:
-                try:
-                    bp = self.m_break_points_by_id[id]
-                except KeyError:
-                    continue
-
-                bp.enable()
-                self.__add_to_function_list(bp)
-                self.__calc_active_break_points_by_file(bp.m_filename)
-
-        finally:
-            self.m_lock.release()
-
-
-    def delete_breakpoint(self, id_list, fAll):
-        """
-        Delete breakpoint.
-        """
-
-        try:
-            self.m_lock.acquire()
-
-            if fAll:
-                id_list = list(self.m_break_points_by_id.keys())
-
-            for id in id_list:
-                try:
-                    bp = self.m_break_points_by_id[id]
-                except KeyError:
-                    continue
-
-                filename = bp.m_filename
-                lineno = bp.m_lineno
-
-                bpm = self.m_break_points_by_file[filename]
-                if bp == bpm[lineno]:
-                    del bpm[lineno]
-
-                if len(bpm) == 0:
-                    del self.m_break_points_by_file[filename]
-
-                self.__remove_from_function_list(bp)
-                self.__calc_active_break_points_by_file(bp.m_filename)
-
-                del self.m_break_points_by_id[id]
-
-        finally:
-            self.m_lock.release()
-
-
-    def get_breakpoints(self):
-        return self.m_break_points_by_id
-
 
 
 #
@@ -13374,7 +12368,6 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
     global g_debugger
     global g_fDebug
     global g_initial_cwd
-    global g_source_provider_aux
 
     _rpdb2_pwd = as_unicode(_rpdb2_pwd)
 
@@ -13396,7 +12389,7 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
             raise BadArgument(STR_PASSWORD_BAD)
 
         g_fDebug = fDebug
-        g_source_provider_aux = source_provider
+        src.source_provider.g_source_provider_aux = source_provider
 
         workaround_import_deadlock()
 

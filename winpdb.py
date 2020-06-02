@@ -24,6 +24,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 import src.const
+import src.source_provider
 
 VERSION = (2, 0, 0, 5, 'Tychod')
 WINPDB_VERSION = "2.0.0.dev5"
@@ -2778,7 +2779,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
             return
             
         try:
-            (_filename, source) = self.m_source_manager.get_source(filename)
+            (_filename, source) = src.source_provider.get_source(filename)
         except KeyError:    
             self.m_source_manager.load_source(filename, self.set_file, (fNoHistory, request_number,), fComplain)
             return
@@ -2825,7 +2826,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         if self.m_cur_filename != filename:
             try:
-                (_filename, source) = self.m_source_manager.get_source(filename)
+                (_filename, source) = src.source_provider.get_source(filename)
             except KeyError:    
                 self.m_source_manager.load_source(filename, self.set_position, (lineno, event, request_number), fComplain = False)
                 return
