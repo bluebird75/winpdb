@@ -2,7 +2,7 @@
 
 **Note from Philippe Fremy**
 
-*I started porting winpdb-reborn to Python 3 / Phoenix but the amount of effort exceeds my availability. So: WINPDB ON PYTHON 3 IS BUGGY AND NOT WORKING.*
+*I started porting winpdb-reborn to Python 3 / Phoenix . This is still in progress. So: WINPDB ON PYTHON 3 IS BUGGY AND NOT WORKING.*
 
 *If you like winpdb and want it on python 3 please contribute a bit of your time to fix one or two bugs. With the help of everybody, we can make it work ! It is on the master branch of this repo*
 
