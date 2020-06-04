@@ -9,7 +9,6 @@ import traceback
 
 from src.globals import g_fDebug, g_traceback_lock
 
-
 def is_unicode(s):
     if type(s) == str:
         return True
@@ -27,6 +26,10 @@ def as_unicode(s, encoding = 'utf-8', fstrict = False):
         u = s.decode(encoding, 'replace')
 
     return u
+
+ENCODING_AUTO = as_unicode('auto')
+ENCODING_RAW = as_unicode('raw')
+ENCODING_RAW_I = as_unicode('__raw')
 
 
 def as_string(s, encoding = 'utf-8', fstrict = False):
@@ -217,3 +220,21 @@ def print_stack():
 
         finally:
             g_traceback_lock.release()
+
+
+def get_python_executable( interpreter=None ):
+    '''Return the python executable, usable to launch the debuggee.
+    Pass a value that may override the default executable.
+
+    Executable is returned as unicode, taking into accoun the file system encoding.'''
+    fse = sys.getfilesystemencoding()
+    if interpreter:
+        python_exec = interpreter
+    else:
+        python_exec = sys.executable
+    if python_exec.endswith('w.exe'):
+        python_exec = python_exec[:-5] + '.exe'
+    python_exec = as_unicode(python_exec, fse)
+    return python_exec
+
+

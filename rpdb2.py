@@ -26,6 +26,7 @@ import src.globals
 import src.source_provider
 from src.breakinfo import CScopeBreakInfo, CalcValidLines
 from src.breakpoint import CBreakPointsManagerProxy, CBreakPointsManager
+from src.compat import sets, unicode, str8
 from src.const import *
 from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, CEventSignalIntercepted, \
     CEventSignalException, CEventEncoding, CEventPsycoWarning, CEventConflictingModules, CEventSyncReceivers, \
@@ -37,10 +38,11 @@ from src.exceptions import InvalidScopeName, CException, BadMBCSPath, NotPythonS
     BadVersion, UnexpectedData, AlreadyAttached, NotAttached, SpawnUnsupported, UnknownServer, UnsetPassword, \
     EncryptionNotSupported, EncryptionExpected, DecryptionFailure, AuthenticationBadData, AuthenticationFailure, \
     AuthenticationBadIndex, g_error_mapping
-from src.globals import g_fDebug, g_traceback_lock
+from src.globals import g_fDebug, g_traceback_lock, g_builtins_module
+from src.repr import class_name, clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
 from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower, _print, \
     print_exception, thread_set_daemon, thread_is_alive, thread_set_name, thread_get_name, current_thread, \
-    detect_encoding, detect_locale
+    detect_encoding, detect_locale, get_python_executable, ENCODING_AUTO, ENCODING_RAW, ENCODING_RAW_I
 from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
     is_provider_filesystem, g_found_unicode_files, myisfile
 
@@ -1360,10 +1362,6 @@ RPDB_EXEC_INFO = as_unicode('rpdb_exception_info')
 MODE_ON = 'ON'
 MODE_OFF = 'OFF'
 
-ENCODING_AUTO = as_unicode('auto')
-ENCODING_RAW = as_unicode('raw')
-ENCODING_RAW_I = as_unicode('__raw')
-
 MAX_EVALUATE_LENGTH = 256 * 1024
 MAX_NAMESPACE_ITEMS = 1024
 MAX_SORTABLE_LENGTH = 256 * 1024
@@ -1400,11 +1398,6 @@ XML_DATA = """<?xml version='1.0'?>
 </methodCall>""" % RPDB_COMPATIBILITY_VERSION
 
 N_WORK_QUEUE_THREADS = 8
-
-DEFAULT_PATH_SUFFIX_LENGTH = 55
-
-ELLIPSIS_UNICODE = as_unicode('...')
-ELLIPSIS_BYTES = as_bytes('...')
 
 ERROR_NO_ATTRIBUTE = 'Error: No attribute.'
 
@@ -1465,29 +1458,9 @@ g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
 g_alertable_waiters = {}
 
 
-
-g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
-
-
-
 #
 # ---------------------------- General Utils ------------------------------
 #
-
-def get_python_executable( interpreter=None ):
-    '''Return the python executable, usable to launch the debuggee.
-    Pass a value that may override the default executable.
-
-    Executable is returned as unicode, taking into accoun the file system encoding.'''
-    fse = sys.getfilesystemencoding()
-    if interpreter:
-        python_exec = interpreter
-    else:
-        python_exec = sys.executable
-    if python_exec.endswith('w.exe'):
-        python_exec = python_exec[:-5] + '.exe'
-    python_exec = as_unicode(python_exec, fse)
-    return python_exec
 
 def parse_console_launch( arg ):
     '''Split a the console command launch into chdir option, interprter option and real commandline
@@ -1604,371 +1577,9 @@ def lock_notify_all(lock):
 def event_is_set(event):
     return event.is_set()
 
-
-class _stub_type:
-    pass
-
-
-def _rpdb2_bytes(s, e):
-    return s.encode(e)
-
-
-if not hasattr(g_builtins_module, 'unicode'):
-    unicode = _stub_type
-
-if not hasattr(g_builtins_module, 'long'):
-    long = _stub_type
-
-if not hasattr(g_builtins_module, 'str8'):
-    str8 = _stub_type
-
-if not hasattr(g_builtins_module, 'bytearray'):
-    bytearray = _stub_type
-
-if not hasattr(g_builtins_module, 'bytes'):
-    bytes = _stub_type
-
-    #
-    # Pickle on Python 2.5 should know how to handle byte strings
-    # that arrive from Python 3.0 over sockets.
-    #
-    g_builtins_module.bytes = _rpdb2_bytes
-
-
-if is_py3k():
-    class sets:
-        Set = _stub_type
-        BaseSet = _stub_type
-        ImmutableSet = _stub_type
-
-
-
 # TODO: adjust
 def _raw_input(s):
     return input(s)
-
-
-def class_name(c):
-    s = safe_str(c)
-
-    if "'" in s:
-        s = s.split("'")[1]
-
-    assert(s.startswith(__name__ + '.'))
-
-    return s
-
-
-
-def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
-    suffix = calc_suffix(path, n)
-    if not suffix.startswith('...'):
-        return suffix
-
-    index = suffix.find(os.sep)
-    if index == -1:
-        return suffix
-
-    clip = '...' + suffix[index:]
-
-    return clip
-
-
-
-def safe_str(x):
-    try:
-        return str(x)
-
-    except:
-        return 'N/A'
-
-
-
-def safe_repr(x):
-    try:
-        return repr(x)
-
-    except:
-        return 'N/A'
-
-
-
-def parse_type(t):
-    rt = safe_repr(t)
-    if not "'" in rt:
-        return rt
-
-    st = rt.split("'")[1]
-    return st
-
-
-def repr_list(pattern, l, length, encoding, is_valid):
-    length = max(0, length - len(pattern) + 2)
-
-    s = ''
-
-    index = 0
-
-    try:
-        for i in l:
-            #
-            # Remove any trace of session password from data structures that
-            # go over the network.
-            #
-            if type(i) == str and i in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
-                continue
-
-            s += repr_ltd(i, length - len(s), encoding, is_valid)
-
-            index += 1
-
-            if index < len(l) and len(s) > length:
-                is_valid[0] = False
-                if not s.endswith('...'):
-                    s += '...'
-                break
-
-            if index < len(l) or (index == 1 and pattern[0] == '('):
-                s += ', '
-
-    except AttributeError:
-        is_valid[0] = False
-
-    return as_unicode(pattern % s)
-
-
-
-def repr_dict(pattern, d, length, encoding, is_valid):
-    length = max(0, length - len(pattern) + 2)
-
-    s = ''
-
-    index = 0
-
-    try:
-        for k in d:
-            #
-            # Remove any trace of session password from data structures that
-            # go over the network.
-            #
-            if type(k) == str and k in ['_rpdb2_args', '_rpdb2_pwd', 'm_rpdb2_pwd']:
-                continue
-
-            v = d[k]
-
-            s += repr_ltd(k, length - len(s), encoding, is_valid)
-
-            if len(s) > length:
-                is_valid[0] = False
-                if not s.endswith('...'):
-                    s += '...'
-                break
-
-            s +=  ': ' + repr_ltd(v, length - len(s), encoding, is_valid)
-
-            index += 1
-
-            if index < len(d) and len(s) > length:
-                is_valid[0] = False
-                if not s.endswith('...'):
-                    s += '...'
-                break
-
-            if index < len(d):
-                s += ', '
-
-    except AttributeError:
-        is_valid[0] = False
-
-    return as_unicode(pattern % s)
-
-
-
-def repr_bytearray(s, length, encoding, is_valid):
-    try:
-        s = s.decode(encoding)
-        r = repr_unicode(s, length, is_valid)
-        return 'bytearray(b' + r[1:] + ')'
-
-    except:
-        #
-        # If a string is not encoded as utf-8 its repr() will be done with
-        # the regular repr() function.
-        #
-        return repr_str_raw(s, length, is_valid)
-
-
-
-def repr_bytes(s, length, encoding, is_valid):
-    try:
-        s = s.decode(encoding)
-        r = repr_unicode(s, length, is_valid)
-        return 'b' + r[1:]
-
-    except:
-        #
-        # If a string is not encoded as utf-8 its repr() will be done with
-        # the regular repr() function.
-        #
-        return repr_str_raw(s, length, is_valid)
-
-
-
-def repr_str8(s, length, encoding, is_valid):
-    try:
-        s = s.decode(encoding)
-        r = repr_unicode(s, length, is_valid)
-        return 's' + r[1:]
-
-    except:
-        #
-        # If a string is not encoded as utf-8 its repr() will be done with
-        # the regular repr() function.
-        #
-        return repr_str_raw(s, length, is_valid)
-
-
-
-def repr_str(s, length, encoding, is_valid):
-    try:
-        s = as_unicode(s, encoding, fstrict = True)
-        r = repr_unicode(s, length, is_valid)
-        return r[1:]
-
-    except:
-        #
-        # If a string is not encoded as utf-8 its repr() will be done with
-        # the regular repr() function.
-        #
-        return repr_str_raw(s, length, is_valid)
-
-
-
-def repr_unicode(s, length, is_valid):
-    index = [2, 1][is_py3k()]
-
-    rs = ''
-
-    for c in s:
-        if len(rs) > length:
-            is_valid[0] = False
-            rs += '...'
-            break
-
-        if ord(c) < 128:
-            rs += repr(c)[index: -1]
-        else:
-            rs += c
-
-    if not "'" in rs:
-        return as_unicode("u'%s'" % rs)
-
-    if not '"' in rs:
-        return as_unicode('u"%s"' % rs)
-
-    return as_unicode("u'%s'" % rs.replace("'", "\\'"))
-
-
-
-def repr_str_raw(s, length, is_valid):
-    if is_unicode(s):
-        eli = ELLIPSIS_UNICODE
-    else:
-        eli = ELLIPSIS_BYTES
-
-    if len(s) > length:
-        is_valid[0] = False
-        s = s[: length] + eli
-
-    return as_unicode(repr(s))
-
-
-
-def repr_base(v, length, is_valid):
-    r = repr(v)
-
-    if len(r) > length:
-        is_valid[0] = False
-        r = r[: length] + '...'
-
-    return as_unicode(r)
-
-
-
-def repr_ltd(x, length, encoding, is_valid = [True]):
-    try:
-        length = max(0, length)
-
-        try:
-            if isinstance(x, frozenset):
-                return repr_list('frozenset([%s])', x, length, encoding, is_valid)
-
-            if isinstance(x, set):
-                return repr_list('set([%s])', x, length, encoding, is_valid)
-
-        except NameError:
-            pass
-
-        if isinstance(x, sets.Set):
-            return repr_list('sets.Set([%s])', x, length, encoding, is_valid)
-
-        if isinstance(x, sets.ImmutableSet):
-            return repr_list('sets.ImmutableSet([%s])', x, length, encoding, is_valid)
-
-        if isinstance(x, list):
-            return repr_list('[%s]', x, length, encoding, is_valid)
-
-        if isinstance(x, tuple):
-            return repr_list('(%s)', x, length, encoding, is_valid)
-
-        if isinstance(x, dict):
-            return repr_dict('{%s}', x, length, encoding, is_valid)
-
-        if encoding == ENCODING_RAW_I and [True for t in [str, unicode, bytearray, bytes, str8] if t is type(x)]:
-            return repr_str_raw(x, length, is_valid)
-
-        if type(x) is unicode:
-            return repr_unicode(x, length, is_valid)
-
-        if type(x) is bytearray:
-            return repr_bytearray(x, length, encoding, is_valid)
-
-        if type(x) is bytes:
-            return repr_bytes(x, length, encoding, is_valid)
-
-        if type(x) is str8:
-            return repr_str8(x, length, encoding, is_valid)
-
-        if type(x) is str:
-            return repr_str(x, length, encoding, is_valid)
-
-        if [True for t in [bool, int, float, long, type(None)] if t is type(x)]:
-            return repr_base(x, length, is_valid)
-
-        is_valid[0] = False
-
-        y = safe_repr(x)[: length]
-        if len(y) == length:
-            y += '...'
-
-        if encoding == ENCODING_RAW_I:
-            encoding = 'utf-8'
-
-        try:
-            y = as_unicode(y, encoding, fstrict = True)
-            return y
-
-        except:
-            pass
-
-        encoding = sys.getfilesystemencoding()
-        y = as_unicode(y, encoding)
-
-        return y
-
-    except:
-        print_debug_exception()
-        return as_unicode('N/A')
 
 
 def split_command_line_path_filename_args(command_line):
@@ -2648,20 +2259,6 @@ def is_encryption_supported():
     return 'DES' in globals()
 
 
-
-def calc_suffix(_str, n):
-    """
-    Return an n charaters suffix of the argument string of the form
-    '...suffix'.
-    """
-
-    if len(_str) <= n:
-        return _str
-
-    return '...' + _str[-(n - 3):]
-
-
-
 def calc_prefix(_str, n):
     """
     Return an n charaters prefix of the argument string of the form
@@ -2985,7 +2582,7 @@ class _RPDB2_FindRepr:
     def __getitem__(self, key):
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW_I).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, encoding =ENCODING_RAW_I).replace('"', '&quot') == key:
                 if isinstance(self.m_object, dict):
                     return self.m_object[i]
 
@@ -3002,7 +2599,7 @@ class _RPDB2_FindRepr:
 
         index = 0
         for i in self.m_object:
-            if repr_ltd(i, self.m_repr_limit, encoding = ENCODING_RAW_I).replace('"', '&quot') == key:
+            if repr_ltd(i, self.m_repr_limit, encoding =ENCODING_RAW_I).replace('"', '&quot') == key:
                 self.m_object[i] = value
                 return
 
@@ -3037,7 +2634,7 @@ def sort_key(e):
     if not is_py3k() and operator.isNumberType(e):
         return (0, e)
 
-    return (1, repr_ltd(e, 256, encoding = ENCODING_RAW_I))
+    return (1, repr_ltd(e, 256, encoding =ENCODING_RAW_I))
 
 
 
@@ -6504,7 +6101,7 @@ class CDebuggerEngine(CDebuggerCore):
 
 
     def __calc_number_of_subnodes(self, r):
-        for t in [bytearray, bytes, str, str8, unicode, int, long, float, bool, type(None)]:
+        for t in [bytearray, bytes, str, str8, unicode, int, float, bool, type(None)]:
             if t is type(r):
                 return 0
 
@@ -6553,7 +6150,7 @@ class CDebuggerEngine(CDebuggerCore):
                         break
 
                     is_valid = [True]
-                    rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW_I)
+                    rk = repr_ltd(i, REPR_ID_LENGTH, encoding =ENCODING_RAW_I)
 
                     e = {}
                     e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
@@ -6583,7 +6180,7 @@ class CDebuggerEngine(CDebuggerCore):
                     break
 
                 is_valid = [True]
-                rk = repr_ltd(i, REPR_ID_LENGTH, encoding = ENCODING_RAW_I)
+                rk = repr_ltd(i, REPR_ID_LENGTH, encoding =ENCODING_RAW_I)
 
                 e = {}
                 e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
@@ -6656,7 +6253,7 @@ class CDebuggerEngine(CDebuggerCore):
                         e[DICT_KEY_EXPR] = as_unicode('(%s)[str8(%s)]' % (expr, rk[1:]))
 
                 if not DICT_KEY_EXPR in e:
-                    rk = repr_ltd(k, REPR_ID_LENGTH, encoding = ENCODING_RAW_I)
+                    rk = repr_ltd(k, REPR_ID_LENGTH, encoding =ENCODING_RAW_I)
                     e[DICT_KEY_EXPR] = as_unicode('_RPDB2_FindRepr((%s), %d)["%s"]' % (expr, REPR_ID_LENGTH, rk.replace('"', '&quot')))
 
                 e[DICT_KEY_NAME] = as_unicode([repr_ltd(k, repr_limit, encoding), k][fForceNames])
@@ -8473,7 +8070,7 @@ class CSessionManagerInternal:
 
         # XXX Should probably adjust path of interpreter if any
 
-        python_exec = get_python_executable( interpreter )
+        python_exec = get_python_executable(interpreter)
 
         if as_bytes('?') in as_bytes(python_exec + debugger, encoding, fstrict = False):
             raise BadMBCSPath

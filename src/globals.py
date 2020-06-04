@@ -1,3 +1,4 @@
+import sys
 import threading
 
 #
@@ -11,3 +12,4 @@ g_fDebug = False
 # output from different threads.
 #
 g_traceback_lock = threading.RLock()
+g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
