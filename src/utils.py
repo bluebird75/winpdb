@@ -1,9 +1,13 @@
 import _thread as thread
+import codecs
+import locale
 import os.path
 import sys
+import threading
 import time
+import traceback
 
-from rpdb2 import g_fDebug, thread_get_name, current_thread, _print, print_exception
+from src.globals import g_fDebug, g_traceback_lock
 
 
 def is_unicode(s):
@@ -95,3 +99,121 @@ def winlower(path):
         return path.lower()
 
     return path
+
+
+def _print(s, f = sys.stdout, feol = True):
+    s = as_unicode(s)
+
+    encoding = detect_encoding(f)
+
+    s = as_bytes(s, encoding, fstrict = False)
+    s = as_string(s, encoding)
+
+    if feol:
+        f.write(s + '\n')
+    else:
+        f.write(s)
+
+
+def print_exception(t, v, tb, fForce = False):
+    """
+    Print exceptions to stderr when in debug mode.
+    """
+
+    if not g_fDebug and not fForce:
+        return
+
+    try:
+        g_traceback_lock.acquire()
+        traceback.print_exception(t, v, tb, file = CFileWrapper(sys.stderr))
+
+    finally:
+        g_traceback_lock.release()
+
+
+def thread_set_daemon(thread, fdaemon):
+    thread.daemon = fdaemon
+
+
+def thread_is_alive(thread):
+    return thread.is_alive()
+
+
+def thread_set_name(thread, name):
+    thread.name = name
+
+
+def thread_get_name(thread):
+    return thread.name
+
+
+def current_thread():
+    return threading.current_thread()
+
+
+def detect_encoding(file):
+    try:
+        encoding = file.encoding
+        if encoding == None:
+            return detect_locale()
+
+    except:
+        return detect_locale()
+
+    try:
+        codecs.lookup(encoding)
+        return encoding
+
+    except:
+        pass
+
+    if encoding.lower().startswith('utf_8'):
+        return 'utf-8'
+
+    return 'ascii'
+
+
+def detect_locale():
+    encoding = locale.getpreferredencoding()
+
+    if encoding == None:
+        return 'ascii'
+
+    try:
+        codecs.lookup(encoding)
+        return encoding
+
+
+    except:
+        pass
+
+    if encoding.lower().startswith('utf_8'):
+        return 'utf-8'
+
+    return 'ascii'
+
+class CFileWrapper:
+    def __init__(self, f):
+        self.m_f = f
+
+
+    def write(self, s):
+        _print(s, self.m_f, feol = False)
+
+
+    def __getattr__(self, name):
+        return self.m_f.__getattr__(name)
+
+
+def print_stack():
+    """
+    Print exceptions to stdout when in debug mode.
+    """
+
+    if g_fDebug == True:
+        try:
+            g_traceback_lock.acquire()
+            traceback.print_stack(file = CFileWrapper(sys.stderr))
+
+        finally:
+            g_traceback_lock.release()

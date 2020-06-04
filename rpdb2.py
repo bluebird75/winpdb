@@ -22,6 +22,7 @@
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA
 """
+import src.globals
 import src.source_provider
 from src.breakinfo import CScopeBreakInfo, CalcValidLines
 from src.breakpoint import CBreakPointsManagerProxy, CBreakPointsManager
@@ -31,8 +32,11 @@ from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, C
     CEventForkSwitch, CEventExecSwitch, CEventExit, CEventState, CEventSynchronicity, CEventBreakOnExit, CEventTrap, \
     CEventForkMode, CEventUnhandledException, CEventNamespace, CEventNoThreads, CEventThreads, CEventThreadBroken, \
     CEventStack, CEventStackFrameChange, CEventStackDepth, CEventBreakpoint, CEventSync, breakpoint_copy
-from src.exceptions import InvalidScopeName
-from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower
+from src.exceptions import InvalidScopeName, CException
+from src.globals import g_fDebug, g_traceback_lock
+from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower, _print, \
+    print_exception, thread_set_daemon, thread_is_alive, thread_set_name, thread_get_name, current_thread, \
+    detect_encoding, detect_locale
 from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
     is_provider_filesystem, g_found_unicode_files, myisfile
 
@@ -54,7 +58,6 @@ import getopt
 import random
 import base64
 import atexit
-import locale
 import codecs
 import signal
 import errno
@@ -1232,18 +1235,6 @@ class CConsole:
 #
 
 
-
-
-class CException(Exception):
-    """
-    Base exception class for the debugger.
-    """
-
-    def __init__(self, *args):
-        Exception.__init__(self, *args)
-
-
-
 class BadMBCSPath(CException):
     """
     Raised on Windows systems when the python executable or debugger script
@@ -1587,18 +1578,6 @@ g_debugger = None
 g_fScreen = False
 g_fDefaultStd = True
 
-#
-# In debug mode errors and tracebacks are printed to stdout
-# and frames of rpdb2 are visible to the user in the debugger
-#
-g_fDebug = True
-
-#
-# Lock for the traceback module to prevent it from interleaving
-# output from different threads.
-#
-g_traceback_lock = threading.RLock()
-
 g_initial_cwd = []
 
 g_error_mapping = {
@@ -1811,20 +1790,6 @@ def lock_notify_all(lock):
 def event_is_set(event):
     return event.is_set()
 
-def thread_set_daemon(thread, fdaemon):
-    thread.daemon = fdaemon
-
-def thread_is_alive(thread):
-    return thread.is_alive()
-
-def thread_set_name(thread, name):
-    thread.name = name
-
-def thread_get_name(thread):
-    return thread.name
-
-def current_thread():
-    return threading.current_thread()
 
 class _stub_type:
     pass
@@ -1867,64 +1832,6 @@ if is_py3k():
 # TODO: adjust
 def _raw_input(s):
     return input(s)
-
-def _print(s, f = sys.stdout, feol = True):
-    s = as_unicode(s)
-
-    encoding = detect_encoding(f)
-
-    s = as_bytes(s, encoding, fstrict = False)
-    s = as_string(s, encoding)
-
-    if feol:
-        f.write(s + '\n')
-    else:
-        f.write(s)
-
-
-
-def detect_encoding(file):
-    try:
-        encoding = file.encoding
-        if encoding == None:
-            return detect_locale()
-
-    except:
-        return detect_locale()
-
-    try:
-        codecs.lookup(encoding)
-        return encoding
-
-    except:
-        pass
-
-    if encoding.lower().startswith('utf_8'):
-        return 'utf-8'
-
-    return 'ascii'
-
-
-
-def detect_locale():
-    encoding = locale.getpreferredencoding()
-
-    if encoding == None:
-        return 'ascii'
-
-    try:
-        codecs.lookup(encoding)
-        return encoding
-
-
-    except:
-        pass
-
-    if encoding.lower().startswith('utf_8'):
-        return 'utf-8'
-
-    return 'ascii'
-
 
 
 def class_name(c):
@@ -2248,53 +2155,6 @@ def repr_ltd(x, length, encoding, is_valid = [True]):
     except:
         print_debug_exception()
         return as_unicode('N/A')
-
-
-class CFileWrapper:
-    def __init__(self, f):
-        self.m_f = f
-
-
-    def write(self, s):
-        _print(s, self.m_f, feol = False)
-
-
-    def __getattr__(self, name):
-        return self.m_f.__getattr__(name)
-
-
-
-def print_exception(t, v, tb, fForce = False):
-    """
-    Print exceptions to stderr when in debug mode.
-    """
-
-    if not g_fDebug and not fForce:
-        return
-
-    try:
-        g_traceback_lock.acquire()
-        traceback.print_exception(t, v, tb, file = CFileWrapper(sys.stderr))
-
-    finally:
-        g_traceback_lock.release()
-
-
-
-def print_stack():
-    """
-    Print exceptions to stdout when in debug mode.
-    """
-
-    if g_fDebug == True:
-        try:
-            g_traceback_lock.acquire()
-            traceback.print_stack(file = CFileWrapper(sys.stderr))
-
-        finally:
-            g_traceback_lock.release()
-
-
 
 
 def split_command_line_path_filename_args(command_line):
@@ -12366,7 +12226,6 @@ def workaround_import_deadlock():
 def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, source_provider, fDebug, depth):
     global g_server
     global g_debugger
-    global g_fDebug
     global g_initial_cwd
 
     _rpdb2_pwd = as_unicode(_rpdb2_pwd)
@@ -12388,7 +12247,7 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         if not is_valid_pwd(_rpdb2_pwd):
             raise BadArgument(STR_PASSWORD_BAD)
 
-        g_fDebug = fDebug
+        src.globals.g_fDebug = fDebug
         src.source_provider.g_source_provider_aux = source_provider
 
         workaround_import_deadlock()
@@ -12590,7 +12449,6 @@ def PrintUsage(fExtended = False):
 
 def main(StartClient_func = StartClient, version =RPDB_TITLE):
     global g_fScreen
-    global g_fDebug
     global g_fFirewallTest
     global g_fbreakonexit
 
@@ -12634,7 +12492,7 @@ def main(StartClient_func = StartClient, version =RPDB_TITLE):
             _print(version)
             return 0
         if o in ['--debug']:
-            g_fDebug = True
+            src.globals.g_fDebug = True
         if o in ['-d', '--debugee', '--debuggee']:
             fWrap = True
         if o in ['-a', '--attach']:

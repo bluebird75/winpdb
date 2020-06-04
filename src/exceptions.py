@@ -1,4 +1,12 @@
-from rpdb2 import CException
+
+
+class CException(Exception):
+    """
+    Base exception class for the debugger.
+    """
+
+    def __init__(self, *args):
+        Exception.__init__(self, *args)
 
 
 class InvalidScopeName(CException):
@@ -7,3 +15,5 @@ class InvalidScopeName(CException):
     This exception might be thrown when a request was made to set a breakpoint
     to an unknown scope.
     """
+
+
