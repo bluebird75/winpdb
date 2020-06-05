@@ -26,15 +26,16 @@ import src.globals
 import src.source_provider
 from src.breakinfo import CScopeBreakInfo, CalcValidLines
 from src.breakpoint import CBreakPointsManager
-from src.compat import sets, unicode, str8
+from src.compat import sets, unicode, str8, base64_decodestring
 from src.const import *
-from src.const import get_version, get_interface_compatibility_version, NT_DEBUG, SCREEN, MAC, DARWIN, POSIX, \
+from src.const import get_interface_compatibility_version, POSIX, \
     STR_STATE_BROKEN, STATE_BROKEN, STATE_RUNNING, STATE_ANALYZE, STATE_DETACHED, DEBUGGER_FILENAME, THREADING_FILENAME, \
     DEFAULT_NUMBER_OF_LINES, DICT_KEY_TID, DICT_KEY_STACK, \
     DICT_KEY_CODE_LIST, DICT_KEY_CURRENT_TID, DICT_KEY_BROKEN, DICT_KEY_BREAKPOINTS, DICT_KEY_LINES, DICT_KEY_FILENAME, \
     DICT_KEY_FIRST_LINENO, DICT_KEY_FRAME_LINENO, DICT_KEY_EVENT, DICT_KEY_EXPR, DICT_KEY_NAME, DICT_KEY_REPR, \
-    DICT_KEY_IS_VALID, DICT_KEY_TYPE, DICT_KEY_SUBNODES, DICT_KEY_N_SUBNODES, DICT_KEY_ERROR, BREAKPOINTS_FILE_EXT, \
-    PYTHON_FILE_EXTENSION, PYTHONW_FILE_EXTENSION, PYTHON_EXT_LIST
+    DICT_KEY_IS_VALID, DICT_KEY_TYPE, DICT_KEY_SUBNODES, DICT_KEY_N_SUBNODES, DICT_KEY_ERROR, PYTHON_FILE_EXTENSION, PYTHONW_FILE_EXTENSION, PYTHON_EXT_LIST
+from src.crypto import is_encryption_supported
+from src.debugee import CDebuggeeServer
 from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, CEventSignalIntercepted, \
     CEventSignalException, CEventPsycoWarning, CEventConflictingModules, CEventSyncReceivers, \
     CEventForkSwitch, CEventExecSwitch, CEventExit, CEventState, CEventSynchronicity, CEventBreakOnExit, CEventTrap, \
@@ -42,25 +43,23 @@ from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, C
     CEventStack, CEventStackDepth, CEventBreakpoint, CEventSync, breakpoint_copy, CEventDispatcher
 from src.exceptions import InvalidScopeName, CException, NotPythonSource, BadArgument, ThreadNotFound, \
     NoThreads, ThreadDone, DebuggerNotBroken, InvalidFrame, NoExceptionFound, CConnectionException, BadVersion, \
-    NotAttached, SpawnUnsupported, EncryptionNotSupported, EncryptionExpected, DecryptionFailure, AuthenticationBadData, AuthenticationFailure, \
+    NotAttached, EncryptionNotSupported, EncryptionExpected, DecryptionFailure, AuthenticationBadData, AuthenticationFailure, \
     AuthenticationBadIndex
 from src.globals import g_fDebug, g_traceback_lock, g_builtins_module
 from src.repr import class_name, clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
-from src.session_manager import CSessionManager, is_valid_pwd, calc_pwd_file_path
+from src.session_manager import CSessionManager, is_valid_pwd, calc_pwd_file_path, delete_pwd_file
 from src.state_manager import CStateManager, lock_notify_all, g_alertable_waiters
 from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower, _print, \
-    thread_set_daemon, thread_is_alive, thread_set_name, thread_get_name, current_thread, \
-    detect_encoding, detect_locale, get_python_executable, ENCODING_AUTO, ENCODING_RAW, ENCODING_RAW_I, generate_rid, \
-    safe_wait, my_os_path_join, FindFile, my_abspath, CalcScriptName, getcwd, getcwdu
+    thread_is_alive, thread_set_name, thread_get_name, current_thread, \
+    detect_encoding, detect_locale, get_python_executable, ENCODING_AUTO, ENCODING_RAW, ENCODING_RAW_I, safe_wait, my_os_path_join, FindFile, my_abspath, CalcScriptName, getcwd, getcwdu, g_safe_base64_from
 from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
-    is_provider_filesystem, g_found_unicode_files, myisfile
+    is_provider_filesystem, g_found_unicode_files
 
 if '.' in __name__:
     raise ImportError('rpdb2 must not be imported as part of a package!')
 
 import threading
 import traceback
-import tempfile
 import platform
 import operator
 import weakref
@@ -69,24 +68,15 @@ import pickle
 import socket
 import getopt
 import random
-import base64
 import atexit
 import codecs
 import signal
-import errno
 import time
 import copy
-import hmac
-import stat
-import zlib
 import sys
 import cmd
 import imp
 import os
-
-# TODO py3k
-import hashlib
-_md5 = hashlib.md5
 
 if sys.version_info[:2] < (3,2):
     print(STR_BAD_PYTHON_VERSION)
@@ -100,8 +90,6 @@ except ImportError:
 import xmlrpc.server as SimpleXMLRPCServer
 import xmlrpc.client as xmlrpclib
 import socketserver as SocketServer
-import subprocess as commands
-import copyreg as copy_reg
 import http.client as httplib
 import _thread as thread
 import numbers
@@ -383,31 +371,6 @@ def is_py3k():
 # According to PEP-8: "Use 4 spaces per indentation level."
 #
 
-GNOME_DEFAULT_TERM = 'gnome-terminal'
-GNOME_DEFAULT_TERM_BEFORE_3_8 = 'gnome-terminal --disable-factory'
-GNOME_DEFAULT_TERM_BEFORE_3_8_CHECK_FILE = "/../share/gnome-terminal/profile-manager.ui" #this glade-related file present for only gnome terminal versions 2.24-3.6
-
-#
-# Map between OS type and relevant command to initiate a new OS console.
-# entries for other OSs can be added here.
-# '%s' serves as a place holder.
-#
-# Currently there is no difference between 'nt' and NT_DEBUG, since now
-# both of them leave the terminal open after termination of debuggee to
-# accommodate scenarios of scripts with child processes.
-#
-osSpawn = {
-    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd.exe /K ""%(exec)s" %(options)s"',
-    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd.exe /K ""%(exec)s" %(options)s"',
-    POSIX: "%(term)s -e %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
-    'Terminal': "Terminal --disable-server -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
-    GNOME_DEFAULT_TERM_BEFORE_3_8: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
-    GNOME_DEFAULT_TERM: "gnome-terminal -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
-    MAC: '%(exec)s %(options)s',
-    DARWIN: '%(exec)s %(options)s',
-    SCREEN: 'screen -t debuggee_console %(exec)s %(options)s'
-}
-
 RPDBTERM = 'RPDBTERM'
 COLORTERM = 'COLORTERM'
 TERM = 'TERM'
@@ -453,8 +416,6 @@ MAX_NAMESPACE_WARNING = {
 
 MAX_EVENT_LIST_LENGTH = 1000
 
-INDEX_TABLE_SIZE = 100
-
 DISPACHER_METHOD = 'dispatcher_method'
 
 CONFLICTING_MODULES = ['psyco', 'pdb', 'bdb', 'doctest']
@@ -477,9 +438,6 @@ ERROR_NO_ATTRIBUTE = 'Error: No attribute.'
 g_server_lock = threading.RLock()
 g_server = None
 g_debugger = None
-
-g_fScreen = False
-g_fDefaultStd = True
 
 #
 # These globals are related to handling the os.fork() os._exit() and exec
@@ -516,12 +474,6 @@ g_signals_pending = []
 #g_profile = None
 
 g_fbreakonexit = False
-
-
-
-g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
-g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
-
 
 
 #
@@ -650,13 +602,6 @@ def calc_frame_path(frame):
         return lowered
 
 
-if is_py3k() and sys.version_info[:2] > (3,0):
-    base64_encodestring = base64.encodebytes
-    base64_decodestring = base64.decodebytes
-else:
-    base64_encodestring = base64.encodestring
-    base64_decodestring = base64.decodestring
-
 
 #
 # MOD
@@ -749,76 +694,6 @@ def IsPrefixInEnviron(_str):
 
 
 
-def CalcTerminalCommand():
-    """
-    Calc the unix command to start a new terminal, for example: xterm
-    """
-
-    if RPDBTERM in os.environ:
-        term = os.environ[RPDBTERM]
-        if IsFileInPath(term):
-            return term
-
-    if COLORTERM in os.environ:
-        term = os.environ[COLORTERM]
-        if term != 'yes' and IsFileInPath(term):
-            return term
-
-    if IsPrefixInEnviron(KDE_PREFIX):
-        (s, term) = commands.getstatusoutput(KDE_DEFAULT_TERM_QUERY)
-        if (s == 0) and IsFileInPath(term):
-            return term
-
-    elif IsPrefixInEnviron(GNOME_PREFIX):
-        try:
-            gnome_terminal_path = FindFile(GNOME_DEFAULT_TERM)
-            if gnome_terminal_path:
-                if myisfile(os.path.dirname(gnome_terminal_path) + GNOME_DEFAULT_TERM_BEFORE_3_8_CHECK_FILE):
-                    return GNOME_DEFAULT_TERM_BEFORE_3_8
-                return GNOME_DEFAULT_TERM
-        except IOError:
-            pass
-
-    if IsFileInPath(XTERM):
-        return XTERM
-
-    if IsFileInPath(RXVT):
-        return RXVT
-
-    raise SpawnUnsupported
-
-
-
-def CalcMacTerminalCommand(command):
-    """
-    Calculate what to put in popen to start a given script.
-    Starts a tiny Applescript that performs the script action.
-    """
-
-    #
-    # Quoting is a bit tricky; we do it step by step.
-    # Make Applescript string: put backslashes before double quotes and
-    # backslashes.
-    #
-    command = command.replace('\\', '\\\\').replace('"', '\\"')
-
-    #
-    # Make complete Applescript command.
-    #
-    command = 'tell application "Terminal" to do script "%s"' % command
-
-    #
-    # Make a shell single quoted string (put backslashed single quotes
-    # outside string).
-    #
-    command = command.replace("'", "'\\''")
-
-    #
-    # Make complete shell command.
-    #
-    return "osascript -e '%s'" % command
-
-
 def get_file_encoding(filename):
     (lines, encoding, ffilesystem) = lines_cache(filename)
     return encoding
@@ -854,21 +729,6 @@ def GetSocketError(e):
 
 
 
-def ControlRate(t_last_call, max_rate):
-    """
-    Limits rate at which this function is called by sleeping.
-    Returns the time of invocation.
-    """
-
-    p = 1.0 / max_rate
-    t_current = time.time()
-    dt = t_current - t_last_call
-
-    if dt < p:
-        time.sleep(p - dt)
-
-    return t_current
-
 
 def generate_random_char(_str):
     """
@@ -880,33 +740,6 @@ def generate_random_char(_str):
 
     i = random.randint(0, len(_str) - 1)
     return _str[i]
-
-
-
-def generate_random_password():
-    """
-    Generate an 8 characters long password.
-    """
-
-    s = 'abdefghijmnqrt' + 'ABDEFGHJLMNQRTY'
-    ds = '23456789_' + s
-
-    _rpdb2_pwd = generate_random_char(s)
-
-    for i in range(0, 7):
-        _rpdb2_pwd += generate_random_char(ds)
-
-    _rpdb2_pwd = as_unicode(_rpdb2_pwd)
-
-    return _rpdb2_pwd
-
-
-def is_encryption_supported():
-    """
-    Is the Crypto module imported/available.
-    """
-
-    return 'DES' in globals()
 
 
 def calc_prefix(_str, n):
@@ -947,65 +780,6 @@ def create_rpdb_settings_folder():
 
 
 
-def cleanup_bpl_folder(path):
-    if random.randint(0, 10) > 0:
-        return
-
-    l = os.listdir(path)
-    if len(l) < MAX_BPL_FILES:
-        return
-
-    try:
-        ll = [(os.stat(os.path.join(path, f))[stat.ST_ATIME], f) for f in l]
-    except:
-        return
-
-    ll.sort()
-
-    for (t, f) in ll[: -MAX_BPL_FILES]:
-        try:
-            os.remove(os.path.join(path, f))
-        except:
-            pass
-
-
-
-def calc_bpl_filename(filename):
-    key = as_bytes(filename)
-    tmp_filename = hmac.new(key, digestmod=_md5).hexdigest()[:10]
-
-    if os.name == POSIX:
-        home = os.path.expanduser('~')
-        bpldir = os.path.join(home, RPDB_BPL_FOLDER)
-        cleanup_bpl_folder(bpldir)
-        path = os.path.join(bpldir, tmp_filename) + BREAKPOINTS_FILE_EXT
-        return path
-
-    #
-    # gettempdir() is used since it works with unicode user names on
-    # Windows.
-    #
-
-    tmpdir = tempfile.gettempdir()
-    bpldir = os.path.join(tmpdir, RPDB_BPL_FOLDER_NT)
-
-    if not os.path.exists(bpldir):
-        #
-        # Folder creation is done here since this is a temp folder.
-        #
-        try:
-            os.mkdir(bpldir, int('0700', 8))
-        except:
-            print_debug_exception()
-            raise CException
-
-    else:
-        cleanup_bpl_folder(bpldir)
-
-    path = os.path.join(bpldir, tmp_filename) + BREAKPOINTS_FILE_EXT
-    return path
-
-
 def read_pwd_file(rid):
     """
     Read password from password file for Posix systems.
@@ -1022,46 +796,6 @@ def read_pwd_file(rid):
     _rpdb2_pwd = as_unicode(_rpdb2_pwd, fstrict = True)
 
     return _rpdb2_pwd
-
-
-
-def delete_pwd_file(rid):
-    """
-    Delete password file for Posix systems.
-    """
-
-    if os.name != POSIX:
-        return
-
-    path = calc_pwd_file_path(rid)
-
-    try:
-        os.remove(path)
-    except:
-        pass
-
-
-
-def CalcUserShell():
-    try:
-        s = os.getenv('SHELL')
-        if s != None:
-            return s
-
-        import getpass
-        username = getpass.getuser()
-
-        f = open('/etc/passwd', 'r')
-        l = f.read()
-        f.close()
-
-        ll = l.split('\n')
-        d = dict([(e.split(':', 1)[0], e.split(':')[-1]) for e in ll])
-
-        return d[username]
-
-    except:
-        return 'sh'
 
 
 
@@ -1487,272 +1221,6 @@ class CThread (threading.Thread):
 #
 #--------------------------------------- Crypto ---------------------------------------
 #
-
-
-
-class CCrypto:
-    """
-    Handle authentication and encryption of data, using password protection.
-    """
-
-    m_keys = {}
-
-    def __init__(self, _rpdb2_pwd, fAllowUnencrypted, rid):
-        assert(is_unicode(_rpdb2_pwd))
-        assert(is_unicode(rid))
-
-        self.m_rpdb2_pwd = _rpdb2_pwd
-        self.m_key = self.__calc_key(_rpdb2_pwd)
-
-        self.m_fAllowUnencrypted = fAllowUnencrypted
-        self.m_rid = rid
-
-        self.m_failure_lock = threading.RLock()
-
-        self.m_lock = threading.RLock()
-
-        self.m_index_anchor_in = random.randint(0, 1000000000)
-        self.m_index_anchor_ex = 0
-
-        self.m_index = 0
-        self.m_index_table = {}
-        self.m_index_table_size = INDEX_TABLE_SIZE
-        self.m_max_index = 0
-
-
-    def __calc_key(self, _rpdb2_pwd):
-        """
-        Create and return a key from a password.
-        A Weak password means a weak key.
-        """
-
-        if _rpdb2_pwd in CCrypto.m_keys:
-            return CCrypto.m_keys[_rpdb2_pwd]
-
-        key = as_bytes(_rpdb2_pwd)
-        suffix = key[:16]
-
-        d = hmac.new(key, digestmod = _md5)
-
-        #
-        # The following loop takes around a second to complete
-        # and should strengthen the password by ~12 bits.
-        # a good password is ~30 bits strong so we are looking
-        # at ~42 bits strong key
-        #
-        for i in range(2 ** 12):
-            d.update((key + suffix) * 16)
-            key = d.digest()
-
-        CCrypto.m_keys[_rpdb2_pwd] = key
-
-        return key
-
-
-    def set_index(self, i, anchor):
-        try:
-            self.m_lock.acquire()
-
-            self.m_index = i
-            self.m_index_anchor_ex = anchor
-
-        finally:
-            self.m_lock.release()
-
-
-    def get_max_index(self):
-        return self.m_max_index
-
-
-    def do_crypto(self, args, fencrypt):
-        """
-        Sign args and possibly encrypt.
-        Return signed/encrypted string.
-        """
-
-        if not fencrypt and not self.m_fAllowUnencrypted:
-            raise EncryptionExpected
-
-        if fencrypt and not is_encryption_supported():
-            raise EncryptionNotSupported
-
-        (digest, s) = self.__sign(args)
-
-        fcompress = False
-
-        if len(s) > 50000:
-            _s = zlib.compress(s)
-
-            if len(_s) < len(s) * 0.4:
-                s = _s
-                fcompress = True
-
-        if fencrypt:
-            s = self.__encrypt(s)
-
-        s = base64_encodestring(s)
-        u = as_unicode(s)
-
-        return (fcompress, digest, u)
-
-
-    def undo_crypto(self, fencrypt, fcompress, digest, msg, fVerifyIndex = True):
-        """
-        Take crypto string, verify its signature and decrypt it, if
-        needed.
-        """
-
-        if not fencrypt and not self.m_fAllowUnencrypted:
-            raise EncryptionExpected
-
-        if fencrypt and not is_encryption_supported():
-            raise EncryptionNotSupported
-
-        s = as_bytes(msg)
-        s = base64_decodestring(s)
-
-        if fencrypt:
-            s = self.__decrypt(s)
-
-        if fcompress:
-            s = zlib.decompress(s)
-
-        args, id = self.__verify_signature(digest, s, fVerifyIndex)
-
-        return (args, id)
-
-
-    def __encrypt(self, s):
-        s_padded = s + as_bytes('\x00') * (DES.block_size - (len(s) % DES.block_size))
-
-        key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
-        iv = as_bytes('0') * DES.block_size
-
-        d = DES.new(key_padded, DES.MODE_CBC, iv)
-        r = d.encrypt(s_padded)
-
-        return r
-
-
-    def __decrypt(self, s):
-        try:
-            key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
-            iv = as_bytes('0') * DES.block_size
-
-            d = DES.new(key_padded, DES.MODE_CBC, iv)
-            _s = d.decrypt(s).strip(as_bytes('\x00'))
-
-            return _s
-
-        except:
-            self.__wait_a_little()
-            raise DecryptionFailure
-
-
-    def __sign(self, args):
-        i = self.__get_next_index()
-        pack = (self.m_index_anchor_ex, i, self.m_rid, args)
-
-        #print_debug('***** 1' + repr(args)[:50])
-        s = pickle.dumps(pack, 2)
-        #print_debug('***** 2' + repr(args)[:50])
-
-        h = hmac.new(self.m_key, s, digestmod = _md5)
-        d = h.hexdigest()
-
-        #if 'coding:' in s:
-        #    print_debug('%s, %s, %s\n\n==========\n\n%s' % (len(s), d, repr(args), repr(s)))
-
-        return (d, s)
-
-
-    def __get_next_index(self):
-        try:
-            self.m_lock.acquire()
-
-            self.m_index += 1
-            return self.m_index
-
-        finally:
-            self.m_lock.release()
-
-
-    def __verify_signature(self, digest, s, fVerifyIndex):
-        try:
-            h = hmac.new(self.m_key, s, digestmod = _md5)
-            d = h.hexdigest()
-
-            #if 'coding:' in s:
-            #    print_debug('%s, %s, %s, %s' % (len(s), digest, d, repr(s)))
-
-            if d != digest:
-                self.__wait_a_little()
-                raise AuthenticationFailure
-
-            pack = pickle.loads(s)
-            (anchor, i, id, args) = pack
-
-        except AuthenticationFailure:
-            raise
-
-        except:
-            print_debug_exception()
-            self.__wait_a_little()
-            raise AuthenticationBadData
-
-        if fVerifyIndex:
-            self.__verify_index(anchor, i, id)
-
-        return args, id
-
-
-    def __verify_index(self, anchor, i, id):
-        """
-        Manage messages ids to prevent replay of old messages.
-        """
-
-        try:
-            try:
-                self.m_lock.acquire()
-
-                if anchor != self.m_index_anchor_in:
-                    raise AuthenticationBadIndex(self.m_max_index, self.m_index_anchor_in)
-
-                if i > self.m_max_index + INDEX_TABLE_SIZE // 2:
-                    raise AuthenticationBadIndex(self.m_max_index, self.m_index_anchor_in)
-
-                i_mod = i % INDEX_TABLE_SIZE
-                (iv, idl) = self.m_index_table.get(i_mod, (None, None))
-
-                #print >> sys.__stderr__, i, i_mod, iv, self.m_max_index
-
-                if (iv is None) or (i > iv):
-                    idl = [id]
-                elif (iv == i) and (not id in idl):
-                    idl.append(id)
-                else:
-                    raise AuthenticationBadIndex(self.m_max_index, self.m_index_anchor_in)
-
-                self.m_index_table[i_mod] = (i, idl)
-
-                if i > self.m_max_index:
-                    self.m_max_index = i
-
-                return self.m_index
-
-            finally:
-                self.m_lock.release()
-
-        except:
-            self.__wait_a_little()
-            raise
-
-
-    def __wait_a_little(self):
-        self.m_failure_lock.acquire()
-        time.sleep((1.0 + random.random()) / 2)
-        self.m_failure_lock.release()
-
 
 
 #
@@ -5135,408 +4603,6 @@ class CPwdServerProxy:
         return xmlrpclib._Method(self.__request, name)
 
 
-
-class CIOServer:
-    """
-    Base class for debuggee server.
-    """
-
-    def __init__(self, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
-        assert(is_unicode(_rpdb2_pwd))
-        assert(is_unicode(rid))
-
-        self.m_thread = None
-
-        self.m_crypto = CCrypto(_rpdb2_pwd, fAllowUnencrypted, rid)
-
-        self.m_fAllowRemote = fAllowRemote
-        self.m_rid = rid
-
-        self.m_port = None
-        self.m_stop = False
-        self.m_server = None
-
-        self.m_work_queue = None
-
-
-    def shutdown(self):
-        self.stop()
-
-
-    def start(self):
-        self.m_thread = CThread(name = 'ioserver', target = self.run, shutdown = self.shutdown)
-        thread_set_daemon(self.m_thread, True)
-        self.m_thread.start()
-
-
-    def jumpstart(self):
-        self.m_stop = False
-        self.start()
-
-
-    def stop(self):
-        if self.m_stop:
-            return
-
-        print_debug('Stopping IO server... (pid = %d)' % _getpid())
-
-        self.m_stop = True
-
-        while thread_is_alive(self.m_thread):
-            try:
-                proxy = CPwdServerProxy(self.m_crypto, calcURL(LOOPBACK, self.m_port), CLocalTimeoutTransport())
-                proxy.null()
-            except (socket.error, CException):
-                pass
-
-            self.m_thread.join(0.5)
-
-        self.m_thread = None
-
-        self.m_work_queue.shutdown()
-
-        #try:
-        #    self.m_server.socket.close()
-        #except:
-        #    pass
-
-        print_debug('Stopping IO server, done.')
-
-
-    def export_null(self):
-        return 0
-
-
-    def run(self):
-        if self.m_server == None:
-            (self.m_port, self.m_server) = self.__StartXMLRPCServer()
-
-        self.m_work_queue = CWorkQueue()
-        self.m_server.register_function(self.dispatcher_method)
-
-        while not self.m_stop:
-            self.m_server.handle_request()
-
-
-    def dispatcher_method(self, rpdb_version, fencrypt, fcompress, digest, msg):
-        """
-        Process RPC call.
-        """
-
-        #print_debug('dispatcher_method() called with: %s, %s, %s, %s' % (rpdb_version, fencrypt, digest, msg[:100]))
-
-        if rpdb_version != as_unicode(get_interface_compatibility_version()):
-            raise BadVersion(as_unicode(get_version()))
-
-        try:
-            try:
-                #
-                # Decrypt parameters.
-                #
-                ((name, __params, target_rid), client_id) = self.m_crypto.undo_crypto(fencrypt, fcompress, digest, msg)
-
-            except AuthenticationBadIndex:
-                e = sys.exc_info()[1]
-                #print_debug_exception()
-
-                #
-                # Notify the caller on the expected index.
-                #
-                max_index = self.m_crypto.get_max_index()
-                args = (max_index, None, e)
-                (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
-                return (fencrypt, fcompress, digest, msg)
-
-            r = None
-            e = None
-
-            try:
-                #
-                # We are forcing the 'export_' prefix on methods that are
-                # callable through XML-RPC to prevent potential security
-                # problems
-                #
-                func = getattr(self, 'export_' + name)
-            except AttributeError:
-                raise Exception('method "%s" is not supported' % ('export_' + name))
-
-            try:
-                if (target_rid != 0) and (target_rid != self.m_rid):
-                    raise NotAttached
-
-                #
-                # Record that client id is still attached.
-                #
-                self.record_client_heartbeat(client_id, name, __params)
-
-                r = func(*__params)
-
-            except Exception:
-                _e = sys.exc_info()[1]
-                print_debug_exception()
-                e = _e
-
-            #
-            # Send the encrypted result.
-            #
-            max_index = self.m_crypto.get_max_index()
-            args = (max_index, r, e)
-            (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
-            return (fencrypt, fcompress, digest, msg)
-
-        except:
-            print_debug_exception()
-            raise
-
-
-    def __StartXMLRPCServer(self):
-        """
-        As the name says, start the XML RPC server.
-        Looks for an available tcp port to listen on.
-        """
-
-        host = [LOOPBACK, ""][self.m_fAllowRemote]
-        port = SERVER_PORT_RANGE_START
-
-        while True:
-            try:
-                server = CXMLRPCServer((host, port), logRequests = 0)
-                return (port, server)
-
-            except socket.error:
-                e = sys.exc_info()[1]
-                if GetSocketError(e) != errno.EADDRINUSE:
-                    raise
-
-                if port >= SERVER_PORT_RANGE_START + SERVER_PORT_RANGE_LENGTH - 1:
-                    raise
-
-                port += 1
-                continue
-
-
-    def record_client_heartbeat(self, id, name, params):
-        pass
-
-
-
-class CServerInfo(object):
-    def __init__(self, age, port, pid, filename, rid, state, fembedded):
-        assert(is_unicode(rid))
-
-        self.m_age = age
-        self.m_port = port
-        self.m_pid = pid
-        self.m_filename = as_unicode(filename, sys.getfilesystemencoding())
-        self.m_module_name = as_unicode(CalcModuleName(filename), sys.getfilesystemencoding())
-        self.m_rid = rid
-        self.m_state = as_unicode(state)
-        self.m_fembedded = fembedded
-
-
-    def __reduce__(self):
-        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
-        return rv
-
-
-    def __str__(self):
-        return 'age: %d, port: %d, pid: %d, filename: %s, rid: %s' % (self.m_age, self.m_port, self.m_pid, self.m_filename, self.m_rid)
-
-
-
-class CDebuggeeServer(CIOServer):
-    """
-    The debuggee XML RPC server class.
-    """
-
-    def __init__(self, filename, debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid = None):
-        if rid is None:
-            rid = generate_rid()
-
-        assert(is_unicode(_rpdb2_pwd))
-        assert(is_unicode(rid))
-
-        CIOServer.__init__(self, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
-
-        self.m_filename = filename
-        self.m_pid = _getpid()
-        self.m_time = time.time()
-        self.m_debugger = debugger
-        self.m_rid = rid
-
-
-    def shutdown(self):
-        CIOServer.shutdown(self)
-
-
-    def record_client_heartbeat(self, id, name, params):
-        finit = (name == 'request_break')
-        fdetach = (name == 'request_go' and True in params)
-
-        self.m_debugger.record_client_heartbeat(id, finit, fdetach)
-
-
-    def export_null(self):
-        return self.m_debugger.send_event_null()
-
-
-    def export_server_info(self):
-        age = time.time() - self.m_time
-        state = self.m_debugger.get_state()
-        fembedded = self.m_debugger.is_embedded()
-
-        si = CServerInfo(age, self.m_port, self.m_pid, self.m_filename, self.m_rid, state, fembedded)
-        return si
-
-
-    def export_sync_with_events(self, fException, fSendUnhandled):
-        ei = self.m_debugger.sync_with_events(fException, fSendUnhandled)
-        return ei
-
-
-    def export_wait_for_event(self, timeout, event_index):
-        (new_event_index, s) = self.m_debugger.wait_for_event(timeout, event_index)
-        return (new_event_index, s)
-
-
-    def export_set_breakpoint(self, filename, scope, lineno, fEnabled, expr, frame_index, fException, encoding):
-        self.m_debugger.set_breakpoint(filename, scope, lineno, fEnabled, expr, frame_index, fException, encoding)
-        return 0
-
-
-    def export_disable_breakpoint(self, id_list, fAll):
-        self.m_debugger.disable_breakpoint(id_list, fAll)
-        return 0
-
-
-    def export_enable_breakpoint(self, id_list, fAll):
-        self.m_debugger.enable_breakpoint(id_list, fAll)
-        return 0
-
-
-    def export_delete_breakpoint(self, id_list, fAll):
-        self.m_debugger.delete_breakpoint(id_list, fAll)
-        return 0
-
-
-    def export_get_breakpoints(self):
-        bpl = self.m_debugger.get_breakpoints()
-        return bpl
-
-
-    def export_request_break(self):
-        self.m_debugger.request_break()
-        return 0
-
-
-    def export_request_go(self, fdetach = False):
-        self.m_debugger.request_go()
-        return 0
-
-
-    def export_request_go_breakpoint(self, filename, scope, lineno, frame_index, fException):
-        self.m_debugger.request_go_breakpoint(filename, scope, lineno, frame_index, fException)
-        return 0
-
-
-    def export_request_step(self):
-        self.m_debugger.request_step()
-        return 0
-
-
-    def export_request_next(self):
-        self.m_debugger.request_next()
-        return 0
-
-
-    def export_request_return(self):
-        self.m_debugger.request_return()
-        return 0
-
-
-    def export_request_jump(self, lineno):
-        self.m_debugger.request_jump(lineno)
-        return 0
-
-
-    def export_get_stack(self, tid_list, fAll, fException):
-        r = self.m_debugger.get_stack(tid_list, fAll, fException)
-        return r
-
-
-    def export_get_source_file(self, filename, lineno, nlines, frame_index, fException):
-        r = self.m_debugger.get_source_file(filename, lineno, nlines, frame_index, fException)
-        return r
-
-
-    def export_get_source_lines(self, nlines, fAll, frame_index, fException):
-        r = self.m_debugger.get_source_lines(nlines, fAll, frame_index, fException)
-        return r
-
-
-    def export_get_thread_list(self):
-        r = self.m_debugger.get_thread_list()
-        return r
-
-
-    def export_set_thread(self, tid):
-        self.m_debugger.set_thread(tid)
-        return 0
-
-
-    def export_get_namespace(self, nl, filter_level, frame_index, fException, repr_limit, encoding, fraw):
-        r = self.m_debugger.get_namespace(nl, filter_level, frame_index, fException, repr_limit, encoding, fraw)
-        return r
-
-
-    def export_evaluate(self, expr, frame_index, fException, encoding, fraw):
-        (v, w, e) = self.m_debugger.evaluate(expr, frame_index, fException, encoding, fraw)
-        return (v, w, e)
-
-
-    def export_execute(self, suite, frame_index, fException, encoding):
-        (w, e) = self.m_debugger.execute(suite, frame_index, fException, encoding)
-        return (w, e)
-
-
-    def export_stop_debuggee(self):
-        self.m_debugger.stop_debuggee()
-        return 0
-
-    def export_set_synchronicity(self, fsynchronicity):
-        self.m_debugger.set_synchronicity(fsynchronicity)
-        return 0
-
-    def export_set_breakonexit(self, fbreakonexit):
-        global g_fbreakonexit
-        g_fbreakonexit = fbreakonexit
-        return 0
-
-    def export_set_trap_unhandled_exceptions(self, ftrap):
-        self.m_debugger.set_trap_unhandled_exceptions(ftrap)
-        return 0
-
-
-    def export_is_unhandled_exception(self):
-        return self.m_debugger.is_unhandled_exception()
-
-
-    def export_set_fork_mode(self, ffork_into_child, ffork_auto):
-        self.m_debugger.set_fork_mode(ffork_into_child, ffork_auto)
-        return 0
-
-
-    def export_set_environ(self, envmap):
-        self.m_debugger.set_environ(envmap)
-        return 0
-
-
-    def export_embedded_sync(self):
-        self.m_debugger.embedded_sync()
-        return 0
-
-
-
 #
 # ------------------------------------- RPC Client --------------------------------------------
 #
@@ -5709,116 +4775,8 @@ class CLocalTimeoutTransport(CLocalTransport):
     _connection_class_old = CLocalTimeoutHTTP
 
 
-
-class CSession:
-    """
-    Basic class that communicates with the debuggee server.
-    """
-
-    def __init__(self, host, port, _rpdb2_pwd, fAllowUnencrypted, rid):
-        self.m_crypto = CCrypto(_rpdb2_pwd, fAllowUnencrypted, rid)
-
-        self.m_host = host
-        self.m_port = port
-        self.m_proxy = None
-        self.m_server_info = None
-        self.m_exc_info = None
-
-        self.m_fShutDown = False
-        self.m_fRestart = False
-
-
-    def get_encryption(self):
-        return self.m_proxy.get_encryption()
-
-
-    def getServerInfo(self):
-        return self.m_server_info
-
-
-    def pause(self):
-        self.m_fRestart = True
-
-
-    def restart(self, sleep = 0, timeout = 10):
-        self.m_fRestart = True
-
-        time.sleep(sleep)
-
-        t0 = time.time()
-
-        try:
-            try:
-                while time.time() < t0 + timeout:
-                    try:
-                        self.Connect()
-                        return
-
-                    except socket.error:
-                        continue
-
-                raise CConnectionException
-
-            except:
-                self.m_fShutDown = True
-                raise
-
-        finally:
-            self.m_fRestart = False
-
-
-    def shut_down(self):
-        self.m_fShutDown = True
-
-
-    def getProxy(self):
-        """
-        Return the proxy object.
-        With this object you can invoke methods on the server.
-        """
-
-        while self.m_fRestart:
-            time.sleep(0.1)
-
-        if self.m_fShutDown:
-            raise NotAttached
-
-        return self.m_proxy
-
-
-    def ConnectAsync(self):
-        t = threading.Thread(target = self.ConnectNoThrow)
-        #thread_set_daemon(t, True)
-        t.start()
-        return t
-
-
-    def ConnectNoThrow(self):
-        try:
-            self.Connect()
-        except:
-            self.m_exc_info = sys.exc_info()
-
-
-    def Connect(self):
-        host = self.m_host
-        if host.lower() == LOCALHOST:
-            host = LOOPBACK
-
-        server = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), CTimeoutTransport())
-        server_info = server.server_info()
-
-        self.m_proxy = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), CLocalTransport(), target_rid = server_info.m_rid)
-        self.m_server_info = server_info
-
-
-    def isConnected(self):
-        return self.m_proxy is not None
-
-
 class CConsoleInternal(cmd.Cmd, threading.Thread):
     def __init__(self, session_manager, stdin = None, stdout = None, fSplit = False):
-        global g_fDefaultStd
 
         cmd.Cmd.__init__(self, stdin = stdin, stdout = stdout)
         threading.Thread.__init__(self)
@@ -5867,7 +4825,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_stdout = self.stdout
         self.m_encoding = detect_encoding(self.stdin)
 
-        g_fDefaultStd = (stdin == None)
+        src.globals.g_fDefaultStd = (stdin == None)
 
         if self.use_rawinput:
             try:
@@ -8592,7 +7550,6 @@ def PrintUsage(fExtended = False):
 
 
 def main(StartClient_func = StartClient, version =RPDB_TITLE):
-    global g_fScreen
     global g_fFirewallTest
     global g_fbreakonexit
 
@@ -8654,7 +7611,7 @@ def main(StartClient_func = StartClient, version =RPDB_TITLE):
         if o in ['--rid']:
             secret = a
         if o in ['-s', '--screen']:
-            g_fScreen = True
+            src.globals.g_fScreen = True
         if o in ['-c', '--chdir']:
             fchdir = True
         if o in ['--base64']:

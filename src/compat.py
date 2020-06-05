@@ -1,5 +1,9 @@
 from src.globals import g_builtins_module
 
+# TODO py3k
+import hashlib
+_md5 = hashlib.md5
+
 
 class _stub_type:
     pass
@@ -29,4 +33,9 @@ if not hasattr(g_builtins_module, 'str8'):
     #
     # g_builtins_module.bytes = _rpdb2_bytes
     pass
+
+
+# TODO: to be removed
+base64_encodestring = base64.encodebytes
+base64_decodestring = base64.decodebytes
 

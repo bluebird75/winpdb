@@ -1,31 +1,60 @@
 import _thread as thread
+import hmac
 import os.path
 import pickle
 import re
 import socket
 import subprocess
+import random
 import sys
+import tempfile
 import threading
 import time
 
-from rpdb2 import  FindFile, delete_pwd_file, \
-    g_fScreen, base64_encodestring, g_safe_base64_to, CalcUserShell, CalcTerminalCommand, osSpawn, getcwdu, \
-    CalcMacTerminalCommand, g_fDefaultStd, CSession, ControlRate, calc_bpl_filename, generate_random_password
+from rpdb2 import CCrypto, CPwdServerProxy, calcURL, CTimeoutTransport, CLocalTransport
 
 from src.breakpoint import CBreakPointsManagerProxy
 from src.const import *
+from src.const import POSIX, RPDB_BPL_FOLDER, BREAKPOINTS_FILE_EXT, RPDB_BPL_FOLDER_NT, LOCALHOST, LOOPBACK
+from src.compat import base64_encodestring, _md5
 from src.events import *
 from src.exceptions import *
-from src.globals import g_fDebug
+from src.exceptions import CException, CConnectionException, NotAttached
+from src.globals import g_fDefaultStd, g_fScreen, g_fDebug
 from src.source_provider import g_found_unicode_files
 from src.utils import as_unicode, _print, print_debug, is_unicode, as_bytes, ENCODING_AUTO, detect_locale, as_string, \
     get_python_executable, print_debug_exception, print_exception, generate_rid, split_command_line_path_filename_args, \
-    my_os_path_join
+    my_os_path_join, FindFile, g_safe_base64_to, getcwdu
 from src.state_manager import CStateManager
 from src.firewall_test import CFirewallTest
 
 
 g_fFirewallTest = True
+
+GNOME_DEFAULT_TERM = 'gnome-terminal'
+GNOME_DEFAULT_TERM_BEFORE_3_8 = 'gnome-terminal --disable-factory'
+GNOME_DEFAULT_TERM_BEFORE_3_8_CHECK_FILE = "/../share/gnome-terminal/profile-manager.ui" #this glade-related file present for only gnome terminal versions 2.24-3.6
+
+#
+# Map between OS type and relevant command to initiate a new OS console.
+# entries for other OSs can be added here.
+# '%s' serves as a place holder.
+#
+# Currently there is no difference between 'nt' and NT_DEBUG, since now
+# both of them leave the terminal open after termination of debuggee to
+# accommodate scenarios of scripts with child processes.
+#
+osSpawn = {
+    'nt': 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd.exe /K ""%(exec)s" %(options)s"',
+    NT_DEBUG: 'start "rpdb2 - Version ' + get_version() + ' - Debuggee Console" cmd.exe /K ""%(exec)s" %(options)s"',
+    POSIX: "%(term)s -e %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
+    'Terminal': "Terminal --disable-server -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
+    GNOME_DEFAULT_TERM_BEFORE_3_8: "gnome-terminal --disable-factory -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
+    GNOME_DEFAULT_TERM: "gnome-terminal -x %(shell)s -c '%(exec)s %(options)s; %(shell)s' &",
+    MAC: '%(exec)s %(options)s',
+    DARWIN: '%(exec)s %(options)s',
+    SCREEN: 'screen -t debuggee_console %(exec)s %(options)s'
+}
 
 def calc_pwd_file_path(rid):
     """
@@ -2309,3 +2338,308 @@ class CServerList:
             raise UnknownServer
 
         return _s
+
+
+def delete_pwd_file(rid):
+    """
+    Delete password file for Posix systems.
+    """
+
+    if os.name != POSIX:
+        return
+
+    path = calc_pwd_file_path(rid)
+
+    try:
+        os.remove(path)
+    except:
+        pass
+
+
+def CalcUserShell():
+    try:
+        s = os.getenv('SHELL')
+        if s != None:
+            return s
+
+        import getpass
+        username = getpass.getuser()
+
+        f = open('/etc/passwd', 'r')
+        l = f.read()
+        f.close()
+
+        ll = l.split('\n')
+        d = dict([(e.split(':', 1)[0], e.split(':')[-1]) for e in ll])
+
+        return d[username]
+
+    except:
+        return 'sh'
+
+
+def CalcTerminalCommand():
+    """
+    Calc the unix command to start a new terminal, for example: xterm
+    """
+
+    if RPDBTERM in os.environ:
+        term = os.environ[RPDBTERM]
+        if IsFileInPath(term):
+            return term
+
+    if COLORTERM in os.environ:
+        term = os.environ[COLORTERM]
+        if term != 'yes' and IsFileInPath(term):
+            return term
+
+    if IsPrefixInEnviron(KDE_PREFIX):
+        (s, term) = commands.getstatusoutput(KDE_DEFAULT_TERM_QUERY)
+        if (s == 0) and IsFileInPath(term):
+            return term
+
+    elif IsPrefixInEnviron(GNOME_PREFIX):
+        try:
+            gnome_terminal_path = FindFile(GNOME_DEFAULT_TERM)
+            if gnome_terminal_path:
+                if myisfile(os.path.dirname(gnome_terminal_path) + GNOME_DEFAULT_TERM_BEFORE_3_8_CHECK_FILE):
+                    return GNOME_DEFAULT_TERM_BEFORE_3_8
+                return GNOME_DEFAULT_TERM
+        except IOError:
+            pass
+
+    if IsFileInPath(XTERM):
+        return XTERM
+
+    if IsFileInPath(RXVT):
+        return RXVT
+
+    raise SpawnUnsupported
+
+
+
+def CalcMacTerminalCommand(command):
+    """
+    Calculate what to put in popen to start a given script.
+    Starts a tiny Applescript that performs the script action.
+    """
+
+    #
+    # Quoting is a bit tricky; we do it step by step.
+    # Make Applescript string: put backslashes before double quotes and
+    # backslashes.
+    #
+    command = command.replace('\\', '\\\\').replace('"', '\\"')
+
+    #
+    # Make complete Applescript command.
+    #
+    command = 'tell application "Terminal" to do script "%s"' % command
+
+    #
+    # Make a shell single quoted string (put backslashed single quotes
+    # outside string).
+    #
+    command = command.replace("'", "'\\''")
+
+    #
+    # Make complete shell command.
+    #
+    return "osascript -e '%s'" % command
+
+
+def generate_random_password():
+    """
+    Generate an 8 characters long password.
+    """
+
+    s = 'abdefghijmnqrt' + 'ABDEFGHJLMNQRTY'
+    ds = '23456789_' + s
+
+    _rpdb2_pwd = generate_random_char(s)
+
+    for i in range(0, 7):
+        _rpdb2_pwd += generate_random_char(ds)
+
+    _rpdb2_pwd = as_unicode(_rpdb2_pwd)
+
+    return _rpdb2_pwd
+
+
+def calc_bpl_filename(filename):
+    key = as_bytes(filename)
+    tmp_filename = hmac.new(key, digestmod=_md5).hexdigest()[:10]
+
+    if os.name == POSIX:
+        home = os.path.expanduser('~')
+        bpldir = os.path.join(home, RPDB_BPL_FOLDER)
+        cleanup_bpl_folder(bpldir)
+        path = os.path.join(bpldir, tmp_filename) + BREAKPOINTS_FILE_EXT
+        return path
+
+    #
+    # gettempdir() is used since it works with unicode user names on
+    # Windows.
+    #
+
+    tmpdir = tempfile.gettempdir()
+    bpldir = os.path.join(tmpdir, RPDB_BPL_FOLDER_NT)
+
+    if not os.path.exists(bpldir):
+        #
+        # Folder creation is done here since this is a temp folder.
+        #
+        try:
+            os.mkdir(bpldir, int('0700', 8))
+        except:
+            print_debug_exception()
+            raise CException
+
+    else:
+        cleanup_bpl_folder(bpldir)
+
+    path = os.path.join(bpldir, tmp_filename) + BREAKPOINTS_FILE_EXT
+    return path
+
+def cleanup_bpl_folder(path):
+    if random.randint(0, 10) > 0:
+        return
+
+    l = os.listdir(path)
+    if len(l) < MAX_BPL_FILES:
+        return
+
+    try:
+        ll = [(os.stat(os.path.join(path, f))[stat.ST_ATIME], f) for f in l]
+    except:
+        return
+
+    ll.sort()
+
+    for (t, f) in ll[: -MAX_BPL_FILES]:
+        try:
+            os.remove(os.path.join(path, f))
+        except:
+            pass
+
+
+def ControlRate(t_last_call, max_rate):
+    """
+    Limits rate at which this function is called by sleeping.
+    Returns the time of invocation.
+    """
+
+    p = 1.0 / max_rate
+    t_current = time.time()
+    dt = t_current - t_last_call
+
+    if dt < p:
+        time.sleep(p - dt)
+
+    return t_current
+
+
+class CSession:
+    """
+    Basic class that communicates with the debuggee server.
+    """
+
+    def __init__(self, host, port, _rpdb2_pwd, fAllowUnencrypted, rid):
+        self.m_crypto = CCrypto(_rpdb2_pwd, fAllowUnencrypted, rid)
+
+        self.m_host = host
+        self.m_port = port
+        self.m_proxy = None
+        self.m_server_info = None
+        self.m_exc_info = None
+
+        self.m_fShutDown = False
+        self.m_fRestart = False
+
+
+    def get_encryption(self):
+        return self.m_proxy.get_encryption()
+
+
+    def getServerInfo(self):
+        return self.m_server_info
+
+
+    def pause(self):
+        self.m_fRestart = True
+
+
+    def restart(self, sleep = 0, timeout = 10):
+        self.m_fRestart = True
+
+        time.sleep(sleep)
+
+        t0 = time.time()
+
+        try:
+            try:
+                while time.time() < t0 + timeout:
+                    try:
+                        self.Connect()
+                        return
+
+                    except socket.error:
+                        continue
+
+                raise CConnectionException
+
+            except:
+                self.m_fShutDown = True
+                raise
+
+        finally:
+            self.m_fRestart = False
+
+
+    def shut_down(self):
+        self.m_fShutDown = True
+
+
+    def getProxy(self):
+        """
+        Return the proxy object.
+        With this object you can invoke methods on the server.
+        """
+
+        while self.m_fRestart:
+            time.sleep(0.1)
+
+        if self.m_fShutDown:
+            raise NotAttached
+
+        return self.m_proxy
+
+
+    def ConnectAsync(self):
+        t = threading.Thread(target = self.ConnectNoThrow)
+        #thread_set_daemon(t, True)
+        t.start()
+        return t
+
+
+    def ConnectNoThrow(self):
+        try:
+            self.Connect()
+        except:
+            self.m_exc_info = sys.exc_info()
+
+
+    def Connect(self):
+        host = self.m_host
+        if host.lower() == LOCALHOST:
+            host = LOOPBACK
+
+        server = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), CTimeoutTransport())
+        server_info = server.server_info()
+
+        self.m_proxy = CPwdServerProxy(self.m_crypto, calcURL(host, self.m_port), CLocalTransport(), target_rid = server_info.m_rid)
+        self.m_server_info = server_info
+
+
+    def isConnected(self):
+        return self.m_proxy is not None

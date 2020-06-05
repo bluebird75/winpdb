@@ -599,3 +599,7 @@ def getcwdu():
         return os.getcwdu()
 
     return getcwd()
+
+
+g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
+g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
