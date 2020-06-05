@@ -453,3 +453,12 @@ STR_MAX_NAMESPACE_WARNING_TITLE = 'Namespace Warning'
 STR_MAX_NAMESPACE_WARNING_TYPE = '*** WARNING ***'
 STR_MAX_NAMESPACE_WARNING_MSG = 'Number of items exceeds capacity of namespace browser.'
 STR_MAX_EVALUATE_LENGTH_WARNING = 'Output length exeeds maximum capacity.'
+
+
+# TODO: use variable directly
+def get_version():
+    return RPDB_VERSION
+
+# TODO: use variable directly
+def get_interface_compatibility_version():
+    return RPDB_COMPATIBILITY_VERSION

@@ -28,6 +28,7 @@ from src.breakinfo import CScopeBreakInfo, CalcValidLines
 from src.breakpoint import CBreakPointsManagerProxy, CBreakPointsManager
 from src.compat import sets, unicode, str8
 from src.const import *
+from src.const import get_version, get_interface_compatibility_version
 from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, CEventSignalIntercepted, \
     CEventSignalException, CEventEncoding, CEventPsycoWarning, CEventConflictingModules, CEventSyncReceivers, \
     CEventForkSwitch, CEventExecSwitch, CEventExit, CEventState, CEventSynchronicity, CEventBreakOnExit, CEventTrap, \
@@ -285,16 +286,6 @@ def set_temp_breakpoint(path, scopename = '', lineno = 1):
 #
 #----------------------------------- Interfaces ------------------------------
 #
-
-
-def get_version():
-    return RPDB_VERSION
-
-
-
-def get_interface_compatibility_version():
-    return RPDB_COMPATIBILITY_VERSION
-
 
 
 class CSimpleSessionManager:
