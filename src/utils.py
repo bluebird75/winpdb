@@ -2,12 +2,26 @@ import _thread as thread
 import codecs
 import locale
 import os.path
+import random
 import sys
 import threading
 import time
 import traceback
 
-from src.globals import g_fDebug, g_traceback_lock
+#
+# Pre-Import needed by my_abspath1
+#
+try:
+    from nt import _getfullpathname
+except ImportError:
+    pass
+
+from src.globals import g_fDebug, g_traceback_lock, g_initial_cwd
+from src.source_provider import myisfile, g_found_unicode_files
+from src.const import PYTHONW_FILE_EXTENSION, PYTHON_FILE_EXTENSION, PYTHONW_SO_EXTENSION
+def is_py3k():
+    return sys.version_info[0] >= 3
+
 
 def is_unicode(s):
     if type(s) == str:
@@ -238,3 +252,350 @@ def get_python_executable( interpreter=None ):
     return python_exec
 
 
+def generate_rid():
+    """
+    Return a 7 digits random id.
+    """
+
+    rid = repr(random.randint(1000000, 9999999))
+    rid = as_unicode(rid)
+
+    return rid
+
+
+def safe_wait(lock, timeout = None):
+    #
+    # workaround windows bug where signal handlers might raise exceptions
+    # even if they return normally.
+    #
+
+    while True:
+        try:
+            t0 = time.time()
+            return lock.wait(timeout)
+
+        except:
+            if timeout == None:
+                continue
+
+            timeout -= (time.time() - t0)
+            if timeout <= 0:
+                return
+
+
+def split_command_line_path_filename_args(command_line):
+    """
+    Split command line to a 3 elements tuple (path, filename, args)
+    """
+
+    command_line = command_line.strip()
+    if len(command_line) == 0:
+        return ('', '', '')
+
+    if myisfile(command_line):
+        (_path, _filename) = split_path(command_line)
+        return (_path, _filename, '')
+
+    if command_line[0] in ['"', "'"]:
+        _command_line = command_line[1:]
+        i = _command_line.find(command_line[0])
+        if i == -1:
+            (_path, filename) = split_path(_command_line)
+            return (_path, filename, '')
+        else:
+            (_path, filename) = split_path(_command_line[: i])
+            args = _command_line[i + 1:].strip()
+            return (_path, filename, args)
+    else:
+        i = command_line.find(' ')
+        if i == -1:
+            (_path, filename) = split_path(command_line)
+            return (_path, filename, '')
+        else:
+            args = command_line[i + 1:].strip()
+            (_path, filename) = split_path(command_line[: i])
+            return (_path, filename, args)
+
+
+def my_os_path_join(dirname, basename):
+    if is_py3k() or (type(dirname) == str and type(basename) == str):
+        return os.path.join(dirname, basename)
+
+    encoding = sys.getfilesystemencoding()
+
+    if type(dirname) == str:
+        dirname = dirname.decode(encoding)
+
+    if type(basename) == str:
+        basename = basename.decode(encoding)
+
+    return os.path.join(dirname, basename)
+
+
+def FindFile(
+        filename,
+        sources_paths = [],
+        fModules = False,
+        fAllowAnyExt = True
+        ):
+
+    """
+    FindFile looks for the full path of a script in a rather non-strict
+    and human like behavior.
+
+    ENCODING:
+    filename should be either Unicode or encoded with sys.getfilesystemencoding()!
+    Returned value is encoded with sys.getfilesystemencoding().
+
+    It will always look for .py or .pyw files even if a .pyc or no
+    extension is given.
+
+    1. It will check against loaded modules if asked.
+    1. full path (if exists).
+    2. sources_paths.
+    2. current path.
+    3. PYTHONPATH
+    4. PATH
+    """
+
+    if filename in g_found_unicode_files:
+        return filename
+
+    if filename.startswith('<'):
+        raise IOError
+
+    filename = filename.strip('\'"')
+    filename = os.path.expanduser(filename)
+
+    if fModules and not (os.path.isabs(filename) or filename.startswith('.')):
+        try:
+            return winlower(FindFileAsModule(filename))
+        except IOError:
+            pass
+
+    if fAllowAnyExt:
+        try:
+            abspath = FindFile(
+                            filename,
+                            sources_paths,
+                            fModules = False,
+                            fAllowAnyExt = False
+                            )
+            return abspath
+        except IOError:
+            pass
+
+    if os.path.isabs(filename) or filename.startswith('.'):
+        try:
+            scriptname = None
+
+            abspath = my_abspath(filename)
+            lowered = winlower(abspath)
+            scriptname = CalcScriptName(lowered, fAllowAnyExt)
+
+            if myisfile(scriptname):
+                return scriptname
+
+            #
+            # Check .pyw files
+            #
+            scriptname += 'w'
+            if scriptname.endswith(PYTHONW_FILE_EXTENSION) and myisfile(scriptname):
+                return scriptname
+
+            scriptname = None
+            raise IOError
+
+        finally:
+            if not is_py3k() and is_unicode(scriptname):
+                fse = sys.getfilesystemencoding()
+                _l = as_string(scriptname, fse)
+                if '?' in _l:
+                    g_found_unicode_files[_l] = scriptname
+                return _l
+
+    scriptname = CalcScriptName(filename, fAllowAnyExt)
+
+    try:
+        cwd = [getcwd(), getcwdu()]
+
+    except UnicodeDecodeError:
+        #
+        # This exception can be raised in py3k (alpha) on nt.
+        #
+        cwd = [getcwdu()]
+
+    env_path = os.environ['PATH']
+    paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep)
+
+    try:
+        lowered = None
+
+        for p in paths:
+            f = my_os_path_join(p, scriptname)
+            abspath = my_abspath(f)
+            lowered = winlower(abspath)
+
+            if myisfile(lowered):
+                return lowered
+
+            #
+            # Check .pyw files
+            #
+            lowered += 'w'
+            if lowered.endswith(PYTHONW_FILE_EXTENSION) and myisfile(lowered):
+                return lowered
+
+        lowered = None
+        raise IOError
+
+    finally:
+        if not is_py3k() and is_unicode(lowered):
+            fse = sys.getfilesystemencoding()
+            _l = as_string(lowered, fse)
+            if '?' in _l:
+                g_found_unicode_files[_l] = lowered
+            return _l
+
+
+def split_path(path):
+    (_path, filename) = os.path.split(path)
+
+    #
+    # Make sure path separator (e.g. '/') ends the splitted path if it was in
+    # the original path.
+    #
+    if (_path[-1:] not in [os.path.sep, os.path.altsep]) and \
+            (path[len(_path): len(_path) + 1] in [os.path.sep, os.path.altsep]):
+        _path = _path + path[len(_path): len(_path) + 1]
+
+    return (_path, filename)
+
+def FindFileAsModule(filename):
+    lowered = winlower(filename)
+    (root, ext) = os.path.splitext(lowered)
+
+    root_dotted = root.replace('\\', '.').replace('/', '.').replace(':', '.')
+
+    match_list = []
+    for (module_name, m) in list(sys.modules.items()):
+        lowered_module_name = winlower(module_name)
+        if (root_dotted + '.').startswith(lowered_module_name + '.'):
+            match_list.append((len(module_name), module_name))
+
+            if lowered_module_name == root_dotted:
+                break
+
+    match_list.sort()
+    match_list.reverse()
+
+    for (matched_len, matched_module) in match_list:
+        try:
+            module_dir = FindModuleDir(matched_module)
+        except IOError:
+            continue
+
+        suffix = root[matched_len:]
+        if suffix == '':
+            path = module_dir + ext
+        else:
+            path = my_os_path_join(module_dir, suffix.strip('\\')) + ext
+
+        scriptname = CalcScriptName(path, fAllowAnyExt = False)
+        if myisfile(scriptname):
+            return scriptname
+
+        #
+        # Check .pyw files
+        #
+        scriptname += 'w'
+        if scriptname.endswith(PYTHONW_FILE_EXTENSION) and myisfile(scriptname):
+            return scriptname
+
+    raise IOError
+
+
+def my_abspath(path):
+    """
+    We need our own little version of os.path.abspath since the original
+    code imports modules in the 'nt' code path which can cause our debugger
+    to deadlock in unexpected locations.
+    """
+
+    if path[:1] == '<':
+        #
+        # 'path' may also be '<stdin>' in which case it is left untouched.
+        #
+        return path
+
+    if os.name == 'nt':
+        return my_abspath1(path)
+
+    return  os.path.abspath(path)
+
+
+def my_abspath1(path):
+    """
+    Modification of ntpath.abspath() that avoids doing an import.
+    """
+
+    if path:
+        try:
+            path = _getfullpathname(path)
+        except WindowsError:
+            pass
+    else:
+        try:
+            path = getcwd()
+
+        except UnicodeDecodeError:
+            #
+            # This exception can be raised in py3k (alpha) on nt.
+            #
+            path = getcwdu()
+
+    np = os.path.normpath(path)
+
+    if (len(np) >= 2) and (np[1:2] == ':'):
+        np = np[:1].upper() + np[1:]
+
+    return np
+
+
+def CalcScriptName(filename, fAllowAnyExt = True):
+    if filename.endswith(PYTHON_FILE_EXTENSION):
+        return filename
+
+    if filename.endswith(PYTHONW_FILE_EXTENSION):
+        return filename
+
+    if filename.endswith(PYTHONW_SO_EXTENSION):
+        scriptname = filename[:-3] + PYTHON_FILE_EXTENSION
+        return scriptname
+
+    if filename[:-1].endswith(PYTHON_FILE_EXTENSION):
+        scriptname = filename[:-1]
+        return scriptname
+
+    if fAllowAnyExt:
+        return filename
+
+    scriptname = filename + PYTHON_FILE_EXTENSION
+
+    return scriptname
+
+
+def getcwd():
+    try:
+        return os.getcwd()
+
+    except UnicodeDecodeError:
+        print_debug_exception(True)
+        raise
+
+
+def getcwdu():
+    if hasattr(os, 'getcwdu'):
+        return os.getcwdu()
+
+    return getcwd()

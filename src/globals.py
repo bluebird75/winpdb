@@ -13,3 +13,4 @@ g_fDebug = False
 #
 g_traceback_lock = threading.RLock()
 g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
+g_initial_cwd = []

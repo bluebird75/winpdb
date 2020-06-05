@@ -5,6 +5,9 @@ import sys
 
 from src.utils import as_unicode
 
+EVENT_EXCLUDE = 'exclude'
+EVENT_INCLUDE = 'include'
+
 def calc_signame(signum):
     for k, v in vars(signal).items():
         if not k.startswith('SIG') or k in ['SIG_IGN', 'SIG_DFL', 'SIGRTMIN', 'SIGRTMAX']:
@@ -321,3 +324,163 @@ class CEventSync(CEvent):
         self.m_fSendUnhandled = fSendUnhandled
 
 
+class CEventDispatcher:
+    """
+    Events dispatcher.
+
+    Dispatchers can be chained together by specifying a source event dispatcher in constructor.
+
+    By default, the source event distpacher will duplicate all events to this dispatcher.
+
+    It is possible to forwarded to the second dispatcher and not fired in the source dispatcher
+    by using register_chain_override() on those events, before event registration.
+    """
+
+    def __init__(self, chained_event_dispatcher = None):
+        self.m_chained_event_dispatcher = chained_event_dispatcher
+        self.m_chain_override_types = {}
+
+        self.m_registrants = {}
+
+
+    def shutdown(self):
+        for er in list(self.m_registrants.keys()):
+            self.__remove_dispatcher_record(er)
+
+
+    def register_callback(self, callback, event_type_dict, fSingleUse):
+        er = CEventDispatcherRecord(callback, event_type_dict, fSingleUse)
+
+        #
+        # If we have a chained dispatcher, register the callback on the
+        # chained dispatcher as well.
+        #
+        if self.m_chained_event_dispatcher is not None:
+            _er = self.__register_callback_on_chain(er, event_type_dict, fSingleUse)
+            self.m_registrants[er] = _er
+            return er
+
+        self.m_registrants[er] = True
+        return er
+
+
+    def remove_callback(self, callback):
+        erl = [er for er in list(self.m_registrants.keys()) if er.m_callback == callback]
+        for er in erl:
+            self.__remove_dispatcher_record(er)
+
+
+    def fire_events(self, event_list):
+        for event in event_list:
+            self.fire_event(event)
+
+
+    def fire_event(self, event):
+        for er in list(self.m_registrants.keys()):
+            self.__fire_er(event, er)
+
+
+    def __fire_er(self, event, er):
+        if not er.is_match(event):
+            return
+
+        try:
+            er.m_callback(event)
+        except:
+            pass
+
+        if not er.m_fSingleUse:
+            return
+
+        try:
+            del self.m_registrants[er]
+        except KeyError:
+            pass
+
+
+    def register_chain_override(self, event_type_dict):
+        """
+        Chain override prevents registration on chained
+        dispatchers for specific event types.
+        """
+
+        for t in list(event_type_dict.keys()):
+            self.m_chain_override_types[t] = True
+
+
+    def __register_callback_on_chain(self, er, event_type_dict, fSingleUse):
+        _event_type_dict = copy.copy(event_type_dict)
+        for t in self.m_chain_override_types:
+            if t in _event_type_dict:
+                del _event_type_dict[t]
+
+        if len(_event_type_dict) == 0:
+            return False
+
+
+        def callback(event, er = er):
+            self.__fire_er(event, er)
+
+        _er = self.m_chained_event_dispatcher.register_callback(callback, _event_type_dict, fSingleUse)
+        return _er
+
+
+    def __remove_dispatcher_record(self, er):
+        try:
+            if self.m_chained_event_dispatcher is not None:
+                _er = self.m_registrants[er]
+                if _er != False:
+                    self.m_chained_event_dispatcher.__remove_dispatcher_record(_er)
+
+            del self.m_registrants[er]
+
+        except KeyError:
+            pass
+
+
+class CEventDispatcherRecord:
+    """
+    Internal structure that binds a callback to particular events.
+
+    The match rules are:
+    - event must always be a instance of a registered type
+    - further filtering is possible on events that have a state:
+        + if event_type_dict contains a key EVENT_INCLUDE, only event whose state is
+           listed EVENT_INCLUDE are matched successfully
+        + or if event_type_dict contains a key EVENT_EXCLUDE, only event whose state is not
+           listed EVENT_EXCLUDE are matched successfully
+
+    EVENT_INCLUDE and EVENT_EXCLUDE may not be used together
+    """
+
+    def __init__(self, callback, event_type_dict, fSingleUse):
+        self.m_callback = callback
+        self.m_event_type_dict = copy.copy(event_type_dict)
+        self.m_fSingleUse = fSingleUse
+
+
+    def is_match(self, event):
+        rtl = [t for t in self.m_event_type_dict.keys() if isinstance(event, t)]
+        if len(rtl) == 0:
+            return False
+
+        #
+        # Examine first match only.
+        #
+
+        rt = rtl[0]
+        rte = self.m_event_type_dict[rt].get(EVENT_EXCLUDE, [])
+        if len(rte) != 0:
+            for e in rte:
+                if event.is_match(e):
+                    return False
+            return True
+
+        rte = self.m_event_type_dict[rt].get(EVENT_INCLUDE, [])
+        if len(rte) != 0:
+            for e in rte:
+                if event.is_match(e):
+                    return True
+            return False
+
+        return True
