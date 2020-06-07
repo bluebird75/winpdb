@@ -75,8 +75,8 @@ def as_bytes(s, encoding = 'utf-8', fstrict = True):
 
 
 def print_debug(_str):
-    if not g_fDebug:
-        return
+    #if not g_fDebug:
+    #    return
 
     t = time.time()
     l = time.localtime(t)
@@ -101,8 +101,8 @@ def print_debug_exception(fForce = False):
     Print exceptions to stdout when in debug mode.
     """
 
-    if not g_fDebug and not fForce:
-        return
+    #if not g_fDebug and not fForce:
+    #    return
 
     (t, v, tb) = sys.exc_info()
     print_exception(t, v, tb, fForce)
@@ -141,8 +141,8 @@ def print_exception(t, v, tb, fForce = False):
     Print exceptions to stderr when in debug mode.
     """
 
-    if not g_fDebug and not fForce:
-        return
+    # if not g_fDebug and not fForce:
+    #     return
 
     try:
         g_traceback_lock.acquire()
@@ -231,7 +231,7 @@ def print_stack():
     Print exceptions to stdout when in debug mode.
     """
 
-    if g_fDebug == True:
+    if g_fDebug == True or True:
         try:
             g_traceback_lock.acquire()
             traceback.print_stack(file = CFileWrapper(sys.stderr))
@@ -254,6 +254,18 @@ def get_python_executable( interpreter=None ):
         python_exec = python_exec[:-5] + '.exe'
     python_exec = as_unicode(python_exec, fse)
     return python_exec
+
+
+def generate_random_char(_str):
+    """
+    Return a random character from string argument.
+    """
+
+    if _str == '':
+        return ''
+
+    i = random.randint(0, len(_str) - 1)
+    return _str[i]
 
 
 def generate_rid():

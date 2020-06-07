@@ -3,13 +3,14 @@ import hmac
 import os.path
 import pickle
 import re
-import socket
 import subprocess
 import random
-import sys
 import tempfile
 import threading
 import time
+import sys
+
+print(sys.path)
 
 from src.breakpoint import CBreakPointsManagerProxy
 from src.const import *
@@ -21,7 +22,7 @@ from src.exceptions import CException, CConnectionException, NotAttached
 from src.globals import g_fDefaultStd, g_fScreen, g_fDebug, g_found_unicode_files
 from src.utils import as_unicode, _print, print_debug, is_unicode, as_bytes, ENCODING_AUTO, detect_locale, as_string, \
     get_python_executable, print_debug_exception, print_exception, generate_rid, split_command_line_path_filename_args, \
-    my_os_path_join, FindFile, g_safe_base64_to, getcwdu, calcURL
+    my_os_path_join, FindFile, g_safe_base64_to, getcwdu, calcURL, generate_random_char
 from src.state_manager import CStateManager
 from src.firewall_test import CFirewallTest
 from src.crypto import CCrypto

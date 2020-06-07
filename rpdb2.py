@@ -676,18 +676,6 @@ def get_file_encoding(filename):
     return encoding
 
 
-def generate_random_char(_str):
-    """
-    Return a random character from string argument.
-    """
-
-    if _str == '':
-        return ''
-
-    i = random.randint(0, len(_str) - 1)
-    return _str[i]
-
-
 def calc_prefix(_str, n):
     """
     Return an n charaters prefix of the argument string of the form
