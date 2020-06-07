@@ -1,9 +1,10 @@
-from src.globals import g_builtins_module
+import base64
 
 # TODO py3k
 import hashlib
 _md5 = hashlib.md5
 
+from src.globals import g_builtins_module
 
 class _stub_type:
     pass

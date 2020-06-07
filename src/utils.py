@@ -11,14 +11,18 @@ import traceback
 #
 # Pre-Import needed by my_abspath1
 #
+import zipfile
+import zipimport
+
 try:
     from nt import _getfullpathname
 except ImportError:
     pass
 
-from src.globals import g_fDebug, g_traceback_lock, g_initial_cwd
-from src.source_provider import myisfile, g_found_unicode_files
+from src.globals import g_fDebug, g_traceback_lock, g_initial_cwd, g_found_unicode_files
 from src.const import PYTHONW_FILE_EXTENSION, PYTHON_FILE_EXTENSION, PYTHONW_SO_EXTENSION
+
+
 def is_py3k():
     return sys.version_info[0] >= 3
 
@@ -603,3 +607,78 @@ def getcwdu():
 
 g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
 g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
+
+
+def _getpid():
+    try:
+        return os.getpid()
+    except:
+        return -1
+
+
+def calcURL(host, port):
+    """
+    Form HTTP URL from 'host' and 'port' arguments.
+    """
+
+    url = "http://" + str(host) + ":" + str(port)
+    return url
+
+
+#
+# myisfile() is similar to os.path.isfile() but also works with
+# Python eggs.
+#
+def myisfile(path):
+    try:
+        mygetfile(path, False)
+        return True
+
+    except:
+        return False
+
+
+#
+# Read a file even if inside a Python egg.
+#
+def mygetfile(path, fread_file = True):
+    if os.path.isfile(path):
+        if not fread_file:
+            return
+
+        if sys.platform == 'OpenVMS':
+            #
+            # OpenVMS filesystem does not support byte stream.
+            #
+            mode = 'r'
+        else:
+            mode = 'rb'
+
+        f = open(path, mode)
+        data = f.read()
+        f.close()
+        return data
+
+    d = os.path.dirname(path)
+
+    while True:
+        if os.path.exists(d):
+            break
+
+        _d = os.path.dirname(d)
+        if _d in [d, '']:
+            raise IOError
+
+        d = _d
+
+    if not zipfile.is_zipfile(d):
+        raise IOError
+
+    z = zipimport.zipimporter(d)
+
+    try:
+        data = z.get_data(path[len(d) + 1:])
+        return data
+
+    except:
+        raise IOError

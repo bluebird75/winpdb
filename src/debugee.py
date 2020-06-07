@@ -4,14 +4,28 @@ import socket
 import sys
 import time
 
-from rpdb2 import CThread, _getpid, CPwdServerProxy, calcURL, CLocalTimeoutTransport, CWorkQueue, \
-    CXMLRPCServer, GetSocketError, CServerInfo, CalcModuleName
 from src.const import LOOPBACK, get_interface_compatibility_version, get_version, SERVER_PORT_RANGE_START, \
     SERVER_PORT_RANGE_LENGTH
 from src.exceptions import CException, BadVersion, AuthenticationBadIndex, NotAttached
 from src.utils import is_unicode, thread_set_daemon, print_debug, thread_is_alive, as_unicode, print_debug_exception, \
-    generate_rid
+    generate_rid, _getpid, calcURL
 from src.crypto import CCrypto
+from src.rpc import CThread, CPwdServerProxy, CLocalTimeoutTransport, CWorkQueue, CXMLRPCServer
+
+def GetSocketError(e):
+    if (not isinstance(e.args, tuple)) or (len(e.args) == 0):
+        return -1
+
+    return e.args[0]
+
+def CalcModuleName(filename):
+    _basename = os.path.basename(filename)
+    (modulename, ext) = os.path.splitext(_basename)
+
+    if ext in PYTHON_EXT_LIST:
+        return modulename
+
+    return  _basename
 
 
 class CIOServer:

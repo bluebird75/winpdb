@@ -24,6 +24,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
 import src.const
+import src.events
 import src.source_provider
 
 VERSION = (2, 0, 0, 5, 'Tychod')
@@ -348,7 +349,7 @@ if (sys.version_info[0] == 2) or platform.python_implementation()  != 'CPython':
 try:
     import wx
 except ImportError:
-    rpdb2._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
+    src.utils._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
     myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
     sys.exit(1)
 
@@ -1519,51 +1520,51 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.Bind(wx.EVT_SIZE, self.OnSizeWindow)
 
         state = self.m_session_manager.get_state()
-        self.update_state(rpdb2.CEventState(state))
+        self.update_state(src.events.CEventState(state))
 
-        event_type_dict = {rpdb2.CEventState: {}}
+        event_type_dict = {src.events.CEventState: {}}
         self.m_session_manager.register_callback(self.update_state, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventStackFrameChange: {}}
+        event_type_dict = {src.events.CEventStackFrameChange: {}}
         self.m_session_manager.register_callback(self.update_frame, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventThreads: {}}
+        event_type_dict = {src.events.CEventThreads: {}}
         self.m_session_manager.register_callback(self.update_threads, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventNoThreads: {}}
+        event_type_dict = {src.events.CEventNoThreads: {}}
         self.m_session_manager.register_callback(self.update_no_threads, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventNamespace: {}}
+        event_type_dict = {src.events.CEventNamespace: {}}
         self.m_session_manager.register_callback(self.update_namespace, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventUnhandledException: {}}
+        event_type_dict = {src.events.CEventUnhandledException: {}}
         self.m_session_manager.register_callback(self.update_unhandled_exception, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventConflictingModules: {}}
+        event_type_dict = {src.events.CEventConflictingModules: {}}
         self.m_session_manager.register_callback(self.update_conflicting_modules, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventThreadBroken: {}}
+        event_type_dict = {src.events.CEventThreadBroken: {}}
         self.m_session_manager.register_callback(self.update_thread_broken, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventStack: {}}
+        event_type_dict = {src.events.CEventStack: {}}
         self.m_session_manager.register_callback(self.update_stack, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventBreakpoint: {}}
+        event_type_dict = {src.events.CEventBreakpoint: {}}
         self.m_session_manager.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventTrap: {}}
+        event_type_dict = {src.events.CEventTrap: {}}
         self.m_session_manager.register_callback(self.update_trap, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventEncoding: {}}
+        event_type_dict = {src.events.CEventEncoding: {}}
         self.m_session_manager.register_callback(self.update_encoding, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventSynchronicity: {}}
+        event_type_dict = {src.events.CEventSynchronicity: {}}
         self.m_session_manager.register_callback(self.update_synchronicity, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventBreakOnExit: {}}
+        event_type_dict = {src.events.CEventBreakOnExit: {}}
         self.m_session_manager.register_callback(self.update_breakonexit, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {rpdb2.CEventClearSourceCache: {}}
+        event_type_dict = {src.events.CEventClearSourceCache: {}}
         self.m_session_manager.register_callback(self.update_source_cache, event_type_dict, fSingleUse = False)
 
         wx.CallAfter(self.__init2)
@@ -2868,7 +2869,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         fposition_timeout = time.time() - self.m_last_position_time > POSITION_TIMEOUT
 
-        if event.m_action == rpdb2.CEventBreakpoint.SET and fposition_timeout:
+        if event.m_action == src.events.CEventBreakpoint.SET and fposition_timeout:
             if self.m_cur_filename == event.m_bp.m_filename:
                 lineno = event.m_bp.m_lineno
                 self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)

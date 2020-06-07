@@ -11,8 +11,6 @@ import tempfile
 import threading
 import time
 
-from rpdb2 import CCrypto, CPwdServerProxy, calcURL, CTimeoutTransport, CLocalTransport
-
 from src.breakpoint import CBreakPointsManagerProxy
 from src.const import *
 from src.const import POSIX, RPDB_BPL_FOLDER, BREAKPOINTS_FILE_EXT, RPDB_BPL_FOLDER_NT, LOCALHOST, LOOPBACK
@@ -20,13 +18,14 @@ from src.compat import base64_encodestring, _md5
 from src.events import *
 from src.exceptions import *
 from src.exceptions import CException, CConnectionException, NotAttached
-from src.globals import g_fDefaultStd, g_fScreen, g_fDebug
-from src.source_provider import g_found_unicode_files
+from src.globals import g_fDefaultStd, g_fScreen, g_fDebug, g_found_unicode_files
 from src.utils import as_unicode, _print, print_debug, is_unicode, as_bytes, ENCODING_AUTO, detect_locale, as_string, \
     get_python_executable, print_debug_exception, print_exception, generate_rid, split_command_line_path_filename_args, \
-    my_os_path_join, FindFile, g_safe_base64_to, getcwdu
+    my_os_path_join, FindFile, g_safe_base64_to, getcwdu, calcURL
 from src.state_manager import CStateManager
 from src.firewall_test import CFirewallTest
+from src.crypto import CCrypto
+from src.rpc import CPwdServerProxy, CTimeoutTransport, CLocalTransport
 
 
 g_fFirewallTest = True

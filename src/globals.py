@@ -16,3 +16,13 @@ g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
 g_initial_cwd = []
 g_fScreen = False
 g_fDefaultStd = True
+g_server_lock = threading.RLock()
+g_server = None
+g_ignore_broken_pipe = 0
+
+#
+# Unicode version of path names that do not encode well witn the windows
+# 'mbcs' encoding. This dict is used to work with such path names on
+# windows.
+#
+g_found_unicode_files = {}

@@ -1,9 +1,8 @@
 import os.path
 import sys
-import zipfile
-import zipimport
 
-from src.utils import as_unicode, is_unicode, winlower, as_bytes
+from src.globals import g_found_unicode_files
+from src.utils import as_unicode, is_unicode, winlower, as_bytes, mygetfile
 
 BLENDER_SOURCE_NOT_AVAILABLE = as_unicode('Blender script source code is not available.')
 SOURCE_NOT_AVAILABLE = as_unicode('Source code is not available.')
@@ -16,71 +15,6 @@ SCOPE_SEP = '.'
 
 g_source_provider_aux = None
 g_lines_cache = {}
-#
-# Unicode version of path names that do not encode well witn the windows
-# 'mbcs' encoding. This dict is used to work with such path names on
-# windows.
-#
-g_found_unicode_files = {}
-
-#
-# Read a file even if inside a Python egg.
-#
-def mygetfile(path, fread_file = True):
-    if os.path.isfile(path):
-        if not fread_file:
-            return
-
-        if sys.platform == 'OpenVMS':
-            #
-            # OpenVMS filesystem does not support byte stream.
-            #
-            mode = 'r'
-        else:
-            mode = 'rb'
-
-        f = open(path, mode)
-        data = f.read()
-        f.close()
-        return data
-
-    d = os.path.dirname(path)
-
-    while True:
-        if os.path.exists(d):
-            break
-
-        _d = os.path.dirname(d)
-        if _d in [d, '']:
-            raise IOError
-
-        d = _d
-
-    if not zipfile.is_zipfile(d):
-        raise IOError
-
-    z = zipimport.zipimporter(d)
-
-    try:
-        data = z.get_data(path[len(d) + 1:])
-        return data
-
-    except:
-        raise IOError
-
-
-#
-# myisfile() is similar to os.path.isfile() but also works with
-# Python eggs.
-#
-def myisfile(path):
-    try:
-        mygetfile(path, False)
-        return True
-
-    except:
-        return False
-
 
 
 def ParseLineEncoding(l):

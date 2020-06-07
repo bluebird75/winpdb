@@ -28,12 +28,12 @@ from src.breakinfo import CScopeBreakInfo, CalcValidLines
 from src.breakpoint import CBreakPointsManager
 from src.compat import sets, unicode, str8, base64_decodestring
 from src.const import *
-from src.const import get_interface_compatibility_version, POSIX, \
+from src.const import POSIX, \
     STR_STATE_BROKEN, STATE_BROKEN, STATE_RUNNING, STATE_ANALYZE, STATE_DETACHED, DEBUGGER_FILENAME, THREADING_FILENAME, \
     DEFAULT_NUMBER_OF_LINES, DICT_KEY_TID, DICT_KEY_STACK, \
     DICT_KEY_CODE_LIST, DICT_KEY_CURRENT_TID, DICT_KEY_BROKEN, DICT_KEY_BREAKPOINTS, DICT_KEY_LINES, DICT_KEY_FILENAME, \
     DICT_KEY_FIRST_LINENO, DICT_KEY_FRAME_LINENO, DICT_KEY_EVENT, DICT_KEY_EXPR, DICT_KEY_NAME, DICT_KEY_REPR, \
-    DICT_KEY_IS_VALID, DICT_KEY_TYPE, DICT_KEY_SUBNODES, DICT_KEY_N_SUBNODES, DICT_KEY_ERROR, PYTHON_FILE_EXTENSION, PYTHONW_FILE_EXTENSION, PYTHON_EXT_LIST
+    DICT_KEY_IS_VALID, DICT_KEY_TYPE, DICT_KEY_SUBNODES, DICT_KEY_N_SUBNODES, DICT_KEY_ERROR, PYTHON_FILE_EXTENSION, PYTHONW_FILE_EXTENSION
 from src.crypto import is_encryption_supported
 from src.debugee import CDebuggeeServer
 from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, CEventSignalIntercepted, \
@@ -42,18 +42,18 @@ from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, C
     CEventForkMode, CEventUnhandledException, CEventNamespace, CEventNoThreads, CEventThreads, CEventThreadBroken, \
     CEventStack, CEventStackDepth, CEventBreakpoint, CEventSync, breakpoint_copy, CEventDispatcher
 from src.exceptions import InvalidScopeName, CException, NotPythonSource, BadArgument, ThreadNotFound, \
-    NoThreads, ThreadDone, DebuggerNotBroken, InvalidFrame, NoExceptionFound, CConnectionException, BadVersion, \
-    NotAttached, EncryptionNotSupported, EncryptionExpected, DecryptionFailure, AuthenticationBadData, AuthenticationFailure, \
-    AuthenticationBadIndex
-from src.globals import g_fDebug, g_traceback_lock, g_builtins_module
-from src.repr import class_name, clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
+    NoThreads, ThreadDone, DebuggerNotBroken, InvalidFrame, NoExceptionFound, CConnectionException, NotAttached, EncryptionNotSupported
+from src.globals import g_fDebug, g_traceback_lock, g_builtins_module, g_server_lock, g_server, g_found_unicode_files
+from src.repr import clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
+from src.rpc import CThread
 from src.session_manager import CSessionManager, is_valid_pwd, calc_pwd_file_path, delete_pwd_file
 from src.state_manager import CStateManager, lock_notify_all, g_alertable_waiters
 from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower, _print, \
-    thread_is_alive, thread_set_name, thread_get_name, current_thread, \
-    detect_encoding, detect_locale, get_python_executable, ENCODING_AUTO, ENCODING_RAW, ENCODING_RAW_I, safe_wait, my_os_path_join, FindFile, my_abspath, CalcScriptName, getcwd, getcwdu, g_safe_base64_from
+    thread_is_alive, thread_get_name, current_thread, \
+    detect_encoding, detect_locale, get_python_executable, ENCODING_AUTO, ENCODING_RAW, ENCODING_RAW_I, safe_wait, \
+    my_os_path_join, FindFile, my_abspath, CalcScriptName, getcwd, getcwdu, g_safe_base64_from, _getpid
 from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
-    is_provider_filesystem, g_found_unicode_files
+    is_provider_filesystem
 
 if '.' in __name__:
     raise ImportError('rpdb2 must not be imported as part of a package!')
@@ -62,7 +62,6 @@ import threading
 import traceback
 import platform
 import operator
-import weakref
 import os.path
 import pickle
 import socket
@@ -87,10 +86,7 @@ try:
 except ImportError:
     pass
 
-import xmlrpc.server as SimpleXMLRPCServer
 import xmlrpc.client as xmlrpclib
-import socketserver as SocketServer
-import http.client as httplib
 import _thread as thread
 import numbers
 
@@ -416,8 +412,6 @@ MAX_NAMESPACE_WARNING = {
 
 MAX_EVENT_LIST_LENGTH = 1000
 
-DISPACHER_METHOD = 'dispatcher_method'
-
 CONFLICTING_MODULES = ['psyco', 'pdb', 'bdb', 'doctest']
 
 XML_DATA = """<?xml version='1.0'?>
@@ -430,13 +424,8 @@ XML_DATA = """<?xml version='1.0'?>
 </params>
 </methodCall>""" % RPDB_COMPATIBILITY_VERSION
 
-N_WORK_QUEUE_THREADS = 8
-
 ERROR_NO_ATTRIBUTE = 'Error: No attribute.'
 
-
-g_server_lock = threading.RLock()
-g_server = None
 g_debugger = None
 
 #
@@ -462,9 +451,6 @@ g_module_main = None
 g_found_conflicting_modules = []
 
 g_fignore_atexit = False
-g_ignore_broken_pipe = 0
-
-
 
 g_frames_path = {}
 
@@ -628,15 +614,6 @@ def IsPythonSourceFile(path):
     # this is too complicated in Python 3
 
 
-def CalcModuleName(filename):
-    _basename = os.path.basename(filename)
-    (modulename, ext) = os.path.splitext(_basename)
-
-    if ext in PYTHON_EXT_LIST:
-        return modulename
-
-    return  _basename
-
 
 def FindModuleDir(module_name):
     if module_name == '':
@@ -697,37 +674,6 @@ def IsPrefixInEnviron(_str):
 def get_file_encoding(filename):
     (lines, encoding, ffilesystem) = lines_cache(filename)
     return encoding
-
-
-
-
-
-
-def _getpid():
-    try:
-        return os.getpid()
-    except:
-        return -1
-
-
-
-def calcURL(host, port):
-    """
-    Form HTTP URL from 'host' and 'port' arguments.
-    """
-
-    url = "http://" + str(host) + ":" + str(port)
-    return url
-
-
-
-def GetSocketError(e):
-    if (not isinstance(e.args, tuple)) or (len(e.args) == 0):
-        return -1
-
-    return e.args[0]
-
-
 
 
 def generate_random_char(_str):
@@ -1103,119 +1049,6 @@ def get_traceback(frame, ctx):
 #
 # ---------------------------------- CThread ---------------------------------------
 #
-
-
-
-class CThread (threading.Thread):
-    m_fstop = False
-    m_threads = {}
-
-    m_lock = threading.RLock()
-    m_id = 0
-
-
-    def __init__(self, name = None, target = None, args = (), shutdown = None):
-        threading.Thread.__init__(self, name = name, target = target, args = args)
-
-        self.m_fstarted = False
-        self.m_shutdown_callback = shutdown
-
-        self.m_id = self.__getId()
-
-
-    def __del__(self):
-        #print_debug('Destructor called for ' + thread_get_name(self))
-
-        #threading.Thread.__del__(self)
-
-        if self.m_fstarted:
-            try:
-                del CThread.m_threads[self.m_id]
-            except KeyError:
-                pass
-
-
-    def start(self):
-        if CThread.m_fstop:
-            return
-
-        CThread.m_threads[self.m_id] = weakref.ref(self)
-
-        if CThread.m_fstop:
-            del CThread.m_threads[self.m_id]
-            return
-
-        self.m_fstarted = True
-
-        threading.Thread.start(self)
-
-
-    def run(self):
-        sys.settrace(None)
-        sys.setprofile(None)
-
-        threading.Thread.run(self)
-
-
-    def join(self, timeout = None):
-        try:
-            threading.Thread.join(self, timeout)
-        except AssertionError:
-            pass
-
-
-    def shutdown(self):
-        if self.m_shutdown_callback:
-            self.m_shutdown_callback()
-
-
-    def joinAll(cls):
-        print_debug('Shutting down debugger threads...')
-
-        CThread.m_fstop = True
-
-        for tid, w in list(CThread.m_threads.items()):
-            t = w()
-            if not t:
-                continue
-
-            try:
-                #print_debug('Calling shutdown of thread %s.' % thread_get_name(t))
-                t.shutdown()
-            except:
-                pass
-
-            t = None
-
-        t0 = time.time()
-
-        while len(CThread.m_threads) > 0:
-            if time.time() - t0 > SHUTDOWN_TIMEOUT:
-                print_debug('Shut down of debugger threads has TIMED OUT!')
-                return
-
-            #print_debug(repr(CThread.m_threads))
-            time.sleep(0.1)
-
-        print_debug('Shut down debugger threads, done.')
-
-    joinAll = classmethod(joinAll)
-
-
-    def clearJoin(cls):
-        CThread.m_fstop = False
-
-    clearJoin = classmethod(clearJoin)
-
-
-    def __getId(self):
-        CThread.m_lock.acquire()
-        id = CThread.m_id
-        CThread.m_id += 1
-        CThread.m_lock.release()
-
-        return id
-
 
 
 #
@@ -2623,7 +2456,6 @@ class CDebuggerCore:
 
     def prepare_fork_step(self, tid):
         global g_forkpid
-        global g_ignore_broken_pipe
 
         if tid != g_forktid:
             return
@@ -2640,7 +2472,7 @@ class CDebuggerCore:
         g_server.shutdown()
         CThread.joinAll()
 
-        g_ignore_broken_pipe = time.time()
+        src.globals.g_ignore_broken_pipe = time.time()
 
 
     def handle_fork(self, ctx):
@@ -3997,7 +3829,7 @@ class CDebuggerEngine(CDebuggerCore):
             args = (expr, fExpand, filter_level, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
 
             if self.m_fsynchronicity:
-                g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name = 'calc_expr %s' % expr)
+                g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name ='calc_expr %s' % expr)
             else:
                 try:
                     ctx = self.get_current_ctx()
@@ -4211,7 +4043,7 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        g_server.m_work_queue.post_work_item(target = _atexit, args = (True, ), name = '_atexit')
+        g_server.m_work_queue.post_work_item(target = _atexit, args = (True,), name ='_atexit')
 
 
     def set_synchronicity(self, fsynchronicity):
@@ -4288,319 +4120,19 @@ class CDebuggerEngine(CDebuggerCore):
 #
 
 
-
-class CWorkQueue:
-    """
-    Worker threads pool mechanism for RPC server.
-    """
-
-    def __init__(self, size = N_WORK_QUEUE_THREADS):
-        self.m_lock = threading.Condition()
-        self.m_work_items = []
-        self.m_f_shutdown = False
-
-        self.m_size = size
-        self.m_n_threads = 0
-        self.m_n_available = 0
-
-        self.__create_thread()
-
-
-    def __create_thread(self):
-        t = CThread(name = '__worker_target', target = self.__worker_target, shutdown = self.shutdown)
-        #thread_set_daemon(t, True)
-        t.start()
-
-
-    def shutdown(self):
-        """
-        Signal worker threads to exit, and wait until they do.
-        """
-
-        if self.m_f_shutdown:
-            return
-
-        print_debug('Shutting down worker queue...')
-
-        self.m_lock.acquire()
-        self.m_f_shutdown = True
-        lock_notify_all(self.m_lock)
-
-        t0 = time.time()
-
-        while self.m_n_threads > 0:
-            if time.time() - t0 > SHUTDOWN_TIMEOUT:
-                self.m_lock.release()
-                print_debug('Shut down of worker queue has TIMED OUT!')
-                return
-
-            safe_wait(self.m_lock, 0.1)
-
-        self.m_lock.release()
-        print_debug('Shutting down worker queue, done.')
-
-
-    def __worker_target(self):
-        try:
-            self.m_lock.acquire()
-
-            self.m_n_threads += 1
-            self.m_n_available += 1
-            fcreate_thread = not self.m_f_shutdown and self.m_n_threads < self.m_size
-
-            self.m_lock.release()
-
-            if fcreate_thread:
-                self.__create_thread()
-
-            self.m_lock.acquire()
-
-            while not self.m_f_shutdown:
-                safe_wait(self.m_lock)
-
-                if self.m_f_shutdown:
-                    break
-
-                if len(self.m_work_items) == 0:
-                    continue
-
-                fcreate_thread = self.m_n_available == 1
-
-                (target, args, name) = self.m_work_items.pop()
-
-                self.m_n_available -= 1
-                self.m_lock.release()
-
-                if fcreate_thread:
-                    print_debug('Creating an extra worker thread.')
-                    self.__create_thread()
-
-                thread_set_name(current_thread(), '__worker_target-' + name)
-
-                try:
-                    target(*args)
-                except:
-                    print_debug_exception()
-
-                thread_set_name(current_thread(), '__worker_target')
-
-                self.m_lock.acquire()
-                self.m_n_available += 1
-
-                if self.m_n_available > self.m_size:
-                    break
-
-            self.m_n_threads -= 1
-            self.m_n_available -= 1
-            lock_notify_all(self.m_lock)
-
-        finally:
-            self.m_lock.release()
-
-
-    def post_work_item(self, target, args, name ): 
-        if self.m_f_shutdown:
-            return
-
-        try:
-            self.m_lock.acquire()
-
-            if self.m_f_shutdown:
-                return
-
-            self.m_work_items.append((target, args, name))
-
-            self.m_lock.notify()
-
-        finally:
-            self.m_lock.release()
-
+#
+# MOD
+#
 
 
 #
 # MOD
 #
-class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
-    """
-    Modification of SocketServer.ThreadingMixIn that uses a worker thread
-    queue instead of spawning threads to process requests.
-    This mod was needed to resolve deadlocks that were generated in some
-    circumstances.
-    """
-
-    def process_request(self, request, client_address):
-        g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name = 'process_request')
-
 
 
 #
 # MOD
 #
-def my_xmlrpclib_loads(data):
-    """
-    Modification of Python 2.3 xmlrpclib.loads() that does not do an
-    import. Needed to prevent deadlocks.
-    """
-
-    p, u = xmlrpclib.getparser()
-    p.feed(data)
-    p.close()
-    return u.close(), u.getmethodname()
-
-
-
-#
-# MOD
-#
-class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServer):
-    if os.name == POSIX:
-        allow_reuse_address = True
-    else:
-        allow_reuse_address = False
-
-    """
-    Modification of Python 2.3 SimpleXMLRPCServer.SimpleXMLRPCDispatcher
-    that uses my_xmlrpclib_loads(). Needed to prevent deadlocks.
-    """
-
-    def __marshaled_dispatch(self, data, dispatch_method = None):
-        params, method = my_xmlrpclib_loads(data)
-
-        # generate response
-        try:
-            if dispatch_method is not None:
-                response = dispatch_method(method, params)
-            else:
-                response = self._dispatch(method, params)
-            # wrap response in a singleton tuple
-            response = (response,)
-            response = xmlrpclib.dumps(response, methodresponse=1)
-        except xmlrpclib.Fault:
-            fault = sys.exc_info()[1]
-            response = xmlrpclib.dumps(fault)
-        except:
-            # report exception back to server
-            response = xmlrpclib.dumps(
-                xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value))
-                )
-            print_debug_exception()
-
-        return response
-
-    if sys.version_info[:2] <= (2, 3):
-        _marshaled_dispatch = __marshaled_dispatch
-
-
-    #def server_activate(self):
-    #    self.socket.listen(1)
-
-
-    def handle_error(self, request, client_address):
-        print_debug("handle_error() in pid %d" % _getpid())
-
-        if g_ignore_broken_pipe + 5 > time.time():
-            return
-
-        return SimpleXMLRPCServer.SimpleXMLRPCServer.handle_error(self, request, client_address)
-
-
-
-class CPwdServerProxy:
-    """
-    Encrypted proxy to the debuggee.
-    Works by wrapping a xmlrpclib.ServerProxy object.
-    """
-
-    def __init__(self, crypto, uri, transport = None, target_rid = 0):
-        self.m_crypto = crypto
-        self.m_proxy = xmlrpclib.ServerProxy(uri, transport)
-
-        self.m_fEncryption = is_encryption_supported()
-        self.m_target_rid = target_rid
-
-        self.m_method = getattr(self.m_proxy, DISPACHER_METHOD)
-
-
-    def __set_encryption(self, fEncryption):
-        self.m_fEncryption = fEncryption
-
-
-    def get_encryption(self):
-        return self.m_fEncryption
-
-
-    def __request(self, name, params):
-        """
-        Call debuggee method 'name' with parameters 'params'.
-        """
-
-        while True:
-            try:
-                #
-                # Encrypt method and params.
-                #
-                fencrypt = self.get_encryption()
-                args = (as_unicode(name), params, self.m_target_rid)
-                (fcompress, digest, msg) = self.m_crypto.do_crypto(args, fencrypt)
-
-                rpdb_version = as_unicode(get_interface_compatibility_version())
-
-                r = self.m_method(rpdb_version, fencrypt, fcompress, digest, msg)
-                (fencrypt, fcompress, digest, msg) = r
-
-                #
-                # Decrypt response.
-                #
-                ((max_index, _r, _e), id) = self.m_crypto.undo_crypto(fencrypt, fcompress, digest, msg, fVerifyIndex = False)
-
-                if _e is not None:
-                    raise _e
-
-            except AuthenticationBadIndex:
-                e = sys.exc_info()[1]
-                self.m_crypto.set_index(e.m_max_index, e.m_anchor)
-                continue
-
-            except xmlrpclib.Fault:
-                fault = sys.exc_info()[1]
-                if class_name(BadVersion) in fault.faultString:
-                    s = fault.faultString.split("'")
-                    version = ['', s[1]][len(s) > 0]
-                    raise BadVersion(version)
-
-                if class_name(EncryptionExpected) in fault.faultString:
-                    raise EncryptionExpected
-
-                elif class_name(EncryptionNotSupported) in fault.faultString:
-                    if self.m_crypto.m_fAllowUnencrypted:
-                        self.__set_encryption(False)
-                        continue
-
-                    raise EncryptionNotSupported
-
-                elif class_name(DecryptionFailure) in fault.faultString:
-                    raise DecryptionFailure
-
-                elif class_name(AuthenticationBadData) in fault.faultString:
-                    raise AuthenticationBadData
-
-                elif class_name(AuthenticationFailure) in fault.faultString:
-                    raise AuthenticationFailure
-
-                else:
-                    print_debug_exception()
-                    assert False
-
-            except xmlrpclib.ProtocolError:
-                print_debug("Caught ProtocolError for %s" % name)
-                #print_debug_exception()
-                raise CConnectionException
-
-            return _r
-
-
-    def __getattr__(self, name):
-        return xmlrpclib._Method(self.__request, name)
 
 
 #
@@ -4612,167 +4144,43 @@ class CPwdServerProxy:
 #
 # MOD
 #
-class CTimeoutHTTPConnection(httplib.HTTPConnection):
-    """
-    Modification of httplib.HTTPConnection with timeout for sockets.
-    """
-
-    _rpdb2_timeout = PING_TIMEOUT
-
-    def connect(self):
-        """Connect to the host and port specified in __init__."""
-
-        # New Python version of connect().
-        if hasattr(self, 'timeout'):
-            self.timeout = self._rpdb2_timeout
-            return httplib.HTTPConnection.connect(self)
-
-        # Old Python version of connect().
-        msg = "getaddrinfo returns an empty list"
-        for res in socket.getaddrinfo(self.host, self.port, 0,
-                                      socket.SOCK_STREAM):
-            af, socktype, proto, canonname, sa = res
-            try:
-                self.sock = socket.socket(af, socktype, proto)
-                self.sock.settimeout(self._rpdb2_timeout)
-                if self.debuglevel > 0:
-                    print_debug("connect: (%s, %s)" % (self.host, self.port))
-                self.sock.connect(sa)
-            except socket.error:
-                msg = sys.exc_info()[1]
-                if self.debuglevel > 0:
-                    print_debug('connect fail: ' + repr((self.host, self.port)))
-                if self.sock:
-                    self.sock.close()
-                self.sock = None
-                continue
-            break
-        if not self.sock:
-            raise socket.error(msg)
-
 
 
 #
 # MOD
 #
-class CLocalTimeoutHTTPConnection(CTimeoutHTTPConnection):
-    """
-    Modification of httplib.HTTPConnection with timeout for sockets.
-    """
-
-    _rpdb2_timeout = LOCAL_TIMEOUT
-
 
 
 if is_py3k():
-    class httplib_HTTP(object):
-        pass
+    pass
 else:
-    httplib_HTTP = httplib.HTTP
+    pass
 
 
 
 #
 # MOD
 #
-class CTimeoutHTTP(httplib_HTTP):
-    """
-    Modification of httplib.HTTP with timeout for sockets.
-    """
-
-    _connection_class = CTimeoutHTTPConnection
-
 
 
 #
 # MOD
 #
-class CLocalTimeoutHTTP(httplib_HTTP):
-    """
-    Modification of httplib.HTTP with timeout for sockets.
-    """
-
-    _connection_class = CLocalTimeoutHTTPConnection
-
 
 
 #
 # MOD
 #
-class CLocalTransport(xmlrpclib.Transport):
-    """
-    Modification of xmlrpclib.Transport to work around Zonealarm sockets
-    bug.
-    """
-
-    _connection_class = httplib.HTTPConnection
-    _connection_class_old = httplib_HTTP
-
-
-    def make_connection(self, host):
-        # New Python version of connect().
-        # However, make_connection is hacked to always create a new connection
-        # Otherwise all threads use single connection and crash.
-        if hasattr(self, '_connection'):
-            chost, self._extra_headers, x509 = self.get_host_info(host)
-            return self._connection_class(chost)
-
-        # Old Python version of connect().
-        # create a HTTP connection object from a host descriptor
-        host, extra_headers, x509 = self.get_host_info(host)
-        return self._connection_class_old(host)
-
-
-    def __parse_response(self, file, sock):
-        # read response from input file/socket, and parse it
-
-        p, u = self.getparser()
-
-        while 1:
-            if sock:
-                response = sock.recv(1024)
-            else:
-                time.sleep(0.002)
-                response = file.read(1024)
-            if not response:
-                break
-            if self.verbose:
-                _print("body: " + repr(response))
-            p.feed(response)
-
-        file.close()
-        p.close()
-
-        return u.close()
-
-    if os.name == 'nt':
-        _parse_response = __parse_response
-
 
 
 #
 # MOD
 #
-class CTimeoutTransport(CLocalTransport):
-    """
-    Modification of xmlrpclib.Transport with timeout for sockets.
-    """
-
-    _connection_class = CTimeoutHTTPConnection
-    _connection_class_old = CTimeoutHTTP
-
 
 
 #
 # MOD
 #
-class CLocalTimeoutTransport(CLocalTransport):
-    """
-    Modification of xmlrpclib.Transport with timeout for sockets.
-    """
-
-    _connection_class = CLocalTimeoutHTTPConnection
-    _connection_class_old = CLocalTimeoutHTTP
 
 
 class CConsoleInternal(cmd.Cmd, threading.Thread):
@@ -7327,7 +6735,6 @@ def workaround_import_deadlock():
 
 
 def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeout, source_provider, fDebug, depth):
-    global g_server
     global g_debugger
 
     _rpdb2_pwd = as_unicode(_rpdb2_pwd)
@@ -7379,8 +6786,8 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
 
         g_debugger = CDebuggerEngine(fembedded = True)
 
-        g_server = CDebuggeeServer(filename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote)
-        g_server.start()
+        src.globals.g_server = CDebuggeeServer(filename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote)
+        src.globals.g_server.start()
 
         if timeout == 0:
             g_debugger.settrace(f, f_break_on_init = False)
@@ -7396,7 +6803,6 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
 def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
     assert(is_unicode(_rpdb2_pwd))
 
-    global g_server
     global g_debugger
     global g_module_main
 
@@ -7438,8 +6844,8 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     g_debugger = CDebuggerEngine()
 
-    g_server = CDebuggeeServer(ExpandedFilename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
-    g_server.start()
+    src.globals.g_server = CDebuggeeServer(ExpandedFilename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
+    src.globals.g_server.start()
 
     try:
         g_debugger.m_bp_manager.set_temp_breakpoint(ExpandedFilename, '', 1, fhard = True)
