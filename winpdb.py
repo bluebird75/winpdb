@@ -23,14 +23,14 @@
     with this program; if not, write to the Free Software Foundation, Inc., 
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA    
 """
-import src.const
-import src.crypto
-import src.utils
-import src.repr
-import src.events
-import src.source_provider
-import src.exceptions
-import src.session_manager
+import rpdb.const
+import rpdb.crypto
+import rpdb.utils
+import rpdb.repr
+import rpdb.events
+import rpdb.source_provider
+import rpdb.exceptions
+import rpdb.session_manager
 
 VERSION = (2, 0, 0, 5, 'Tychod')
 WINPDB_VERSION = "2.0.0.dev5"
@@ -346,7 +346,7 @@ if (sys.version_info[0] == 2) or platform.python_implementation()  != 'CPython':
 try:
     import wx
 except ImportError:
-    src.utils._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
+    rpdb.utils._print(STR_WXPYTHON_ERROR_MSG, sys.__stderr__)
     myErrorMsgDialog( STR_WXPYTHON_ERROR_TITLE, STR_WXPYTHON_ERROR_MSG )
     sys.exit(1)
 
@@ -710,18 +710,18 @@ STATE_ATTACHING_TOOLBAR = {ENABLED: [], DISABLED: [TB_EXCEPTION, TB_FILTER, TB_B
 STATE_DETACHED_TOOLBAR = {ENABLED: [], DISABLED: [TB_EXCEPTION, TB_FILTER, TB_BREAK, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO]}
 STATE_DETACHING_TOOLBAR = {ENABLED: [], DISABLED: [TB_EXCEPTION, TB_FILTER, TB_BREAK, TB_GO, TB_STEP, TB_NEXT, TB_RETURN, TB_GOTO]}
 
-STATE_DRAGDROP_INACTIVE    = [ src.session_manager.STATE_DETACHING, src.session_manager.STATE_SPAWNING, src.session_manager.STATE_ATTACHING ]
-STATE_DRAGDROP_OPEN_TARGET = [ src.session_manager.STATE_DETACHED ]
-STATE_DRAGDROP_OPEN_SOURCE = [ src.session_manager.STATE_BROKEN, src.session_manager.STATE_RUNNING, src.session_manager.STATE_ANALYZE, ]
+STATE_DRAGDROP_INACTIVE    = [rpdb.session_manager.STATE_DETACHING, rpdb.session_manager.STATE_SPAWNING, rpdb.session_manager.STATE_ATTACHING]
+STATE_DRAGDROP_OPEN_TARGET = [rpdb.session_manager.STATE_DETACHED]
+STATE_DRAGDROP_OPEN_SOURCE = [rpdb.session_manager.STATE_BROKEN, rpdb.session_manager.STATE_RUNNING, rpdb.session_manager.STATE_ANALYZE, ]
 
 STATE_MAP = {
-    src.session_manager.STATE_SPAWNING: (STATE_SPAWNING_MENU, STATE_SPAWNING_TOOLBAR),
-    src.session_manager.STATE_ATTACHING: (STATE_ATTACHING_MENU, STATE_ATTACHING_TOOLBAR),
-    src.session_manager.STATE_BROKEN: (STATE_BROKEN_MENU, STATE_BROKEN_TOOLBAR),
-    src.session_manager.STATE_ANALYZE: (STATE_ANALYZE_MENU, STATE_ANALYZE_TOOLBAR),
-    src.session_manager.STATE_RUNNING: (STATE_RUNNING_MENU, STATE_RUNNING_TOOLBAR),
-    src.session_manager.STATE_DETACHED: (STATE_DETACHED_MENU, STATE_DETACHED_TOOLBAR),
-    src.session_manager.STATE_DETACHING: (STATE_DETACHING_MENU, STATE_DETACHING_TOOLBAR)
+    rpdb.session_manager.STATE_SPAWNING: (STATE_SPAWNING_MENU, STATE_SPAWNING_TOOLBAR),
+    rpdb.session_manager.STATE_ATTACHING: (STATE_ATTACHING_MENU, STATE_ATTACHING_TOOLBAR),
+    rpdb.session_manager.STATE_BROKEN: (STATE_BROKEN_MENU, STATE_BROKEN_TOOLBAR),
+    rpdb.session_manager.STATE_ANALYZE: (STATE_ANALYZE_MENU, STATE_ANALYZE_TOOLBAR),
+    rpdb.session_manager.STATE_RUNNING: (STATE_RUNNING_MENU, STATE_RUNNING_TOOLBAR),
+    rpdb.session_manager.STATE_DETACHED: (STATE_DETACHED_MENU, STATE_DETACHED_TOOLBAR),
+    rpdb.session_manager.STATE_DETACHING: (STATE_DETACHING_MENU, STATE_DETACHING_TOOLBAR)
 }
 
 LICENSE_TITLE = 'License.'
@@ -771,15 +771,15 @@ def calc_title(path):
     if dn == '':
         return '%s - %s' % (bn, WINPDB_TITLE)
 
-    if os.name != src.const.POSIX:
-        return '%s (%s) - %s' % (bn, src.repr.calc_suffix(dn, 64), WINPDB_TITLE)
+    if os.name != rpdb.const.POSIX:
+        return '%s (%s) - %s' % (bn, rpdb.repr.calc_suffix(dn, 64), WINPDB_TITLE)
 
     home = os.path.expanduser('~')
 
     if dn.startswith(home):
         dn = '~' + dn[len(home):]
 
-    return '%s (%s) - %s' % (bn, src.repr.calc_suffix(dn, 64), WINPDB_TITLE)
+    return '%s (%s) - %s' % (bn, rpdb.repr.calc_suffix(dn, 64), WINPDB_TITLE)
 
 
 
@@ -818,7 +818,7 @@ def open_new(url):
 from io import BytesIO
 
 def image_from_base64(str_b64):
-    b = src.utils.as_bytes(str_b64)
+    b = rpdb.utils.as_bytes(str_b64)
     s = base64.decodebytes(b)
     stream = BytesIO(s)
     image = wx.Image(stream)
@@ -832,7 +832,7 @@ class CSettings:
 
 
     def calc_path(self):
-        if os.name == src.const.POSIX:
+        if os.name == rpdb.const.POSIX:
             home = os.path.expanduser('~')
             path = os.path.join(home, '.' + WINPDB_SETTINGS_FILENAME)
             return path
@@ -860,7 +860,7 @@ class CSettings:
             self.m_dict.update(d)
 
         except:
-            src.utils.print_debug_exception()
+            rpdb.utils.print_debug_exception()
 
         f.close()
 
@@ -958,7 +958,7 @@ class CMenuBar:
 
     def add_menu_item(self, menu_label, item_label, command):
         if not g_fUnicode:
-            item_label = src.utils.as_string(item_label)
+            item_label = rpdb.utils.as_string(item_label)
 
         parent = self.m_cascades[menu_label]
         item = parent.Append(-1, item_label)
@@ -1231,7 +1231,7 @@ class CJobs:
             exc_info = sys.exc_info()
 
             if callback == None:
-                src.utils.print_debug_exception()
+                rpdb.utils.print_debug_exception()
 
         if callback is not None:
             wx.CallAfter(callback, r, exc_info)
@@ -1276,31 +1276,31 @@ class CAsyncSessionManagerCall:
         if self.m_callback != None:
             try:
                 if self.m_ftrace:
-                    src.utils.print_debug('Calling %s' % repr(self.m_f))
+                    rpdb.utils.print_debug('Calling %s' % repr(self.m_f))
 
                 return self.m_f(*args, **kwargs)
 
             finally:
                 if self.m_ftrace:
-                    src.utils.print_debug('Returned from %s' % repr(self.m_f))
+                    rpdb.utils.print_debug('Returned from %s' % repr(self.m_f))
 
         try:
             self.m_f(*args, **kwargs)
 
-        except src.exceptions.FirewallBlock:
+        except rpdb.exceptions.FirewallBlock:
             self.m_session_manager.report_exception(*sys.exc_info())
 
-            dlg = wx.MessageDialog(self.m_job_manager, src.const.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+            dlg = wx.MessageDialog(self.m_job_manager, rpdb.const.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
             dlg.ShowModal()
             dlg.Destroy()
 
-        except (socket.error, src.exceptions.CConnectionException):
+        except (socket.error, rpdb.exceptions.CConnectionException):
             self.m_session_manager.report_exception(*sys.exc_info())
-        except src.exceptions.CException:
+        except rpdb.exceptions.CException:
             self.m_session_manager.report_exception(*sys.exc_info())
         except:
             self.m_session_manager.report_exception(*sys.exc_info())
-            src.utils.print_debug_exception(True)
+            rpdb.utils.print_debug_exception(True)
 
 
     def __call__(self, *args, **kwargs):
@@ -1391,7 +1391,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         self.m_stack = None
 
-        self.m_state = src.session_manager.STATE_DETACHED
+        self.m_state = rpdb.session_manager.STATE_DETACHED
         self.m_fembedded_warning = True
         self.m_filter_level = 1
 
@@ -1513,51 +1513,51 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.Bind(wx.EVT_SIZE, self.OnSizeWindow)
 
         state = self.m_session_manager.get_state()
-        self.update_state(src.events.CEventState(state))
+        self.update_state(rpdb.events.CEventState(state))
 
-        event_type_dict = {src.events.CEventState: {}}
+        event_type_dict = {rpdb.events.CEventState: {}}
         self.m_session_manager.register_callback(self.update_state, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventStackFrameChange: {}}
+        event_type_dict = {rpdb.events.CEventStackFrameChange: {}}
         self.m_session_manager.register_callback(self.update_frame, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventThreads: {}}
+        event_type_dict = {rpdb.events.CEventThreads: {}}
         self.m_session_manager.register_callback(self.update_threads, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventNoThreads: {}}
+        event_type_dict = {rpdb.events.CEventNoThreads: {}}
         self.m_session_manager.register_callback(self.update_no_threads, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventNamespace: {}}
+        event_type_dict = {rpdb.events.CEventNamespace: {}}
         self.m_session_manager.register_callback(self.update_namespace, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventUnhandledException: {}}
+        event_type_dict = {rpdb.events.CEventUnhandledException: {}}
         self.m_session_manager.register_callback(self.update_unhandled_exception, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventConflictingModules: {}}
+        event_type_dict = {rpdb.events.CEventConflictingModules: {}}
         self.m_session_manager.register_callback(self.update_conflicting_modules, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventThreadBroken: {}}
+        event_type_dict = {rpdb.events.CEventThreadBroken: {}}
         self.m_session_manager.register_callback(self.update_thread_broken, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventStack: {}}
+        event_type_dict = {rpdb.events.CEventStack: {}}
         self.m_session_manager.register_callback(self.update_stack, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventBreakpoint: {}}
+        event_type_dict = {rpdb.events.CEventBreakpoint: {}}
         self.m_session_manager.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventTrap: {}}
+        event_type_dict = {rpdb.events.CEventTrap: {}}
         self.m_session_manager.register_callback(self.update_trap, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventEncoding: {}}
+        event_type_dict = {rpdb.events.CEventEncoding: {}}
         self.m_session_manager.register_callback(self.update_encoding, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventSynchronicity: {}}
+        event_type_dict = {rpdb.events.CEventSynchronicity: {}}
         self.m_session_manager.register_callback(self.update_synchronicity, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventBreakOnExit: {}}
+        event_type_dict = {rpdb.events.CEventBreakOnExit: {}}
         self.m_session_manager.register_callback(self.update_breakonexit, event_type_dict, fSingleUse = False)
 
-        event_type_dict = {src.events.CEventClearSourceCache: {}}
+        event_type_dict = {rpdb.events.CEventClearSourceCache: {}}
         self.m_session_manager.register_callback(self.update_source_cache, event_type_dict, fSingleUse = False)
 
         wx.CallAfter(self.__init2)
@@ -1567,10 +1567,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         self.m_console.start()
 
         if fAttach:
-            self.m_async_sm.attach(command_line, encoding = src.utils.detect_locale())
+            self.m_async_sm.attach(command_line, encoding = rpdb.utils.detect_locale())
 
         elif command_line != '':
-            self.m_async_sm.launch(fchdir, command_line, interpreter, encoding = src.utils.detect_locale())
+            self.m_async_sm.launch(fchdir, command_line, interpreter, encoding = rpdb.utils.detect_locale())
 
 
     #
@@ -1697,14 +1697,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def do_set_position(self, index):
-        s = self.m_stack[src.const.DICT_KEY_STACK]
+        s = self.m_stack[rpdb.const.DICT_KEY_STACK]
         e = s[-(1 + index)]
 
         filename = e[0]
         lineno = e[1]
 
-        fBroken = self.m_stack[src.const.DICT_KEY_BROKEN]
-        _event = self.m_stack[src.const.DICT_KEY_EVENT]
+        fBroken = self.m_stack[rpdb.const.DICT_KEY_BROKEN]
+        _event = self.m_stack[rpdb.const.DICT_KEY_EVENT]
         __event = ['running', ['call', _event][index == 0]][fBroken]
 
         self.m_code_viewer.set_position(filename, lineno, __event)
@@ -1742,7 +1742,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def do_analyze_menu(self, event):
         state = self.m_session_manager.get_state()
-        f = (state != src.session_manager.STATE_ANALYZE)
+        f = (state != rpdb.session_manager.STATE_ANALYZE)
 
         self.m_async_sm.set_analyze(f)
 
@@ -1798,9 +1798,9 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def notify_conflicting_modules(self, event):
         s = ', '.join(event.m_modules_list)
         if not g_fUnicode:
-            s = src.utils.as_string(s)
+            s = rpdb.utils.as_string(s)
 
-        dlg = wx.MessageDialog(self, src.const.STR_CONFLICTING_MODULES % s, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg = wx.MessageDialog(self, rpdb.const.STR_CONFLICTING_MODULES % s, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
         dlg.ShowModal()
         dlg.Destroy()
 
@@ -1835,7 +1835,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
 
     def OnCloseWindow(self, event):
-        if event.CanVeto() and self.m_session_manager.get_state() != src.session_manager.STATE_DETACHED:
+        if event.CanVeto() and self.m_session_manager.get_state() != rpdb.session_manager.STATE_DETACHED:
             dlg = wx.MessageDialog(self, STR_EXIT_WARNING, MSG_WARNING_TITLE, wx.YES_NO | wx.CANCEL | wx.YES_DEFAULT | wx.ICON_WARNING)
             res = dlg.ShowModal()
             dlg.Destroy()
@@ -1896,14 +1896,14 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def callback_encoding(self, event):
         encoding, fraw = self.m_session_manager.get_encoding()
 
-        if encoding != src.utils.ENCODING_AUTO:
+        if encoding != rpdb.utils.ENCODING_AUTO:
             try:
                 codecs.lookup(encoding)
             except:
                 encoding += ' (?)'
 
         if fraw:
-            encoding += ', ' + src.utils.ENCODING_RAW
+            encoding += ', ' + rpdb.utils.ENCODING_RAW
 
         self.set_toolbar_item_text(TB_ENCODING, TB_ENCODING_TEXT % encoding)
 
@@ -1943,12 +1943,12 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
             pass
 
         state_text = self.m_state
-        if state_text == src.session_manager.STATE_BROKEN:
-            state_text = src.const.STR_STATE_BROKEN
+        if state_text == rpdb.session_manager.STATE_BROKEN:
+            state_text = rpdb.const.STR_STATE_BROKEN
 
         self.set_statusbar_data({SB_STATE: state_text.upper()})
 
-        if self.m_state == src.session_manager.STATE_DETACHED:
+        if self.m_state == rpdb.session_manager.STATE_DETACHED:
             self.m_fembedded_warning = True
 
             self.set_statusbar_data({SB_ENCRYPTION: (None, None)})
@@ -1962,28 +1962,28 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
             self.SetTitle(WINPDB_TITLE)
 
-        elif ((old_state in [src.session_manager.STATE_DETACHED,
-                            src.session_manager.STATE_DETACHING,
-                            src.session_manager.STATE_SPAWNING,
-                            src.session_manager.STATE_ATTACHING])
-            and (self.m_state not in [src.session_manager.STATE_DETACHED,
-                                        src.session_manager.STATE_DETACHING,
-                                        src.session_manager.STATE_SPAWNING,
-                                        src.session_manager.STATE_ATTACHING])):
+        elif ((old_state in [rpdb.session_manager.STATE_DETACHED,
+                             rpdb.session_manager.STATE_DETACHING,
+                             rpdb.session_manager.STATE_SPAWNING,
+                             rpdb.session_manager.STATE_ATTACHING])
+            and (self.m_state not in [rpdb.session_manager.STATE_DETACHED,
+                                      rpdb.session_manager.STATE_DETACHING,
+                                      rpdb.session_manager.STATE_SPAWNING,
+                                      rpdb.session_manager.STATE_ATTACHING])):
             try:
                 serverinfo = self.m_session_manager.get_server_info()
                 title = calc_title(serverinfo.m_filename)
                 self.SetTitle(title)
 
                 f = self.m_session_manager.get_encryption()
-            except src.exceptions.NotAttached:
+            except rpdb.exceptions.NotAttached:
                 f = False
 
             data = [BASE64_UNLOCKED, BASE64_LOCKED][f]
             tooltip = [TOOLTIP_UNLOCKED, TOOLTIP_LOCKED][f]
             self.set_statusbar_data({SB_ENCRYPTION: (data, tooltip)})
 
-        if self.m_state == src.session_manager.STATE_BROKEN:
+        if self.m_state == rpdb.session_manager.STATE_BROKEN:
             self.set_toggle(TB_EXCEPTION, False)
 
             #self.m_code_viewer._enable()
@@ -2006,7 +2006,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
                     if res == wx.ID_CANCEL:
                         g_ignored_warnings[warning] = True
 
-        elif self.m_state == src.session_manager.STATE_ANALYZE:
+        elif self.m_state == rpdb.session_manager.STATE_ANALYZE:
             self.set_toggle(TB_EXCEPTION, True)
 
             #self.m_code_viewer._enable()
@@ -2064,7 +2064,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
             try:
                 self.m_session_manager.set_password(pwd)
-            except src.exceptions.AlreadyAttached:
+            except rpdb.exceptions.AlreadyAttached:
                 assert(0)
 
         pwd_dialog.Destroy()
@@ -2074,7 +2074,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
         (fchdir, command_line, interpreter) = self.m_session_manager.get_launch_args()
 
         if None in (fchdir, command_line, interpreter):
-            (fchdir, command_line, interpreter) = (True, '', src.utils.get_python_executable())
+            (fchdir, command_line, interpreter) = (True, '', rpdb.utils.get_python_executable())
 
         launch_dialog = CLaunchDialog(self, fchdir, command_line, interpreter)
         r = launch_dialog.ShowModal()
@@ -2087,7 +2087,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
     def do_open(self, event):
         host = self.m_session_manager.get_host().lower()
-        flocal = (host in [src.const.LOCALHOST, src.const.LOOPBACK])
+        flocal = (host in [rpdb.const.LOCALHOST, rpdb.const.LOOPBACK])
 
         open_dialog = COpenDialog(self, flocal)
         r = open_dialog.ShowModal()
@@ -2109,7 +2109,7 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
 
         # XXX should display launch dialog instead of launching program directly
         if self.m_state in STATE_DRAGDROP_OPEN_TARGET:
-            (fchdir, command_line, interpreter) = (True, filenames[0], src.utils.get_python_executable())
+            (fchdir, command_line, interpreter) = (True, filenames[0], rpdb.utils.get_python_executable())
             self.m_async_sm.launch(fchdir, command_line, interpreter)
             return True
 
@@ -2154,10 +2154,10 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def callback_load(self, r, exc_info):
         (t, v, tb) = exc_info
 
-        if t == socket.error or isinstance(v, src.exceptions.CException):
-            error = src.const.STR_BREAKPOINTS_LOAD_PROBLEM
+        if t == socket.error or isinstance(v, rpdb.exceptions.CException):
+            error = rpdb.const.STR_BREAKPOINTS_LOAD_PROBLEM
         elif t == IOError:
-            error = src.const.STR_BREAKPOINTS_NOT_FOUND
+            error = rpdb.const.STR_BREAKPOINTS_NOT_FOUND
         else:
             return
 
@@ -2185,8 +2185,8 @@ class CWinpdbWindow(wx.Frame, CMainWindow):
     def callback_save(self, r, exc_info):
         (t, v, tb) = exc_info
 
-        if t in (socket.error, IOError) or isinstance(v, src.exceptions.CException):
-            error = src.const.STR_BREAKPOINTS_SAVE_PROBLEM
+        if t in (socket.error, IOError) or isinstance(v, rpdb.exceptions.CException):
+            error = rpdb.const.STR_BREAKPOINTS_SAVE_PROBLEM
         else:
             return
 
@@ -2245,8 +2245,8 @@ class CWinpdbApp(wx.App):
 
         self.m_settings.load_settings()
 
-        if (not self.m_fAllowUnencrypted) and not src.crypto.is_encryption_supported():
-            dlg = wx.MessageDialog(None, src.const.STR_ENCRYPTION_SUPPORT_ERROR, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+        if (not self.m_fAllowUnencrypted) and not rpdb.crypto.is_encryption_supported():
+            dlg = wx.MessageDialog(None, rpdb.const.STR_ENCRYPTION_SUPPORT_ERROR, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
             return True
@@ -2363,7 +2363,7 @@ class CStyledViewer(stc.StyledTextCtrl):
             self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:Courier')
 
         self.StyleClearAll()
-        self.SetTabWidth(src.const.PYTHON_TAB_WIDTH)
+        self.SetTabWidth(rpdb.const.PYTHON_TAB_WIDTH)
 
         self.StyleSetSpec(stc.STC_STYLE_LINENUMBER, 'fore:#000000,back:#99A9C2')
         self.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, 'fore:#00009D,back:#FFFF00')
@@ -2439,7 +2439,7 @@ class CStyledViewer(stc.StyledTextCtrl):
         elif key_code == 74: # J
             (_, col_no, line_no) = self.PositionToXY(self.GetInsertionPoint())
             console = wx.FindWindowByName('console')
-            value = src.utils.as_unicode('jump %s' % (line_no + 1))
+            value = rpdb.utils.as_unicode('jump %s' % (line_no + 1))
             console.m_queue.put(value + '\n')
         elif key_code == 86: # V
             value = self.GetSelectedText()
@@ -2448,7 +2448,7 @@ class CStyledViewer(stc.StyledTextCtrl):
                 console = wx.FindWindowByName('console')
                 console.m_console_out.AppendText(CONSOLE_PROMPT + value + '\n')
                 # console.set_history(value)
-                value = src.utils.as_unicode(value)
+                value = rpdb.utils.as_unicode(value)
                 console.m_queue.put(value + '\n')
 
         event.Skip()
@@ -2472,7 +2472,7 @@ class CSourceManager:
 
     def mark_files_dirty(self):
         for k, v in list(self.m_files.items()):
-            self.m_files[k] = (DIRTY_CACHE, src.utils.as_string(''))
+            self.m_files[k] = (DIRTY_CACHE, rpdb.utils.as_string(''))
 
 
     def is_in_files(self, filename):
@@ -2511,31 +2511,31 @@ class CSourceManager:
     def callback_load_source(self, r, exc_info, filename, callback, args, fComplain):
         (t, v, tb) = exc_info
 
-        if self.m_session_manager.get_state() == src.session_manager.STATE_DETACHED:
+        if self.m_session_manager.get_state() == rpdb.session_manager.STATE_DETACHED:
             return
 
         if t == None:
             _time = 0
-            _filename = r[src.const.DICT_KEY_FILENAME]
-            source_lines = r[src.const.DICT_KEY_LINES]
+            _filename = r[rpdb.const.DICT_KEY_FILENAME]
+            source_lines = r[rpdb.const.DICT_KEY_LINES]
             source = ''.join(source_lines)
             if not g_fUnicode:
-                source = src.utils.as_string(source)
+                source = rpdb.utils.as_string(source)
 
-        elif t == src.exceptions.NotPythonSource and fComplain:
+        elif t == rpdb.exceptions.NotPythonSource and fComplain:
             dlg = wx.MessageDialog(None, MSG_ERROR_FILE_NOT_PYTHON % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
             dlg.ShowModal()
             dlg.Destroy()
             return
 
-        elif t in (IOError, socket.error, src.exceptions.NotPythonSource) or isinstance(v, src.exceptions.CConnectionException):
+        elif t in (IOError, socket.error, rpdb.exceptions.NotPythonSource) or isinstance(v, rpdb.exceptions.CConnectionException):
             if fComplain:
                 dlg = wx.MessageDialog(None, STR_FILE_LOAD_ERROR % (filename, ), MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
                 dlg.Destroy()
                 return
 
-            if t == IOError and src.source_provider.BLENDER_SOURCE_NOT_AVAILABLE in v.args and not self.is_in_files(filename):
+            if t == IOError and rpdb.source_provider.BLENDER_SOURCE_NOT_AVAILABLE in v.args and not self.is_in_files(filename):
                 dlg = wx.MessageDialog(None, STR_BLENDER_SOURCE_WARNING, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
                 dlg.Destroy()
@@ -2544,16 +2544,16 @@ class CSourceManager:
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
             if not g_fUnicode:
-                source = src.utils.as_string(source)
+                source = rpdb.utils.as_string(source)
 
         else:
-            src.utils.print_debug('get_source_file() returned the following error: %s' % repr(t))
+            rpdb.utils.print_debug('get_source_file() returned the following error: %s' % repr(t))
 
             _time = time.time()
             _filename = filename
             source = STR_FILE_LOAD_ERROR2 % (filename, )
             if not g_fUnicode:
-                source = src.utils.as_string(source)
+                source = rpdb.utils.as_string(source)
 
         try:
             self.m_lock.acquire()
@@ -2664,7 +2664,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
     def __toggle_breakpoint(self, lineno):
         try:
             bpl = self.m_session_manager.get_breakpoints()
-        except src.exceptions.NotAttached:
+        except rpdb.exceptions.NotAttached:
             return
 
         id = self.m_breakpoint_lines.get(lineno, None)
@@ -2803,9 +2803,9 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         displayed_filename = _filename
         if not g_fUnicode:
-            displayed_filename = src.utils.as_string(displayed_filename)
+            displayed_filename = rpdb.utils.as_string(displayed_filename)
 
-        label = CAPTION_SOURCE + ' ' + src.repr.clip_filename(displayed_filename)
+        label = CAPTION_SOURCE + ' ' + rpdb.repr.clip_filename(displayed_filename)
         self.m_caption.m_static_text.SetLabel(label)
         self.m_sizerv.Layout()
 
@@ -2846,9 +2846,9 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         displayed_filename = filename
         if not g_fUnicode:
-            displayed_filename = src.utils.as_string(displayed_filename)
+            displayed_filename = rpdb.utils.as_string(displayed_filename)
 
-        label = CAPTION_SOURCE + ' ' + src.repr.clip_filename(displayed_filename)
+        label = CAPTION_SOURCE + ' ' + rpdb.repr.clip_filename(displayed_filename)
         self.m_caption.m_static_text.SetLabel(label)
         self.m_sizerv.Layout()
 
@@ -2871,7 +2871,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         fposition_timeout = time.time() - self.m_last_position_time > POSITION_TIMEOUT
 
-        if event.m_action == src.events.CEventBreakpoint.SET and fposition_timeout:
+        if event.m_action == rpdb.events.CEventBreakpoint.SET and fposition_timeout:
             if self.m_cur_filename == event.m_bp.m_filename:
                 lineno = event.m_bp.m_lineno
                 self.m_viewer.EnsureVisibleEnforcePolicy(lineno - 1)
@@ -2891,7 +2891,7 @@ class CCodeViewer(wx.Panel, CJobs, CCaptionManager):
 
         try:
             bpl = self.m_session_manager.get_breakpoints()
-        except src.exceptions.NotAttached:
+        except rpdb.exceptions.NotAttached:
             return
 
         self.m_breakpoint_lines = {}
@@ -3024,9 +3024,9 @@ class CConsole(wx.Panel, CCaptionManager):
 
     def write(self, _str):
         if not g_fUnicode:
-            _str = src.utils.as_string(_str)
+            _str = rpdb.utils.as_string(_str)
         else:
-            _str = src.utils.as_unicode(_str, self.encoding)
+            _str = rpdb.utils.as_unicode(_str, self.encoding)
 
         sl = _str.split('\n')
 
@@ -3146,7 +3146,7 @@ class CConsole(wx.Panel, CCaptionManager):
             self.m_exit_command()
             return
 
-        value = src.utils.as_unicode(value)
+        value = rpdb.utils.as_unicode(value)
 
         self.m_queue.put(value + '\n')
 
@@ -3294,17 +3294,17 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
 
 
     def update_thread(self, thread_id, thread_name, fBroken):
-        assert(src.utils.is_unicode(thread_name))
+        assert(rpdb.utils.is_unicode(thread_name))
 
         index = self.m_threads.FindItemData(-1, thread_id)
         if index < 0:
             return -1
 
         if not g_fUnicode:
-            thread_name = src.utils.as_string(thread_name)
+            thread_name = rpdb.utils.as_string(thread_name)
 
         self.m_threads.SetItem(index, 1, thread_name)
-        self.m_threads.SetItem(index, 2, [src.session_manager.STATE_RUNNING, src.const.STR_STATE_BROKEN][fBroken])
+        self.m_threads.SetItem(index, 2, [rpdb.session_manager.STATE_RUNNING, rpdb.const.STR_STATE_BROKEN][fBroken])
 
         return index
 
@@ -3318,15 +3318,15 @@ class CThreadsViewer(wx.Panel, CCaptionManager):
 
         j = None
         for i, s in enumerate(threads_list):
-            tid = s[src.const.DICT_KEY_TID]
-            name = s[src.const.DICT_KEY_NAME]
+            tid = s[rpdb.const.DICT_KEY_TID]
+            name = s[rpdb.const.DICT_KEY_NAME]
             if not g_fUnicode:
-                name = src.utils.as_string(name)
+                name = rpdb.utils.as_string(name)
 
-            fBroken = s[src.const.DICT_KEY_BROKEN]
+            fBroken = s[rpdb.const.DICT_KEY_BROKEN]
             index = self.m_threads.InsertItem( i, repr(tid))
             self.m_threads.SetItem(index, 1, name)
-            self.m_threads.SetItem(index, 2, [src.session_manager.STATE_RUNNING, src.const.STR_STATE_BROKEN][fBroken])
+            self.m_threads.SetItem(index, 2, [rpdb.session_manager.STATE_RUNNING, rpdb.const.STR_STATE_BROKEN][fBroken])
             self.m_threads.SetItemData(index, tid)
             if tid == current_thread:
                 j = i
@@ -3445,7 +3445,7 @@ class CNamespacePanel(wx.Panel, CJobs):
     def OnItemActivated(self, event):
         item = event.GetItem()
         (expr, is_valid) = self.m_tree.GetItemData(item)
-        if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK, src.const.STR_MAX_NAMESPACE_WARNING_TITLE]:
+        if expr in [STR_NAMESPACE_LOADING, STR_NAMESPACE_DEADLOCK, rpdb.const.STR_MAX_NAMESPACE_WARNING_TITLE]:
             return
 
         if is_valid:
@@ -3475,7 +3475,7 @@ class CNamespacePanel(wx.Panel, CJobs):
         (t, v, tb) = exc_info
 
         if t != None:
-            src.utils.print_exception(t, v, tb)
+            rpdb.utils.print_exception(t, v, tb)
             return
 
         (warning, error) = r
@@ -3554,7 +3554,7 @@ class CNamespacePanel(wx.Panel, CJobs):
 
         (expr, is_valid) = self.m_tree.GetItemData(item)
 
-        l = [e for e in _map if e.get(src.const.DICT_KEY_EXPR, None) == expr]
+        l = [e for e in _map if e.get(rpdb.const.DICT_KEY_EXPR, None) == expr]
         if l == []:
             return None
 
@@ -3562,11 +3562,11 @@ class CNamespacePanel(wx.Panel, CJobs):
         if _r is None:
             return
 
-        if src.const.DICT_KEY_ERROR in _r:
+        if rpdb.const.DICT_KEY_ERROR in _r:
             dbg_gui('expand_item() -> no action due to error')
             return
 
-        if _r[src.const.DICT_KEY_N_SUBNODES] == 0:
+        if _r[rpdb.const.DICT_KEY_N_SUBNODES] == 0:
             dbg_gui('expand_item() -> no subnodes, setting HasChildren to false')
             SetItemHasChildren(self.m_tree, item, False)
             return
@@ -3578,26 +3578,26 @@ class CNamespacePanel(wx.Panel, CJobs):
         #
 
         dbg_gui('expand_item() -> filling subnodes, setting HasChildren to true & expand item')
-        snl = _r[src.const.DICT_KEY_SUBNODES]
+        snl = _r[rpdb.const.DICT_KEY_SUBNODES]
 
         for r in snl:
             if g_fUnicode:
-                _name = r[src.const.DICT_KEY_NAME]
-                _type = r[src.const.DICT_KEY_TYPE]
-                _repr = r[src.const.DICT_KEY_REPR]
+                _name = r[rpdb.const.DICT_KEY_NAME]
+                _type = r[rpdb.const.DICT_KEY_TYPE]
+                _repr = r[rpdb.const.DICT_KEY_REPR]
             else:
-                _name = src.utils.as_string(r[src.const.DICT_KEY_NAME])
-                _type = src.utils.as_string(r[src.const.DICT_KEY_TYPE])
-                _repr = src.utils.as_string(r[src.const.DICT_KEY_REPR])
+                _name = rpdb.utils.as_string(r[rpdb.const.DICT_KEY_NAME])
+                _type = rpdb.utils.as_string(r[rpdb.const.DICT_KEY_TYPE])
+                _repr = rpdb.utils.as_string(r[rpdb.const.DICT_KEY_REPR])
 
             identation = ''
-            #identation = ['', '  '][os.name == src.const.POSIX and r[src.const.DICT_KEY_N_SUBNODES] == 0]
+            #identation = ['', '  '][os.name == rpdb.const.POSIX and r[rpdb.const.DICT_KEY_N_SUBNODES] == 0]
 
             child = self.m_tree.AppendItem(item, identation + _name)
             self.m_tree.SetItemText(child, 2, ' ' + _repr)
             self.m_tree.SetItemText(child, 1, ' ' + _type)
-            self.m_tree.SetItemData(child, (r[src.const.DICT_KEY_EXPR], r[src.const.DICT_KEY_IS_VALID]))
-            SetItemHasChildren(self.m_tree, child, (r[src.const.DICT_KEY_N_SUBNODES] > 0))
+            self.m_tree.SetItemData(child, (r[rpdb.const.DICT_KEY_EXPR], r[rpdb.const.DICT_KEY_IS_VALID]))
+            SetItemHasChildren(self.m_tree, child, (r[rpdb.const.DICT_KEY_N_SUBNODES] > 0))
 
         self.m_tree.Expand(item)
 
@@ -3762,11 +3762,11 @@ class CNamespacePanel(wx.Panel, CJobs):
                 rl = self.m_session_manager.get_namespace(el, filter_level)
                 wx.CallAfter(self.do_update_namespace, rl)
 
-            except (src.exceptions.ThreadDone, src.exceptions.NoThreads):
+            except (rpdb.exceptions.ThreadDone, rpdb.exceptions.NoThreads):
                 wx.CallAfter(self.m_tree.DeleteAllItems)
 
             except:
-                src.utils.print_debug_exception()
+                rpdb.utils.print_debug_exception()
 
             self.m_lock.acquire()
             self.m_n_workers -= 1
@@ -3809,13 +3809,13 @@ class CNamespacePanel(wx.Panel, CJobs):
 
 class CLocals(CNamespacePanel):
     def get_root_expr(self):
-        return src.utils.as_unicode('locals()')
+        return rpdb.utils.as_unicode('locals()')
 
 
 
 class CGlobals(CNamespacePanel):
     def get_root_expr(self):
-        return src.utils.as_unicode('globals()')
+        return rpdb.utils.as_unicode('globals()')
 
 
 
@@ -3891,7 +3891,7 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
         _stack: a dictionnary describing the current thread. See session_manager.py:get_stack() for detailed information.
         '''
         frame_index = self.m_session_manager.get_frame_index()
-        c = _stack.get(src.const.DICT_KEY_CODE_LIST, [])
+        c = _stack.get(rpdb.const.DICT_KEY_CODE_LIST, [])
         key = c[-(1 + frame_index)]
         return key
 
@@ -3901,7 +3901,7 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
         _stack: a dictionnary describing the current thread. See session_manager.py:get_stack() for detailed information.
         '''
         frame_index = self.m_session_manager.get_frame_index()
-        s = _stack.get(src.const.DICT_KEY_STACK, [])
+        s = _stack.get(rpdb.const.DICT_KEY_STACK, [])
         key = s[-(1 + frame_index)][0]
         return key
 
@@ -3926,7 +3926,7 @@ class CNamespaceViewer(wx.Panel, CCaptionManager):
             (key1, el1) = self.m_exception.update_namespace(key, el)
             self.m_key_map[key] = el1
 
-        except src.exceptions.NotAttached:
+        except rpdb.exceptions.NotAttached:
             return
 
 
@@ -3988,7 +3988,7 @@ class CStackViewer(wx.Panel, CCaptionManager):
     def update_stack_list(self, st):
         self.m_stack.DeleteAllItems()
 
-        s = st.get(src.const.DICT_KEY_STACK, [])
+        s = st.get(rpdb.const.DICT_KEY_STACK, [])
 
         i = 0
         while i < len(s):
@@ -3999,8 +3999,8 @@ class CStackViewer(wx.Panel, CCaptionManager):
             function = e[2]
 
             if not g_fUnicode:
-                filename = src.utils.as_string(filename)
-                function = src.utils.as_string(function)
+                filename = rpdb.utils.as_string(filename)
+                function = rpdb.utils.as_string(function)
 
             index = self.m_stack.InsertItem( i, repr(i))
             self.m_stack.SetItem(index, 1, os.path.basename(filename))
@@ -4197,7 +4197,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         try:
             self.m_session_manager.set_password(pwd)
 
-        except src.exceptions.AlreadyAttached:
+        except rpdb.exceptions.AlreadyAttached:
             assert(0)
 
             self.Close()
@@ -4226,7 +4226,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         if host == '':
             host = 'localhost'
 
-        host = src.utils.as_unicode(host)
+        host = rpdb.utils.as_unicode(host)
 
         f = lambda r, exc_info: self.callback_sethost(r, exc_info, host)
         self.m_async_sm.with_callback(f).set_host(host)
@@ -4236,7 +4236,7 @@ class CAttachDialog(wx.Dialog, CJobs):
         (t, v, tb) = exc_info
 
         if t == socket.gaierror:
-            dlg = wx.MessageDialog(self, src.const.MSG_ERROR_HOST_TEXT % (host, v), MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+            dlg = wx.MessageDialog(self, rpdb.const.MSG_ERROR_HOST_TEXT % (host, v), MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
 
@@ -4255,8 +4255,8 @@ class CAttachDialog(wx.Dialog, CJobs):
         (t, v, tb) = exc_info
 
         if t != None:
-            if t == src.exceptions.FirewallBlock:
-                dlg = wx.MessageDialog(self, src.const.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+            if t == rpdb.exceptions.FirewallBlock:
+                dlg = wx.MessageDialog(self, rpdb.const.STR_FIREWALL_BLOCK, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
                 dlg.Destroy()
 
@@ -4267,18 +4267,18 @@ class CAttachDialog(wx.Dialog, CJobs):
 
         if len(self.m_errors) > 0:
             for k, el in self.m_errors.items():
-                if k in [src.exceptions.AuthenticationBadData, src.exceptions.AuthenticationFailure]:
-                    self.report_attach_warning(src.const.STR_ACCESS_DENIED)
+                if k in [rpdb.exceptions.AuthenticationBadData, rpdb.exceptions.AuthenticationFailure]:
+                    self.report_attach_warning(rpdb.const.STR_ACCESS_DENIED)
 
-                elif k == src.exceptions.EncryptionNotSupported:
-                    self.report_attach_warning(src.const.STR_DEBUGGEE_NO_ENCRYPTION)
+                elif k == rpdb.exceptions.EncryptionNotSupported:
+                    self.report_attach_warning(rpdb.const.STR_DEBUGGEE_NO_ENCRYPTION)
 
-                elif k == src.exceptions.EncryptionExpected:
-                    self.report_attach_warning(src.const.STR_ENCRYPTION_EXPECTED)
+                elif k == rpdb.exceptions.EncryptionExpected:
+                    self.report_attach_warning(rpdb.const.STR_ENCRYPTION_EXPECTED)
 
-                elif k == src.exceptions.BadVersion:
+                elif k == rpdb.exceptions.BadVersion:
                     for (t, v, tb) in el:
-                        self.report_attach_warning(src.const.STR_BAD_VERSION % {'value': v})
+                        self.report_attach_warning(rpdb.const.STR_BAD_VERSION % {'value': v})
 
         self.m_ok.Disable()
 
@@ -4292,7 +4292,7 @@ class CAttachDialog(wx.Dialog, CJobs):
 
             filename = s.m_filename
             if not g_fUnicode:
-                filename = src.utils.as_string(filename)
+                filename = rpdb.utils.as_string(filename)
 
             self.m_listbox_scripts.SetItem(index, 1, filename)
             self.m_listbox_scripts.SetItemData(index, i)
@@ -4343,7 +4343,7 @@ class CExpressionDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         if not g_fUnicode:
-            default_value = src.utils.as_string(default_value)
+            default_value = rpdb.utils.as_string(default_value)
 
         self.m_entry_expr = wx.TextCtrl(self, value = default_value, size = (200, -1))
         self.m_entry_expr.SetFocus()
@@ -4377,7 +4377,7 @@ class CExpressionDialog(wx.Dialog):
 
     def get_expression(self):
         expr = self.m_entry_expr.GetValue()
-        expr = src.utils.as_unicode(expr)
+        expr = rpdb.utils.as_unicode(expr)
 
         return expr
 
@@ -4404,7 +4404,7 @@ class CEncodingDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
         encoding = [current_encoding, ''][current_encoding is None]
         if not g_fUnicode:
-            encoding = src.utils.as_string(encoding)
+            encoding = rpdb.utils.as_string(encoding)
 
         self.m_entry_encoding = wx.TextCtrl(self, value = encoding, size = (200, -1))
         self.m_entry_encoding.SetFocus()
@@ -4444,14 +4444,14 @@ class CEncodingDialog(wx.Dialog):
 
     def get_encoding(self):
         encoding = self.m_entry_encoding.GetValue()
-        encoding = src.utils.as_unicode(encoding)
+        encoding = rpdb.utils.as_unicode(encoding)
 
         return encoding, self.m_cb.GetValue()
 
 
     def do_validate(self):
         encoding, fraw = self.get_encoding()
-        if encoding == src.utils.ENCODING_AUTO:
+        if encoding == rpdb.utils.ENCODING_AUTO:
             return True
 
         try:
@@ -4461,7 +4461,7 @@ class CEncodingDialog(wx.Dialog):
         except:
             pass
 
-        dlg = wx.MessageDialog(self, src.const.STR_ENCODING_BAD, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
+        dlg = wx.MessageDialog(self, rpdb.const.STR_ENCODING_BAD, MSG_WARNING_TITLE, wx.OK | wx.ICON_WARNING)
         dlg.ShowModal()
         dlg.Destroy()
 
@@ -4537,7 +4537,7 @@ class CPwdDialog(wx.Dialog):
         pwd = [current_password, ''][current_password is None]
 
         if not g_fUnicode:
-            pwd = src.utils.as_string(pwd)
+            pwd = rpdb.utils.as_string(pwd)
 
         self.m_entry_pwd = wx.TextCtrl(self, value = pwd, size = (200, -1))
         self.m_entry_pwd.SetFocus()
@@ -4573,16 +4573,16 @@ class CPwdDialog(wx.Dialog):
 
     def get_password(self):
         pwd = self.m_entry_pwd.GetValue()
-        pwd = src.utils.as_unicode(pwd)
+        pwd = rpdb.utils.as_unicode(pwd)
 
         return pwd
 
 
     def do_validate(self):
-        if src.session_manager.is_valid_pwd(self.get_password()):
+        if rpdb.session_manager.is_valid_pwd(self.get_password()):
             return True
 
-        dlg = wx.MessageDialog(self, src.const.STR_PASSWORD_BAD, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
+        dlg = wx.MessageDialog(self, rpdb.const.STR_PASSWORD_BAD, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
         dlg.ShowModal()
         dlg.Destroy()
 
@@ -4650,7 +4650,7 @@ class COpenDialog(wx.Dialog):
 
     def do_browse(self, event = None):
         command_line = self.m_entry.GetValue()
-        (_path, filename, args) = src.utils.split_command_line_path_filename_args(command_line)
+        (_path, filename, args) = rpdb.utils.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
         dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.FD_OPEN | wx.FD_CHANGE_DIR)
@@ -4670,7 +4670,7 @@ class COpenDialog(wx.Dialog):
 
     def get_file_name(self):
         filename = self.m_entry.GetValue()
-        filename = src.utils.as_unicode(filename)
+        filename = rpdb.utils.as_unicode(filename)
 
         return filename
 
@@ -4694,7 +4694,7 @@ class CLaunchDialog(wx.Dialog):
         sizerh.Add(label, 0, wx.ALIGN_CENTRE | wx.ALL, 5)
 
         if not g_fUnicode:
-            command_line = src.utils.as_string(command_line)
+            command_line = rpdb.utils.as_string(command_line)
 
         self.m_entry_commandline = wx.TextCtrl(self, value = command_line, size = (200, -1))
         self.m_entry_commandline.SetFocus()
@@ -4762,10 +4762,10 @@ class CLaunchDialog(wx.Dialog):
 
     def do_browse_commandline(self, event = None):
         command_line = self.m_entry_commandline.GetValue()
-        (_path, filename, args) = src.utils.split_command_line_path_filename_args(command_line)
+        (_path, filename, args) = rpdb.utils.split_command_line_path_filename_args(command_line)
         _abs_path = os.path.abspath(_path)
 
-        cwd = src.utils.getcwdu()
+        cwd = rpdb.utils.getcwdu()
 
         dlg = wx.FileDialog(self, defaultDir = _abs_path, defaultFile = filename, wildcard = WILDCARD_WINPDB, style = wx.FD_OPEN | wx.FD_CHANGE_DIR)
         r = dlg.ShowModal()
@@ -4789,9 +4789,9 @@ class CLaunchDialog(wx.Dialog):
         (_path, filename) = os.path.split( interpreter )
         _abs_path = os.path.abspath(_path)
 
-        cwd = src.utils.getcwdu()
+        cwd = rpdb.utils.getcwdu()
 
-        if os.name == src.const.POSIX:
+        if os.name == rpdb.const.POSIX:
             wildcard = WILDCARD_ALL
         else:
             wildcard = WILDCARD_EXECUTABLES
@@ -4817,13 +4817,13 @@ class CLaunchDialog(wx.Dialog):
 
     def do_validate(self):
         command_line = self.m_entry_commandline.GetValue()
-        command_line = src.utils.as_unicode(command_line)
+        command_line = rpdb.utils.as_unicode(command_line)
 
-        (_path, filename, args)  = src.utils.split_command_line_path_filename_args(command_line)
+        (_path, filename, args)  = rpdb.utils.split_command_line_path_filename_args(command_line)
 
         try:
             _filename = os.path.join(_path, filename)
-            abs_path = src.utils.FindFile(_filename)
+            abs_path = rpdb.utils.FindFile(_filename)
 
         except IOError:
             dlg = wx.MessageDialog(self, MSG_ERROR_FILE_NOT_FOUND, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
@@ -4840,7 +4840,7 @@ class CLaunchDialog(wx.Dialog):
 
         interpreter = self.m_entry_interpreter.GetValue()
         try:
-            interpreter = src.utils.FindFile( interpreter )
+            interpreter = rpdb.utils.FindFile(interpreter)
         except IOError:
             dlg = wx.MessageDialog(self, MSG_ERROR_INTERPRETER_NOT_FOUND, MSG_ERROR_TITLE, wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()
@@ -4860,21 +4860,21 @@ class CLaunchDialog(wx.Dialog):
 
     def get_command_line(self):
         command_line = self.m_entry_commandline.GetValue()
-        command_line = src.utils.as_unicode(command_line)
+        command_line = rpdb.utils.as_unicode(command_line)
         interpreter = self.m_entry_interpreter.GetValue()
         return (command_line, self.m_cb.GetValue(), interpreter)
 
 
 
 def StartClient(command_line, fAttach, fchdir, pwd, fAllowUnencrypted, fRemote, host, interpreter):
-    sm = src.session_manager.CSessionManager(pwd, fAllowUnencrypted, fRemote, host)
+    sm = rpdb.session_manager.CSessionManager(pwd, fAllowUnencrypted, fRemote, host)
 
     try:
         app = CWinpdbApp(sm, fchdir, command_line, fAttach, fAllowUnencrypted, interpreter)
 
     except SystemError:
-        if os.name == src.const.POSIX:
-            src.utils._print(STR_X_ERROR_MSG, sys.__stderr__)
+        if os.name == rpdb.const.POSIX:
+            rpdb.utils._print(STR_X_ERROR_MSG, sys.__stderr__)
             sys.exit(1)
 
         raise
@@ -4898,8 +4898,8 @@ def dbg(*args):
 
 
 def main():
-    if src.const.get_version() != RPDB2_EXPECTED_VERSION:
-        src.utils._print(STR_ERROR_INTERFACE_COMPATIBILITY % ( RPDB2_EXPECTED_VERSION, src.const.get_version()))
+    if rpdb.const.get_version() != RPDB2_EXPECTED_VERSION:
+        rpdb.utils._print(STR_ERROR_INTERFACE_COMPATIBILITY % (RPDB2_EXPECTED_VERSION, rpdb.const.get_version()))
         return
 
     return rpdb2.main(StartClient, WINPDB_TITLE)

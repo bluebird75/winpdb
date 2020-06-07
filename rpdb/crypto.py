@@ -5,10 +5,10 @@ import threading
 import time
 import zlib
 
-from src.compat import _md5, base64_encodestring, base64_decodestring
-from src.exceptions import EncryptionExpected, EncryptionNotSupported, DecryptionFailure, AuthenticationFailure, \
+from rpdb.compat import _md5, base64_encodestring, base64_decodestring
+from rpdb.exceptions import EncryptionExpected, EncryptionNotSupported, DecryptionFailure, AuthenticationFailure, \
     AuthenticationBadData, AuthenticationBadIndex
-from src.utils import is_unicode, as_bytes, as_unicode, print_debug_exception
+from rpdb.utils import is_unicode, as_bytes, as_unicode, print_debug_exception
 
 INDEX_TABLE_SIZE = 100
 

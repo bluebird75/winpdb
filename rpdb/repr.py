@@ -1,7 +1,7 @@
 import sys, os
 
-from src.utils import as_unicode, is_unicode, print_debug_exception, ENCODING_RAW_I, as_bytes
-from src.compat import sets, unicode
+from rpdb.utils import as_unicode, is_unicode, print_debug_exception, ENCODING_RAW_I, as_bytes
+from rpdb.compat import sets, unicode
 
 def is_py3k():
     return sys.version_info[0] >= 3

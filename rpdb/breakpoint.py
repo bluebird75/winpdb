@@ -1,10 +1,10 @@
 import copyreg as copy_reg
 import threading
 
-from src.events import CEventBreakpoint
-from src.utils import as_bytes, as_unicode, print_debug, winlower
-from src.source_provider import  ENCODING_SOURCE, MODULE_SCOPE, MODULE_SCOPE2, SCOPE_SEP
-from src.breakinfo import CBreakInfoManager
+from rpdb.events import CEventBreakpoint
+from rpdb.utils import as_bytes, as_unicode, print_debug, winlower
+from rpdb.source_provider import  ENCODING_SOURCE, MODULE_SCOPE, MODULE_SCOPE2, SCOPE_SEP
+from rpdb.breakinfo import CBreakInfoManager
 
 
 

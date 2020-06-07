@@ -1,8 +1,8 @@
 import os.path
 import sys, codecs
 
-from src.globals import g_found_unicode_files
-from src.utils import as_unicode, is_unicode, winlower, as_bytes, mygetfile
+from rpdb.globals import g_found_unicode_files
+from rpdb.utils import as_unicode, is_unicode, winlower, as_bytes, mygetfile
 
 BLENDER_SOURCE_NOT_AVAILABLE = as_unicode('Blender script source code is not available.')
 SOURCE_NOT_AVAILABLE = as_unicode('Source code is not available.')

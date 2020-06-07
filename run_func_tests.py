@@ -27,9 +27,9 @@ import os, time, sys, re, signal
 
 # RPDB2
 import rpdb2
-import src.const
+import rpdb.const
 
-src.const.STARTUP_TIMEOUT = 10.0 # necessary because sometimes subprocess debugger is really slow to start
+rpdb.const.STARTUP_TIMEOUT = 10.0 # necessary because sometimes subprocess debugger is really slow to start
 
 # Compatibility support
 IS_PYTHON_LESS_THAN_26 = sys.version_info[:2] < (2,6)

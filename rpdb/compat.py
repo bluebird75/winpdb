@@ -4,7 +4,7 @@ import base64
 import hashlib
 _md5 = hashlib.md5
 
-from src.globals import g_builtins_module
+from rpdb.globals import g_builtins_module
 
 class _stub_type:
     pass

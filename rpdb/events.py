@@ -3,7 +3,7 @@ import copyreg as copy_reg
 import signal
 import sys
 
-from src.utils import as_unicode
+from rpdb.utils import as_unicode
 
 EVENT_EXCLUDE = 'exclude'
 EVENT_INCLUDE = 'include'

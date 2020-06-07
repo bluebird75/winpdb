@@ -22,37 +22,37 @@
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02111-1307 USA
 """
-import src.globals
-import src.source_provider
-from src.breakinfo import CScopeBreakInfo, CalcValidLines
-from src.breakpoint import CBreakPointsManager
-from src.compat import sets, unicode, str8, base64_decodestring
-from src.const import *
-from src.const import POSIX, \
+import rpdb.globals
+import rpdb.source_provider
+from rpdb.breakinfo import CScopeBreakInfo, CalcValidLines
+from rpdb.breakpoint import CBreakPointsManager
+from rpdb.compat import sets, unicode, str8, base64_decodestring
+from rpdb.const import *
+from rpdb.const import POSIX, \
     STR_STATE_BROKEN, STATE_BROKEN, STATE_RUNNING, STATE_ANALYZE, STATE_DETACHED, DEBUGGER_FILENAME, THREADING_FILENAME, \
     DEFAULT_NUMBER_OF_LINES, DICT_KEY_TID, DICT_KEY_STACK, \
     DICT_KEY_CODE_LIST, DICT_KEY_CURRENT_TID, DICT_KEY_BROKEN, DICT_KEY_BREAKPOINTS, DICT_KEY_LINES, DICT_KEY_FILENAME, \
     DICT_KEY_FIRST_LINENO, DICT_KEY_FRAME_LINENO, DICT_KEY_EVENT, DICT_KEY_EXPR, DICT_KEY_NAME, DICT_KEY_REPR, \
     DICT_KEY_IS_VALID, DICT_KEY_TYPE, DICT_KEY_SUBNODES, DICT_KEY_N_SUBNODES, DICT_KEY_ERROR, PYTHON_FILE_EXTENSION, PYTHONW_FILE_EXTENSION
-from src.crypto import is_encryption_supported
-from src.debugee import CDebuggeeServer
-from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, CEventSignalIntercepted, \
+from rpdb.crypto import is_encryption_supported
+from rpdb.debugee import CDebuggeeServer
+from rpdb.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, CEventSignalIntercepted, \
     CEventSignalException, CEventPsycoWarning, CEventConflictingModules, CEventSyncReceivers, \
     CEventForkSwitch, CEventExecSwitch, CEventExit, CEventState, CEventSynchronicity, CEventBreakOnExit, CEventTrap, \
     CEventForkMode, CEventUnhandledException, CEventNamespace, CEventNoThreads, CEventThreads, CEventThreadBroken, \
     CEventStack, CEventStackDepth, CEventBreakpoint, CEventSync, breakpoint_copy, CEventDispatcher
-from src.exceptions import InvalidScopeName, CException, NotPythonSource, BadArgument, ThreadNotFound, \
+from rpdb.exceptions import InvalidScopeName, CException, NotPythonSource, BadArgument, ThreadNotFound, \
     NoThreads, ThreadDone, DebuggerNotBroken, InvalidFrame, NoExceptionFound, CConnectionException, NotAttached, EncryptionNotSupported
-from src.globals import g_fDebug, g_traceback_lock, g_builtins_module, g_server_lock, g_found_unicode_files
-from src.repr import clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
-from src.rpc import CThread
-from src.session_manager import CSessionManager, is_valid_pwd, calc_pwd_file_path, delete_pwd_file
-from src.state_manager import CStateManager, lock_notify_all, g_alertable_waiters
-from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower, _print, \
+from rpdb.globals import g_fDebug, g_traceback_lock, g_builtins_module, g_server_lock, g_found_unicode_files
+from rpdb.repr import clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
+from rpdb.rpc import CThread
+from rpdb.session_manager import CSessionManager, is_valid_pwd, calc_pwd_file_path, delete_pwd_file
+from rpdb.state_manager import CStateManager, lock_notify_all, g_alertable_waiters
+from rpdb.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, print_debug_exception, winlower, _print, \
     thread_is_alive, thread_get_name, current_thread, \
     detect_encoding, detect_locale, get_python_executable, ENCODING_AUTO, ENCODING_RAW, ENCODING_RAW_I, safe_wait, \
     my_os_path_join, FindFile, my_abspath, CalcScriptName, getcwd, getcwdu, g_safe_base64_from, _getpid
-from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
+from rpdb.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
     is_provider_filesystem, ENCODING_SOURCE
 
 if '.' in __name__:
@@ -193,7 +193,7 @@ def start_embedded_debugger_interactive_password(
                 depth = 0
                 ):
 
-    if src.globals.g_server is not None:
+    if rpdb.globals.g_server is not None:
         return
 
     while True:
@@ -2457,10 +2457,10 @@ class CDebuggerCore:
         n = self.get_clients_attached()
         self.send_fork_switch(n)
         time.sleep(0.5)
-        src.globals.g_server.shutdown()
+        rpdb.globals.g_server.shutdown()
         CThread.joinAll()
 
-        src.globals.g_ignore_broken_pipe = time.time()
+        rpdb.globals.g_ignore_broken_pipe = time.time()
 
 
     def handle_fork(self, ctx):
@@ -2483,7 +2483,7 @@ class CDebuggerCore:
 
             if not self.m_ffork_into_child:
                 #CThread.clearJoin()
-                #src.globals.g_server.jumpstart()
+                #rpdb.globals.g_server.jumpstart()
 
                 return True
 
@@ -2501,7 +2501,7 @@ class CDebuggerCore:
         self.m_threads = {tid: ctx}
 
         CThread.clearJoin()
-        src.globals.g_server.jumpstart()
+        rpdb.globals.g_server.jumpstart()
 
         return True
 
@@ -2518,7 +2518,7 @@ class CDebuggerCore:
         n = self.get_clients_attached()
         self.send_exec_switch(n)
         time.sleep(0.5)
-        src.globals.g_server.shutdown()
+        rpdb.globals.g_server.shutdown()
         CThread.joinAll()
 
 
@@ -2540,7 +2540,7 @@ class CDebuggerCore:
         #
 
         CThread.clearJoin()
-        src.globals.g_server.jumpstart()
+        rpdb.globals.g_server.jumpstart()
 
         return True
 
@@ -3817,7 +3817,7 @@ class CDebuggerEngine(CDebuggerCore):
             args = (expr, fExpand, filter_level, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
 
             if self.m_fsynchronicity:
-                src.globals.g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name ='calc_expr %s' % expr)
+                rpdb.globals.g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name ='calc_expr %s' % expr)
             else:
                 try:
                     ctx = self.get_current_ctx()
@@ -4031,7 +4031,7 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        src.globals.g_server.m_work_queue.post_work_item(target = _atexit, args = (True,), name ='_atexit')
+        rpdb.globals.g_server.m_work_queue.post_work_item(target = _atexit, args = (True,), name ='_atexit')
 
 
     def set_synchronicity(self, fsynchronicity):
@@ -4221,7 +4221,7 @@ class CConsoleInternal(cmd.Cmd, threading.Thread):
         self.m_stdout = self.stdout
         self.m_encoding = detect_encoding(self.stdin)
 
-        src.globals.g_fDefaultStd = (stdin == None)
+        rpdb.globals.g_fDefaultStd = (stdin == None)
 
         if self.use_rawinput:
             try:
@@ -6439,7 +6439,7 @@ def __close(fd):
     global g_fos_exit
 
     try:
-        if fd == src.globals.g_server.m_server.socket._sock.fileno():
+        if fd == rpdb.globals.g_server.m_server.socket._sock.fileno():
             g_fos_exit = (setbreak() != None)
     except:
         pass
@@ -6470,7 +6470,7 @@ def __dup2(fd, fd2):
     global g_fos_exit
 
     try:
-        if fd2 == src.globals.g_server.m_server.socket._sock.fileno():
+        if fd2 == rpdb.globals.g_server.m_server.socket._sock.fileno():
             g_fos_exit = (setbreak() != None)
     except:
         pass
@@ -6678,7 +6678,7 @@ def _atexit(fabort = False):
 
     time.sleep(1.0)
 
-    src.globals.g_server.shutdown()
+    rpdb.globals.g_server.shutdown()
     g_debugger.shutdown()
 
     if not fabort:
@@ -6744,8 +6744,8 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         if not is_valid_pwd(_rpdb2_pwd):
             raise BadArgument(STR_PASSWORD_BAD)
 
-        src.globals.g_fDebug = fDebug
-        src.source_provider.g_source_provider_aux = source_provider
+        rpdb.globals.g_fDebug = fDebug
+        rpdb.source_provider.g_source_provider_aux = source_provider
 
         workaround_import_deadlock()
 
@@ -6761,13 +6761,13 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         #
         if sys.path[0] == '':
             try:
-                src.globals.g_initial_cwd = [getcwd(), getcwdu()]
+                rpdb.globals.g_initial_cwd = [getcwd(), getcwdu()]
 
             except UnicodeDecodeError:
                 #
                 # This exception can be raised in py3k (alpha) on nt.
                 #
-                src.globals.g_initial_cwd = [getcwdu()]
+                rpdb.globals.g_initial_cwd = [getcwdu()]
 
 
         atexit.register(_atexit)
@@ -6775,8 +6775,8 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         g_debugger = CDebuggerEngine(fembedded = True)
 
         print_debug('Setting g_server')
-        src.globals.g_server = CDebuggeeServer(filename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote)
-        src.globals.g_server.start()
+        rpdb.globals.g_server = CDebuggeeServer(filename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote)
+        rpdb.globals.g_server.start()
         print_debug('Setting g_server set')
 
         if timeout == 0:
@@ -6835,8 +6835,8 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
     g_debugger = CDebuggerEngine()
 
     print_debug('Setting g_server')
-    src.globals.g_server = CDebuggeeServer(ExpandedFilename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
-    src.globals.g_server.start()
+    rpdb.globals.g_server = CDebuggeeServer(ExpandedFilename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
+    rpdb.globals.g_server.start()
     print_debug('Setting g_server done')
 
     try:
@@ -6991,7 +6991,7 @@ def main(StartClient_func = StartClient, version =RPDB_TITLE):
             _print(version)
             return 0
         if o in ['--debug']:
-            src.globals.g_fDebug = True
+            rpdb.globals.g_fDebug = True
         if o in ['-d', '--debugee', '--debuggee']:
             fWrap = True
         if o in ['-a', '--attach']:
@@ -7009,7 +7009,7 @@ def main(StartClient_func = StartClient, version =RPDB_TITLE):
         if o in ['--rid']:
             secret = a
         if o in ['-s', '--screen']:
-            src.globals.g_fScreen = True
+            rpdb.globals.g_fScreen = True
         if o in ['-c', '--chdir']:
             fchdir = True
         if o in ['--base64']:

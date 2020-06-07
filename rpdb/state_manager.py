@@ -2,9 +2,9 @@ import _thread as thread
 import threading
 import time
 
-from src.const import PING_TIMEOUT
-from src.events import CEventState
-from src.utils import safe_wait
+from rpdb.const import PING_TIMEOUT
+from rpdb.events import CEventState
+from rpdb.utils import safe_wait
 
 g_alertable_waiters = {}
 

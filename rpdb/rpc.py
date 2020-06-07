@@ -8,15 +8,15 @@ import weakref
 from http import client as httplib
 from xmlrpc import client as xmlrpclib, server as SimpleXMLRPCServer
 
-from src.const import SHUTDOWN_TIMEOUT, POSIX, get_interface_compatibility_version, PING_TIMEOUT, LOCAL_TIMEOUT
-from src.crypto import is_encryption_supported
-from src.exceptions import AuthenticationBadIndex, BadVersion, EncryptionExpected, EncryptionNotSupported, \
+from rpdb.const import SHUTDOWN_TIMEOUT, POSIX, get_interface_compatibility_version, PING_TIMEOUT, LOCAL_TIMEOUT
+from rpdb.crypto import is_encryption_supported
+from rpdb.exceptions import AuthenticationBadIndex, BadVersion, EncryptionExpected, EncryptionNotSupported, \
     DecryptionFailure, AuthenticationBadData, AuthenticationFailure, CConnectionException
-from src.repr import class_name
-from src.state_manager import lock_notify_all
-from src.utils import print_debug, safe_wait, thread_set_name, current_thread, print_debug_exception, as_unicode, _print, \
+from rpdb.repr import class_name
+from rpdb.state_manager import lock_notify_all
+from rpdb.utils import print_debug, safe_wait, thread_set_name, current_thread, print_debug_exception, as_unicode, _print, \
                         _getpid
-import src.globals
+import rpdb.globals
 
 N_WORK_QUEUE_THREADS = 8
 
@@ -159,7 +159,7 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     """
 
     def process_request(self, request, client_address):
-        src.globals.g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name = 'process_request')
+        rpdb.globals.g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name ='process_request')
 
 
 def my_xmlrpclib_loads(data):
@@ -220,7 +220,7 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
     def handle_error(self, request, client_address):
         print_debug("handle_error() in pid %d" % _getpid())
 
-        if src.globals.g_ignore_broken_pipe + 5 > time.time():
+        if rpdb.globals.g_ignore_broken_pipe + 5 > time.time():
             return
 
         return SimpleXMLRPCServer.SimpleXMLRPCServer.handle_error(self, request, client_address)

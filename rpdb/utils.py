@@ -19,8 +19,8 @@ try:
 except ImportError:
     pass
 
-from src.globals import g_fDebug, g_traceback_lock, g_initial_cwd, g_found_unicode_files
-from src.const import PYTHONW_FILE_EXTENSION, PYTHON_FILE_EXTENSION, PYTHONW_SO_EXTENSION
+from rpdb.globals import g_fDebug, g_traceback_lock, g_initial_cwd, g_found_unicode_files
+from rpdb.const import PYTHONW_FILE_EXTENSION, PYTHON_FILE_EXTENSION, PYTHONW_SO_EXTENSION
 
 
 def is_py3k():
