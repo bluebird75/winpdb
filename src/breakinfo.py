@@ -1,6 +1,6 @@
 import copy
 
-from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, get_source
+from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, get_source, SCOPE_SEP
 from src.utils import as_string, as_unicode, print_debug
 from src.exceptions import InvalidScopeName
 

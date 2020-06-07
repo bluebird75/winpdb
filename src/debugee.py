@@ -3,9 +3,10 @@ import errno
 import socket
 import sys
 import time
+import os
 
 from src.const import LOOPBACK, get_interface_compatibility_version, get_version, SERVER_PORT_RANGE_START, \
-    SERVER_PORT_RANGE_LENGTH
+    SERVER_PORT_RANGE_LENGTH, PYTHON_EXT_LIST
 from src.exceptions import CException, BadVersion, AuthenticationBadIndex, NotAttached
 from src.utils import is_unicode, thread_set_daemon, print_debug, thread_is_alive, as_unicode, print_debug_exception, \
     generate_rid, _getpid, calcURL

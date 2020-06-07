@@ -1,5 +1,5 @@
 import os.path
-import sys
+import sys, codecs
 
 from src.globals import g_found_unicode_files
 from src.utils import as_unicode, is_unicode, winlower, as_bytes, mygetfile

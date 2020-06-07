@@ -43,7 +43,7 @@ from src.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, C
     CEventStack, CEventStackDepth, CEventBreakpoint, CEventSync, breakpoint_copy, CEventDispatcher
 from src.exceptions import InvalidScopeName, CException, NotPythonSource, BadArgument, ThreadNotFound, \
     NoThreads, ThreadDone, DebuggerNotBroken, InvalidFrame, NoExceptionFound, CConnectionException, NotAttached, EncryptionNotSupported
-from src.globals import g_fDebug, g_traceback_lock, g_builtins_module, g_server_lock, g_server, g_found_unicode_files
+from src.globals import g_fDebug, g_traceback_lock, g_builtins_module, g_server_lock, g_found_unicode_files
 from src.repr import clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
 from src.rpc import CThread
 from src.session_manager import CSessionManager, is_valid_pwd, calc_pwd_file_path, delete_pwd_file
@@ -53,7 +53,7 @@ from src.utils import is_unicode, as_unicode, as_string, as_bytes, print_debug, 
     detect_encoding, detect_locale, get_python_executable, ENCODING_AUTO, ENCODING_RAW, ENCODING_RAW_I, safe_wait, \
     my_os_path_join, FindFile, my_abspath, CalcScriptName, getcwd, getcwdu, g_safe_base64_from, _getpid
 from src.source_provider import MODULE_SCOPE, MODULE_SCOPE2, lines_cache, g_lines_cache, get_source_line, \
-    is_provider_filesystem
+    is_provider_filesystem, ENCODING_SOURCE
 
 if '.' in __name__:
     raise ImportError('rpdb2 must not be imported as part of a package!')
@@ -193,7 +193,7 @@ def start_embedded_debugger_interactive_password(
                 depth = 0
                 ):
 
-    if g_server is not None:
+    if src.globals.g_server is not None:
         return
 
     while True:
@@ -2457,7 +2457,7 @@ class CDebuggerCore:
         n = self.get_clients_attached()
         self.send_fork_switch(n)
         time.sleep(0.5)
-        g_server.shutdown()
+        src.globals.g_server.shutdown()
         CThread.joinAll()
 
         src.globals.g_ignore_broken_pipe = time.time()
@@ -2483,7 +2483,7 @@ class CDebuggerCore:
 
             if not self.m_ffork_into_child:
                 #CThread.clearJoin()
-                #g_server.jumpstart()
+                #src.globals.g_server.jumpstart()
 
                 return True
 
@@ -2501,7 +2501,7 @@ class CDebuggerCore:
         self.m_threads = {tid: ctx}
 
         CThread.clearJoin()
-        g_server.jumpstart()
+        src.globals.g_server.jumpstart()
 
         return True
 
@@ -2518,7 +2518,7 @@ class CDebuggerCore:
         n = self.get_clients_attached()
         self.send_exec_switch(n)
         time.sleep(0.5)
-        g_server.shutdown()
+        src.globals.g_server.shutdown()
         CThread.joinAll()
 
 
@@ -2540,7 +2540,7 @@ class CDebuggerCore:
         #
 
         CThread.clearJoin()
-        g_server.jumpstart()
+        src.globals.g_server.jumpstart()
 
         return True
 
@@ -3817,7 +3817,7 @@ class CDebuggerEngine(CDebuggerCore):
             args = (expr, fExpand, filter_level, frame_index, fException, _globals, _locals, lock, event, rl, index, repr_limit, encoding)
 
             if self.m_fsynchronicity:
-                g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name ='calc_expr %s' % expr)
+                src.globals.g_server.m_work_queue.post_work_item(target = self.calc_expr, args = args, name ='calc_expr %s' % expr)
             else:
                 try:
                     ctx = self.get_current_ctx()
@@ -4031,7 +4031,7 @@ class CDebuggerEngine(CDebuggerCore):
         Notify the client and terminate this proccess.
         """
 
-        g_server.m_work_queue.post_work_item(target = _atexit, args = (True,), name ='_atexit')
+        src.globals.g_server.m_work_queue.post_work_item(target = _atexit, args = (True,), name ='_atexit')
 
 
     def set_synchronicity(self, fsynchronicity):
@@ -6439,7 +6439,7 @@ def __close(fd):
     global g_fos_exit
 
     try:
-        if fd == g_server.m_server.socket._sock.fileno():
+        if fd == src.globals.g_server.m_server.socket._sock.fileno():
             g_fos_exit = (setbreak() != None)
     except:
         pass
@@ -6470,7 +6470,7 @@ def __dup2(fd, fd2):
     global g_fos_exit
 
     try:
-        if fd2 == g_server.m_server.socket._sock.fileno():
+        if fd2 == src.globals.g_server.m_server.socket._sock.fileno():
             g_fos_exit = (setbreak() != None)
     except:
         pass
@@ -6678,7 +6678,7 @@ def _atexit(fabort = False):
 
     time.sleep(1.0)
 
-    g_server.shutdown()
+    src.globals.g_server.shutdown()
     g_debugger.shutdown()
 
     if not fabort:
@@ -6774,8 +6774,10 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
 
         g_debugger = CDebuggerEngine(fembedded = True)
 
+        print_debug('Setting g_server')
         src.globals.g_server = CDebuggeeServer(filename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote)
         src.globals.g_server.start()
+        print_debug('Setting g_server set')
 
         if timeout == 0:
             g_debugger.settrace(f, f_break_on_init = False)
@@ -6832,8 +6834,10 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     g_debugger = CDebuggerEngine()
 
+    print_debug('Setting g_server')
     src.globals.g_server = CDebuggeeServer(ExpandedFilename, g_debugger, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid)
     src.globals.g_server.start()
+    print_debug('Setting g_server done')
 
     try:
         g_debugger.m_bp_manager.set_temp_breakpoint(ExpandedFilename, '', 1, fhard = True)

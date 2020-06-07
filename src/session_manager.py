@@ -10,8 +10,6 @@ import threading
 import time
 import sys
 
-print(sys.path)
-
 from src.breakpoint import CBreakPointsManagerProxy
 from src.const import *
 from src.const import POSIX, RPDB_BPL_FOLDER, BREAKPOINTS_FILE_EXT, RPDB_BPL_FOLDER_NT, LOCALHOST, LOOPBACK
@@ -1247,7 +1245,8 @@ class CSessionManagerInternal:
             b = ' --base64=%s' % _b
 
         # for .pyc files, strip the c
-        debugger = os.path.abspath(__file__)
+        fpath, ext = os.path.splitext(__file__)
+        debugger = os.path.join( os.path.basename(fpath), '..', 'rpdb2') + ext
         if debugger[-1:] == 'c':
             debugger = debugger[:-1]
 

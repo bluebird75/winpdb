@@ -16,7 +16,7 @@ from src.repr import class_name
 from src.state_manager import lock_notify_all
 from src.utils import print_debug, safe_wait, thread_set_name, current_thread, print_debug_exception, as_unicode, _print, \
                         _getpid
-from src.globals import g_server, g_ignore_broken_pipe
+import src.globals
 
 N_WORK_QUEUE_THREADS = 8
 
@@ -159,7 +159,7 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     """
 
     def process_request(self, request, client_address):
-        g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name = 'process_request')
+        src.globals.g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name = 'process_request')
 
 
 def my_xmlrpclib_loads(data):
@@ -220,7 +220,7 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
     def handle_error(self, request, client_address):
         print_debug("handle_error() in pid %d" % _getpid())
 
-        if g_ignore_broken_pipe + 5 > time.time():
+        if src.globals.g_ignore_broken_pipe + 5 > time.time():
             return
 
         return SimpleXMLRPCServer.SimpleXMLRPCServer.handle_error(self, request, client_address)
