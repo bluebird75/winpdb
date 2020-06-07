@@ -43,7 +43,6 @@ from rpdb.events import CEventNull, CEventEmbeddedSync, CEventClearSourceCache, 
     CEventStack, CEventStackDepth, CEventBreakpoint, CEventSync, breakpoint_copy, CEventDispatcher
 from rpdb.exceptions import InvalidScopeName, CException, NotPythonSource, BadArgument, ThreadNotFound, \
     NoThreads, ThreadDone, DebuggerNotBroken, InvalidFrame, NoExceptionFound, CConnectionException, NotAttached, EncryptionNotSupported
-from rpdb.globals import g_fDebug, g_traceback_lock, g_builtins_module, g_server_lock, g_found_unicode_files
 from rpdb.repr import clip_filename, safe_str, safe_repr, parse_type, repr_ltd, calc_suffix
 from rpdb.rpc import CThread
 from rpdb.session_manager import CSessionManager, is_valid_pwd, calc_pwd_file_path, delete_pwd_file
@@ -601,7 +600,7 @@ def IsPythonSourceFile(path):
     if path.endswith(PYTHONW_FILE_EXTENSION):
         return True
 
-    path = g_found_unicode_files.get(path, path)
+    path = rpdb.globals.g_found_unicode_files.get(path, path)
 
     for lineno in range(1, 10):
         line = get_source_line(path, lineno)
@@ -959,11 +958,11 @@ def my_extract_stack(f):
         return []
 
     try:
-        g_traceback_lock.acquire()
+        rpdb.globals.g_traceback_lock.acquire()
         _s = traceback.extract_stack(f)
 
     finally:
-        g_traceback_lock.release()
+        rpdb.globals.g_traceback_lock.release()
 
     _s.reverse()
 
@@ -995,11 +994,11 @@ def my_extract_tb(tb):
         - list of : (filename, line number, function name, text of source code)
     '''
     try:
-        g_traceback_lock.acquire()
+        rpdb.globals.g_traceback_lock.acquire()
         _s = traceback.extract_tb(tb)
 
     finally:
-        g_traceback_lock.release()
+        rpdb.globals.g_traceback_lock.release()
 
     s = []
     for (p, ln, fn, text) in _s:
@@ -2035,7 +2034,7 @@ class CDebuggerCore:
             if self.m_builtins_hack != None:
                 if calc_frame_path(frame) == self.m_builtins_hack:
                     self.m_builtins_hack = None
-                    frame.f_globals['__builtins__'] = g_builtins_module
+                    frame.f_globals['__builtins__'] = rpdb.globals.g_builtins_module
 
             code_context = CCodeContext(frame, self.m_bp_manager)
             return self.m_code_contexts.setdefault(frame.f_code, code_context)
@@ -3327,11 +3326,11 @@ class CDebuggerEngine(CDebuggerCore):
 
         while nlines != 0:
             try:
-                g_traceback_lock.acquire()
+                rpdb.globals.g_traceback_lock.acquire()
                 line = get_source_line(_filename, _lineno)
 
             finally:
-                g_traceback_lock.release()
+                rpdb.globals.g_traceback_lock.release()
 
             if line == '':
                 break
@@ -3414,11 +3413,11 @@ class CDebuggerEngine(CDebuggerCore):
 
         while nlines != 0:
             try:
-                g_traceback_lock.acquire()
+                rpdb.globals.g_traceback_lock.acquire()
                 line = get_source_line(frame_filename, _lineno)
 
             finally:
-                g_traceback_lock.release()
+                rpdb.globals.g_traceback_lock.release()
 
             if line == '':
                 break
@@ -3884,7 +3883,7 @@ class CDebuggerEngine(CDebuggerCore):
                 _expr = as_bytes(ENCODING_SOURCE % encoding + expr, encoding, fstrict = True)
 
                 if '_RPDB2_builtins' in expr:
-                    _locals['_RPDB2_builtins'] = vars(g_builtins_module)
+                    _locals['_RPDB2_builtins'] = vars(rpdb.globals.g_builtins_module)
 
                 try:
                     redirect_exc_info = True
@@ -6138,7 +6137,7 @@ def rpdb2_import_wrapper(*args, **kwargs):
 def is_func_hidden( name ):
     '''Return whether we should hide this function and frame from display'''
     # in debug mode, we hide nothing
-    if g_fDebug: 
+    if rpdb.globals.g_fDebug: 
         return False
     # currently, only rpdb2 import wrapper is hidden
     return name in ['rpdb2_import_wrapper']
@@ -6146,9 +6145,9 @@ def is_func_hidden( name ):
 
 g_import = None
 
-if 0 and __name__ == 'rpdb2' and g_builtins_module.__import__ != rpdb2_import_wrapper:
-    g_import = g_builtins_module.__import__
-    g_builtins_module.__import__ = rpdb2_import_wrapper
+if __name__ == 'rpdb2' and rpdb.globals.g_builtins_module.__import__ != rpdb2_import_wrapper:
+    g_import = rpdb.globals.g_builtins_module.__import__
+    rpdb.globals.g_builtins_module.__import__ = rpdb2_import_wrapper
 
 
 
@@ -6728,7 +6727,7 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
     _rpdb2_pwd = as_unicode(_rpdb2_pwd)
 
     try:
-        g_server_lock.acquire()
+        rpdb.globals.g_server_lock.acquire()
 
         if g_debugger is not None and timeout == 0:
             f = sys._getframe(depth)
@@ -6786,7 +6785,7 @@ def __start_embedded_debugger(_rpdb2_pwd, fAllowUnencrypted, fAllowRemote, timeo
         g_debugger.settrace(f, timeout = timeout)
 
     finally:
-        g_server_lock.release()
+        rpdb.globals.g_server_lock.release()
 
 
 
@@ -6798,12 +6797,12 @@ def StartServer(args, fchdir, _rpdb2_pwd, fAllowUnencrypted, fAllowRemote, rid):
 
     try:
         ExpandedFilename = FindFile(args[0])
-        _path = g_found_unicode_files.get(ExpandedFilename, ExpandedFilename)
+        _path = rpdb.globals.g_found_unicode_files.get(ExpandedFilename, ExpandedFilename)
 
         if fchdir:
             os.chdir(os.path.dirname(_path))
 
-        if ExpandedFilename in g_found_unicode_files:
+        if ExpandedFilename in rpdb.globals.g_found_unicode_files:
             prefix = os.path.join(getcwdu(), '')
             _path = _path.replace(winlower(prefix), '')
 
