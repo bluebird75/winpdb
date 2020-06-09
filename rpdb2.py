@@ -865,15 +865,7 @@ class _RPDB2_FindRepr:
 # before all other types.
 #
 def sort(s):
-    if sys.version_info[:2] == (2, 3):
-        #
-        # On Python 2.3 the key parameter is not supported.
-        #
-        s.sort(sort_cmp)
-        return
-
     s.sort(key = sort_key)
-
 
 
 def sort_key(e):
@@ -884,15 +876,6 @@ def sort_key(e):
         return (0, e)
 
     return (1, repr_ltd(e, 256, encoding =ENCODING_RAW_I))
-
-
-
-def sort_cmp(x, y):
-    skx = sort_key(x)
-    sky = sort_key(y)
-
-    return cmp(skx, sky)
-
 
 
 def recalc_sys_path(old_pythonpath):
@@ -3802,6 +3785,7 @@ class CDebuggerEngine(CDebuggerCore):
                 break
 
         _rl = [r for r in rl if r != 'error']
+        print_debug(_rl)
 
         return _rl
 
