@@ -694,3 +694,37 @@ def mygetfile(path, fread_file = True):
 
     except:
         raise IOError
+
+
+def FindModuleDir(module_name):
+    if module_name == '':
+        raise IOError
+
+    dot_index = module_name.rfind('.')
+    if dot_index != -1:
+        parent = module_name[: dot_index]
+        child = module_name[dot_index + 1:]
+    else:
+        parent = ''
+        child = module_name
+
+    m = sys.modules[module_name]
+
+    if not hasattr(m, '__file__') or m.__file__ == None:
+        parent_dir = FindModuleDir(parent)
+        module_dir = my_os_path_join(parent_dir, winlower(child))
+        return module_dir
+
+    if not os.path.isabs(m.__file__):
+        parent_dir = FindModuleDir(parent)
+        module_dir = my_os_path_join(parent_dir, winlower(child))
+        return module_dir
+
+    (root, ext) = os.path.splitext(m.__file__)
+    if root.endswith('__init__'):
+        root = os.path.dirname(root)
+
+    abspath = my_abspath(root)
+    lowered = winlower(abspath)
+
+    return lowered
