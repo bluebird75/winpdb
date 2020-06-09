@@ -109,6 +109,7 @@ class Rpdb2Stdout(StringIO):
         self.lineCount = 0
 
     def write(self,t):
+        nb_written = super().write(t)
         if len(t) == 0 or (len(t) == 1 and t == "\n"):
             return
 
@@ -122,10 +123,11 @@ class Rpdb2Stdout(StringIO):
 
             for retomatch, attr, assignment in self.matcher:
                 if retomatch.match( l ) and getattr(self, attr) != assignment:
-                    dbg('Auto-setting %s to %s' % (attr, assignment) )
+                    # dbg('Auto-setting %s to %s' % (attr, assignment) )
                     setattr( self, attr, assignment )
 
             self.lineCount += 1
+        return nb_written
 
 
 def findBpHint( fname ):
@@ -275,15 +277,18 @@ class BaseTestRpdb2( unittest.TestCase ):
         self.console.start()
         time.sleep(1.0)
 
-    def command( self, cmd, syncLines, timeout=3):
+    def command( self, cmd, syncLines=0, timeout=3):
         '''Send the command cmd to the debuggee and wait until syncLines lines have been outputted
         by the debuggee or until the timeout expires'''
+        value_before = self.rpdb2Stdout.getvalue()
         endLineCount = self.rpdb2Stdout.lineCount + syncLines
         endTime = time.time() + timeout
         self.fakeStdin.appendCmd( "%s\n" % cmd )
-        while ( (syncLines == 0 or self.rpdb2Stdout.lineCount < endLineCount)
+        while ( (syncLines != 0 and self.rpdb2Stdout.lineCount < endLineCount)
                 and time.time() < endTime):
             time.sleep(0.2)
+        value_delta = self.rpdb2Stdout.getvalue()[len(value_before):]
+        return value_delta
 
     def attach( self ):
         self.command("attach %s\n" % DEBUGME, 4, 20 )
@@ -313,4 +318,7 @@ class BaseTestRpdb2( unittest.TestCase ):
 
     def breakp( self, arg ):
         self.fakeStdin.appendCmd( "bp %s" % arg)
+
+    def stack( self, sync_lines=3 ):
+        return self.command( "stack", sync_lines )
 

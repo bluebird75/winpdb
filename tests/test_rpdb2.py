@@ -5,10 +5,10 @@ import unittest
 import os
 
 # RPDB2
-from tests.utils_func_tests import BaseTestRpdb2, Rpdb2Stdout
+from tests.utils_func_tests import BaseTestRpdb2, Rpdb2Stdout, dbg
 
 
-class TestRpb2( BaseTestRpdb2 ):
+class TestRpdb2( BaseTestRpdb2 ):
 
     def testGo( self ):
         self.startPdb2()
@@ -34,6 +34,33 @@ class TestRpb2( BaseTestRpdb2 ):
         self.goAndExit() # run until the end
         assert os.path.exists('tests/done')
         assert os.path.exists('tests/atexit')
+
+    def testStack( self ):
+        self.startPdb2()
+        self.attach()
+        self.breakp( 'f4' )
+        self.goAndWaitOnBp() # break during definition of f4
+        self.goAndWaitOnBp() # break during call of f4
+
+        stack_list = self.stack()
+        self.assertIn( 'debugme.py', stack_list)
+        self.assertIn( ' f4', stack_list)
+        self.assertIn( ' f1', stack_list)
+        self.assertIn( ' >     0', stack_list)
+
+        self.command('down')
+        stack_list = self.stack()
+        self.assertIn( ' >     1', stack_list)
+
+        self.command('up')
+        stack_list = self.stack()
+        self.assertIn( ' >     0', stack_list)
+
+
+
+
+# Disable this long and tedious test
+class XXXTestBreakOnExit(BaseTestRpdb2):
 
     def testChangingBreakonexit( self ):
         self.startPdb2()
