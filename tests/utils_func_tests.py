@@ -226,40 +226,18 @@ class BaseTestRpdb2( unittest.TestCase ):
         time.sleep(1.0)
         if self.script.poll() != None: return
 
-        if not IS_PYTHON_LESS_THAN_26:
-            dbg( 'Teardown.Script: terminate()')
-            self.script.terminate()
-            if self.script.poll() != None: return
-            time.sleep(1.0)
-            if self.script.poll() != None: return
+        # python more than 2.6
+        dbg( 'Teardown.Script: terminate()')
+        self.script.terminate()
+        if self.script.poll() != None: return
+        time.sleep(1.0)
+        if self.script.poll() != None: return
 
-            dbg( 'Teardown.Script: kill()')
-            self.script.kill()
-            if self.script.poll() != None: return
-            time.sleep(1.0)
-            if self.script.poll() != None: return
-        elif sys.platform == 'win32':
-            # windows, Python < 2.6
-            dbg( 'Teardown.Script: pskill')
-            self.failIfCanNotKillTheProcess()
-            subprocess.call( ['pskill', '%s' % self.script.pid] )
-            if self.script.poll() != None: return
-            time.sleep(1.0)
-            if self.script.poll() != None: return
-
-        else:
-            # unix, Python < 2.6
-            dbg( 'Teardown.Script: SIGTERM')
-            os.kill( self.script.pid, signal.SIGTERM )
-            if self.script.poll() != None: return
-            time.sleep(1.0)
-            if self.script.poll() != None: return
-
-            dbg( 'Teardown.Script: SIGKILL')
-            os.kill( self.script.pid, signal.SIGKILL )
-            if self.script.poll() != None: return
-            time.sleep(1.0)
-            if self.script.poll() != None: return
+        dbg( 'Teardown.Script: kill()')
+        self.script.kill()
+        if self.script.poll() != None: return
+        time.sleep(1.0)
+        if self.script.poll() != None: return
 
         raise OSError( 'Error, can not terminate or kill a python process. Process is still running  with pid: %d' % self.script.pid )
 
@@ -335,8 +313,4 @@ class BaseTestRpdb2( unittest.TestCase ):
 
     def breakp( self, arg ):
         self.fakeStdin.appendCmd( "bp %s" % arg)
-
-    def failIfCanNotKillTheProcess( self ):
-        if sys.platform == 'win32' and IS_PYTHON_LESS_THAN_26 and not HAS_PSKILL:
-            self.fail("On Python 2.4 and 2.5 on Windows this work only if you have pstools installed: http://technet.microsoft.com/fr-fr/sysinternals/bb896649.aspx" )
 
