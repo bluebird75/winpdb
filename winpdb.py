@@ -1046,14 +1046,14 @@ class CToolBar:
     def __gtk_enable_tool(self, id):
         p = self.m_toolbar.ScreenToClient(wx.GetMousePosition())
         (x, y) = self.m_toolbar.GetSize()
-        r = wx.RectS((x, y))
+        r = wx.Rect((x, y))
 
-        if r.Inside(p):
+        if r.Contains(p):
             self.m_toolbar.WarpPointer(p.x, p.y + 2 * y)
 
         self.m_toolbar.EnableTool(id, True)
 
-        if r.Inside(p):
+        if r.Contains(p):
             self.m_toolbar.WarpPointer(p.x, p.y)
 
 
