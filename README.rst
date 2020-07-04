@@ -6,8 +6,6 @@
 
 *Please help by providing bug reports and ideally bug fixes. All pull requests are welcome.*
 
-Winpdb for Python 2 is maintained under the branch *winpdb-reborn-python2*
-
 --------------------
 
 |Build Status Linux| |Build status Windows|
