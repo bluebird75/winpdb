@@ -3,7 +3,7 @@
 
     Setup script for winpdb
 
-    Copyright (C) 2013-2018 Philippe Fremy
+    Copyright (C) 2013-2020 Philippe Fremy
     Copyright (C) 2005-2009 Nir Aides
 
     This program is free software; you can redistribute it and/or modify it 
@@ -21,7 +21,9 @@
     59 Temple Place, Suite 330, Boston, MA 02111-1307 USA    
 """
 
-
+# The goal of this setup is to pull the latest version of winpdb-reborn when installing winpdb
+# winpdb itself is no longer maintained and the repository is gone for a long time. This setup
+# exists only for backward compatibility
 
 from setuptools import setup
 
@@ -30,14 +32,13 @@ import os, re
 # strip out build status
 LONG_DESC = ''.join( open('README.rst').readlines()[1:-8] )
 
-WINPDB_VERSION = re.search( r'WINPDB_VERSION\s*=\s*"(.*)"', open('winpdb.py').read() ).group(1).replace('-alpha', 'a')
+WINPDB_VERSION = '1.4.9'
 print( 'Packaging winpdb version: "%s"' % WINPDB_VERSION )
 
 setup(
-    name = 'winpdb-reborn',
+    name = 'winpdb',
     version = WINPDB_VERSION,
-    description = 'A platform independent GPL Python debugger.',
-    long_description = LONG_DESC,
+    description = 'A backward compatibility package to the official winpdb-reborn, a platform independent GPL Python debugger.',
     author = 'Philippe Fremy, Nir Aides',
     author_email = 'phil.fremy@free.fr',
     url = 'https://github.com/bluebird75/winpdb',
@@ -83,20 +84,19 @@ setup(
 
     project_urls={
         'Source': 'https://github.com/bluebird75/winpdb/',
-        'Documentation': "http://www.winpdb.org/?page_id=5",
         'Tracker': 'https://github.com/bluebird75/winpdb/issues',
     },
 
-    python_requires='>=3.4',
-    install_requires='wxpython>=4',
-    py_modules = ['winpdb', 'rpdb2'],
+    python_requires='>=3.5',
+    install_requires=[ 
+        'wxpython>=4',
+        'winpdb-reborn>=2.0',
+    ],
+    py_modules = ['winpdb_legacy'],
 
     entry_points={
         'console_scripts': [
-            'rpdb2=rpdb2:run_rpdb2',
-        ],
-        'gui_scripts': [
-            'winpdb=winpdb:run_winpdb',
+            'winpdb_legacy=winpdb_legacy:main',
         ],
     },
 
