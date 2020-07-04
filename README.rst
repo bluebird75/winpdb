@@ -2,9 +2,9 @@
 
 **Note from Philippe Fremy**
 
-*I started porting winpdb-reborn to Python 3 / Phoenix . This is still in progress. So: WINPDB ON PYTHON 3 IS BUGGY AND NOT WORKING.*
+*Port of winpdb-reborn to Python 3 / WxPython 4 is work-in-progress. There are still some rough edges.*
 
-*If you like winpdb and want it on python 3 please contribute a bit of your time to fix one or two bugs. With the help of everybody, we can make it work ! It is on the master branch of this repo*
+*Please help by providing bug reports and ideally bug fixes. All pull requests are welcome.*
 
 Winpdb for Python 2 is maintained under the branch *winpdb-reborn-python2*
 
@@ -19,15 +19,11 @@ by Philippe Fremy as maintainer, and Nir Aides as initial author
 
 Website: https://github.com/bluebird75/winpdb 
 
-**This version of Winpdb is for Python 3 only. It is under development. Use it at your own risk !**
-
-A stable version of Winpdb for Python 2 is available on PyPi: https://pypi.org/project/winpdb-reborn/1.5.0/ and in the branch *winpdb-reborn-python2*
-
 Description
 ===========
 
 *Winpdb Reborn* is a portable (Windows / Linux / macOS) standalone graphical debugger for Python. It focuses on making debugging
-easy and does not include any IDE features. It works on both Python 2 and 3 and has very little dependencies (only wxPython for the GUI).
+easy and does not include any IDE features. It has very little dependencies (only wxPython for the GUI).
 
 **Features**:
 
@@ -40,7 +36,7 @@ easy and does not include any IDE features. It works on both Python 2 and 3 and 
 - debug PyPy scripts
 
 **Note:** The original Winpdb was no longer maintained since the v1.4.8 release in
-2010. I (Philippe Fremy) am providing a maintained version with new
+2010. With the agreement of the author (Nir Aides), I (Philippe Fremy) am providing a maintained version with new
 functionality under the *Winpdb Reborn* name.
 
 Requirements
@@ -54,8 +50,9 @@ Platform supported:
 
 To run Winpdb Reborn:
 
-- CPython 2.6 or 2.7 and wxPython 3
-- or CPython 3.4 or above and wxPython 4
+- CPython 3.5 or above and wxPython 4
+
+This version is for Python 3 only. A stable version of Winpdb for Python 2 is available on PyPi: https://pypi.org/project/winpdb-reborn/1.5.0/ and in the branch *winpdb-reborn-python2* . You will need Python 2.7 and WxPython 3 to run it.
 
 Note that running Winpdb with PyPy is possible, by launching rpdb2.py with ``pypy`` and using the Winpdb GUI to connect to it.
 
