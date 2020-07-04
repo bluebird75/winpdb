@@ -25,20 +25,23 @@
 # winpdb itself is no longer maintained and the repository is gone for a long time. This setup
 # exists only for backward compatibility
 
+DESC = 'A backward compatibility package to the official winpdb-reborn, a platform independent GPL Python debugger.'
+LONG_DESC = DESC + '\n\n' + '''The debugger `winpdb` is now developed under the package name (winpdb-reborn)[https://pypi.org/project/winpdb-reborn/]
+
+This package exists just for backward compatibility reasons.
+'''
+
 from setuptools import setup
 
-import os, re
-
-# strip out build status
-LONG_DESC = ''.join( open('README.rst').readlines()[1:-8] )
-
-WINPDB_VERSION = '1.4.9'
+WINPDB_VERSION = '1.4.9' + '.1'
 print( 'Packaging winpdb version: "%s"' % WINPDB_VERSION )
 
 setup(
     name = 'winpdb',
     version = WINPDB_VERSION,
-    description = 'A backward compatibility package to the official winpdb-reborn, a platform independent GPL Python debugger.',
+    description = DESC,
+    long_description = LONG_DESC,
+    long_description_content_type = 'text/markdown',
     author = 'Philippe Fremy, Nir Aides',
     author_email = 'phil.fremy@free.fr',
     url = 'https://github.com/bluebird75/winpdb',
