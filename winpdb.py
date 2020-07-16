@@ -2357,11 +2357,11 @@ class CStyledViewer(stc.StyledTextCtrl):
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeyPressed)
         self.Bind(wx.EVT_KEY_UP, self.OnKeyReleased)
 
-        if wx.Platform == '__WXMSW__':
-            self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:Courier New,size:9')
-        else:
-            self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:Courier')
-
+        # Get the fixed font face name:
+        font = self.GetFont()
+        family = wx.FONTFAMILY_MODERN
+        fixed_font = wx.Font(font.GetPointSize(), family, font.GetStyle(), font.GetWeight(), font.GetUnderlined())
+        self.StyleSetSpec(stc.STC_STYLE_DEFAULT, 'fore:#000000,back:#FFFFFF,face:%s' % fixed_font.GetFaceName())
         self.StyleClearAll()
         self.SetTabWidth(rpdb.const.PYTHON_TAB_WIDTH)
 
@@ -3000,16 +3000,11 @@ class CConsole(wx.Panel, CCaptionManager):
     def set_font(self, ctrl):
         font = ctrl.GetFont()
 
-        if wx.Platform == '__WXMSW__':
-            face = "Courier New"
-            point_size = 9
-        else:
-            face = "Courier"
-            point_size = font.GetPointSize()
-
-        new_font = wx.Font(point_size, font.GetFamily(), font.GetStyle(), font.GetWeight(), font.GetUnderlined(), face)
+        # Request a fixed pitch font
+        family = wx.FONTFAMILY_MODERN
+        new_font = wx.Font(font.GetPointSize(), family, font.GetStyle(), font.GetWeight(), font.GetUnderlined())
+        rpdb.utils.print_debug('Using font "%s" for Console' % new_font.GetFaceName())
         ctrl.SetFont(new_font)
-
 
     def start(self):
         self.m_console.start()
