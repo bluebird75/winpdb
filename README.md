@@ -8,7 +8,9 @@
 
 --------------------
 
-|Build Status Linux| |Build status Windows|
+[![Build Status Windows](https://ci.appveyor.com/api/projects/status/l3a98gaeamkgwrl7?svg=true&passingText=Windows%20Build%20passing&failingText=Windows%20Build%20failed)](https://ci.appveyor.com/project/bluebird75/luaunit)
+
+[![Build Status Linux](https://travis-ci.org/bluebird75/winpdb.svg?branch=winpdb)](https://travis-ci.org/bluebird75/winpdb)
 
 *Winpdb Reborn - A GPL Python Debugger, reborn from the unmaintained
 Winpdb*
@@ -17,8 +19,7 @@ by Philippe Fremy as maintainer, and Nir Aides as initial author
 
 Website: https://github.com/bluebird75/winpdb 
 
-Description
-===========
+# Description
 
 *Winpdb Reborn* is a portable (Windows / Linux / macOS) standalone graphical debugger for Python. It focuses on making debugging
 easy and does not include any IDE features. It has very little dependencies (only wxPython for the GUI).
@@ -37,8 +38,7 @@ easy and does not include any IDE features. It has very little dependencies (onl
 2010. With the agreement of the author (Nir Aides), I (Philippe Fremy) am providing a maintained version with new
 functionality under the *Winpdb Reborn* name.
 
-Requirements
-============
+# Requirements
 
 Platform supported:
 
@@ -56,17 +56,16 @@ Note that running Winpdb with PyPy is possible, by launching rpdb2.py with ``pyp
 
 Winpdb Reborn is NOT compatible with Jython or IronPython.
 
-Release history
-===============
+# Release history
 
-Version 2.0.0
--------------
+## Version 2.0.0
+
 - port Winpdb to wxPython 4 / Python 3
 - the effort is still in progress
 
 
-Version 1.5.0
--------------
+## Version 1.5.0
+
 
 -  First official release by Philippe Fremy
 -  Add support for Python 3 GUI (using wxPython Phoenix)
@@ -85,12 +84,11 @@ Version 1.5.0
 -  fix for launching Gnome Terminal properly
 
 
-Version 1.4.8
--------------
+## Version 1.4.8
+
 Last stable version released by Nir Aides.
 
-Installation
-============
+# Installation
 
 (not working yet until the new version is released).
 
@@ -106,23 +104,20 @@ You must also install the wxPython for your version of Python:
 *Winpdb Reborn* is not packaged yet by any Linux distro. If your package manager proposes
 to install Winpdb, that’s the old unmaintained Winpdb which works neither with Python 2.7 nor with Python 3.
 
-Additional installation methods
--------------------------------
+## Additional installation methods
 
 To install from a checkout or from an archive::
 
     # python setup.py install -f
 
-No install mode
----------------
+## No install mode
 
 If you don’t want to install Winpdb Reborn, you can still try it by calling it explicitly with
 your program to debug::
 
     $ python /the/path/to/winpdb.py my_program.py 
 
-Where do the files go ?
------------------------
+## Where do the files go ?
 
 The setup script copies rpdb2.py and winpdb.py modules to the Python
 site-packages folder. The scripts rpdb2 and winpdb are copied to the
@@ -131,8 +126,7 @@ and is in the path by default. On Windows, this folder is ``%PYTHONHOME%\Scripts
 where you should see a winpdb.exe and rpdb2.exe .
 
 
-Usage
-=====
+# Usage
 
 If you have installed Winpdb Reborn, the simplest way to launch it is::
 
@@ -144,8 +138,7 @@ or even::
 
 Find out about the other command-line options with ``–-help`` .
 
-Documentation
-=============
+# Documentation
 
 Use the ``-h`` or ``--help``  command-line flag for command-line help.
 
@@ -158,18 +151,10 @@ An introduction to Winpdb usage, by Pr Norm Matloff: http://heather.cs.ucdavis.e
 
 A detailed Winpdb tutorial is also available at: https://code.google.com/archive/p/winpdb/wikis/DebuggingTutorial.wiki
 
-Community
-=========
+# Community
 
 You can ask questions about Winpdb Reborn on the dedicated Google group:
 https://groups.google.com/forum/#!forum/winpdb
 
 Feel free to raise issues or propose improvements on the GitHub repository: https://github.com/bluebird75/winpdb/issues
 
-|stats|
-
-.. |Build Status Linux| image:: https://travis-ci.org/bluebird75/winpdb.svg?branch=winpdb
-   :target: https://travis-ci.org/bluebird75/winpdb
-.. |Build Status Windows| image:: https://ci.appveyor.com/api/projects/status/l3a98gaeamkgwrl7?svg=true&passingText=Windows%20Build%20passing&failingText=Windows%20Build%20failed
-   :target: https://ci.appveyor.com/project/bluebird75/winpdb
-.. |stats| image:: https://stats.sylphide-consulting.com/piwik/piwik.php?idsite=38&rec=1
