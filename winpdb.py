@@ -4715,7 +4715,7 @@ class CLaunchDialog(wx.Dialog):
 
         btn = wx.Button(self, label = BUTTON_LAUNCH_BROWSE)
         self.Bind(wx.EVT_BUTTON, self.do_browse_interpreter, btn)
-        sizerh.Add(btn, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+        sizerh.Add(btn, 0, wx.ALL, 5)
 
         # Env remark
         label = wx.StaticText(self, -1, STATIC_LAUNCH_ENV, size = (400, -1))
