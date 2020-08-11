@@ -32,8 +32,8 @@ import rpdb.source_provider
 import rpdb.exceptions
 import rpdb.session_manager
 
-VERSION = (2, 0, 0, 5, 'Tychod')
-WINPDB_VERSION = "2.0.0.dev5"
+VERSION = (2, 0, 0, 0, 'Tychod')
+WINPDB_VERSION = "2.0.0.0"
 WINPDB_TITLE = "Winpdb Reborn %s" % WINPDB_VERSION
 RPDB2_EXPECTED_VERSION = 'RPDB_1_5_0'
 
