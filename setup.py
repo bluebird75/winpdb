@@ -28,7 +28,7 @@ from setuptools import setup
 import os, re
 
 # strip out build status
-LONG_DESC = ''.join( open('README.rst').readlines()[1:-8] )
+LONG_DESC = ''.join( open('README.md').readlines()[1:] )
 
 WINPDB_VERSION = re.search( r'WINPDB_VERSION\s*=\s*"(.*)"', open('winpdb.py').read() ).group(1).replace('-alpha', 'a')
 print( 'Packaging winpdb version: "%s"' % WINPDB_VERSION )
@@ -38,6 +38,7 @@ setup(
     version = WINPDB_VERSION,
     description = 'A platform independent GPL Python debugger.',
     long_description = LONG_DESC,
+    long_description_content_type="text/markdown",
     author = 'Philippe Fremy, Nir Aides',
     author_email = 'phil.fremy@free.fr',
     url = 'https://github.com/bluebird75/winpdb',
