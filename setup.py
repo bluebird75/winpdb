@@ -33,7 +33,7 @@ This package exists just for backward compatibility reasons.
 
 from setuptools import setup
 
-WINPDB_VERSION = '1.4.9'
+WINPDB_VERSION = '1.4.9.1'
 print( 'Packaging winpdb version: "%s"' % WINPDB_VERSION )
 
 setup(
@@ -93,7 +93,7 @@ setup(
     python_requires='>=3.5',
     install_requires=[ 
         'wxpython>=4',
-        'winpdb-reborn>=2.0.0.dev5  ',
+        'winpdb-reborn>=2.0.0.0  ',
     ],
     py_modules = ['winpdb_legacy'],
 
