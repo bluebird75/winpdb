@@ -143,7 +143,7 @@ Use the ``-h`` or ``--help``  command-line flag for command-line help.
 Inside Winpdb/Rpdb2 console, use the ``help`` command for detailed description of
 debugger commands.
 
-Online documentation is available at: http://www.winpdb.org/docs
+Online documentation is available at: https://web.archive.org/web/20180724122042/http://www.winpdb.org/docs
 
 An introduction to Winpdb usage, by Pr Norm Matloff: http://heather.cs.ucdavis.edu/%7Ematloff/winpdb.html
 
