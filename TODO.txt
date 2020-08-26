@@ -1,0 +1,59 @@
+
+TODO:
+- remove type str8
+- remove type unicode
+
+Release Process:
+----------------
+- sync git repo to have the latest version
+
+- make sure debug option is switched off by default
+	see rpd/globals.py g_fDebug default value
+
+- edit the version number in winpdb.py
+	VERSION 
+	WINPDB_VERSION
+
+- run the version to make sure everything is going fine
+
+- update the README.rst with the version description
+
+- run:
+	python setup.py sdist bdist_wheel
+
+	This creates the wheel in directory dist/
+
+- verify the description rendering with:
+	twine check dist/*
+
+- Upload the project to test.pypi.org:
+
+	twine upload --repository testpypi dist/*
+
+- Check the rendering on test.pypi.org: https://test.pypi.org/project/winpdb-reborn/
+
+- Upload the final version to pypi:
+
+	twine upload dist/*
+
+- tag and push to github
+
+
+- upgrade the dependency for winpdb-legacy:
+	- goto winpdb-legacy
+	- Edit the lines:
+	    install_requires=[ 
+	        'wxpython>=4',
+	        'winpdb-reborn>=2.0.0.0  ',
+	    ],
+	- list the exact version of winpdb-reborn just released
+	- upgrade the 4th digit of the winpdb version:
+		WINPDB_VERSION = '1.4.9' -> WINPDB_VERSION = '1.4.9.1'
+	- commit
+	- package  it:
+		python setup.py sdist bdist_wheel
+	- Upload the final version to pypi:
+		twine upload dist/*
+	- git push
+
+	
