@@ -43,6 +43,30 @@ setup(
     author_email = 'phil.fremy@free.fr',
     url = 'https://github.com/bluebird75/winpdb',
     license = 'GNU GPL',
+
+    project_urls={
+        'Source': 'https://github.com/bluebird75/winpdb/',
+        'Documentation': "http://www.winpdb.org/?page_id=5",
+        'Tracker': 'https://github.com/bluebird75/winpdb/issues',
+    },
+
+    python_requires='>=3.4',
+    install_requires='wxpython>=4',
+    packages = ['rpdb'],
+    py_modules = ['rpdb2', 'winpdb'],
+
+    entry_points={
+        'console_scripts': [
+            'rpdb2=rpdb2:run_rpdb2',
+        ],
+        'gui_scripts': [
+            'winpdb=winpdb:run_winpdb',
+        ],
+    },
+
+
+
+
     keywords = 'debugger',
     classifiers=[
         # How mature is this project? Common values are
@@ -81,25 +105,6 @@ setup(
         'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
     ],
-
-    project_urls={
-        'Source': 'https://github.com/bluebird75/winpdb/',
-        'Documentation': "http://www.winpdb.org/?page_id=5",
-        'Tracker': 'https://github.com/bluebird75/winpdb/issues',
-    },
-
-    python_requires='>=3.4',
-    install_requires='wxpython>=4',
-    py_modules = ['winpdb', 'rpdb2'],
-
-    entry_points={
-        'console_scripts': [
-            'rpdb2=rpdb2:run_rpdb2',
-        ],
-        'gui_scripts': [
-            'winpdb=winpdb:run_winpdb',
-        ],
-    },
 
 )
 
