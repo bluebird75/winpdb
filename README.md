@@ -56,6 +56,10 @@ Winpdb Reborn is NOT compatible with Jython or IronPython.
 
 # Release history
 
+## Version 2.0.0.1
+
+- fix packaging mistake which prevented winpdb to run
+
 ## Version 2.0.0
 
 - port Winpdb to wxPython 4 / Python 3
