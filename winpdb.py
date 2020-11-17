@@ -4178,7 +4178,7 @@ class CAttachDialog(wx.Dialog, CJobs):
             return
 
         pwd_dialog = CPwdDialog(self, pwd)
-        pos = self.GetPositionTuple()
+        pos = self.GetPosition()
         pwd_dialog.SetPosition((pos[0] + 50, pos[1] + 50))
         r = pwd_dialog.ShowModal()
         if r != wx.ID_OK:
