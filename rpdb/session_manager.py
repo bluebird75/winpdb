@@ -1246,7 +1246,7 @@ class CSessionManagerInternal:
 
         # for .pyc files, strip the c
         fpath, ext = os.path.splitext(__file__)
-        debugger = os.path.join( os.path.basename(fpath), '..', 'rpdb2') + ext
+        debugger = os.path.join( os.path.dirname(fpath), '..', 'rpdb2') + ext
         if debugger[-1:] == 'c':
             debugger = debugger[:-1]
 
