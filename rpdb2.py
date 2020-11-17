@@ -365,16 +365,6 @@ def is_py3k():
 # According to PEP-8: "Use 4 spaces per indentation level."
 #
 
-RPDBTERM = 'RPDBTERM'
-COLORTERM = 'COLORTERM'
-TERM = 'TERM'
-KDE_PREFIX = 'KDE'
-GNOME_PREFIX = 'GNOME'
-
-KDE_DEFAULT_TERM_QUERY = "kreadconfig --file kdeglobals --group General --key TerminalApplication --default konsole"
-XTERM = 'xterm'
-RXVT = 'rxvt'
-
 FORK_CHILD = 'child'
 FORK_PARENT = 'parent'
 FORK_MANUAL = 'manual'

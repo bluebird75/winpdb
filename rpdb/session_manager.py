@@ -29,6 +29,15 @@ from rpdb.rpc import CPwdServerProxy, CTimeoutTransport, CLocalTransport
 
 g_fFirewallTest = True
 
+RPDBTERM = 'RPDBTERM'
+COLORTERM = 'COLORTERM'
+TERM = 'TERM'
+KDE_PREFIX = 'KDE'
+GNOME_PREFIX = 'GNOME'
+
+KDE_DEFAULT_TERM_QUERY = "kreadconfig --file kdeglobals --group General --key TerminalApplication --default konsole"
+XTERM = 'xterm'
+RXVT = 'rxvt'
 GNOME_DEFAULT_TERM = 'gnome-terminal'
 GNOME_DEFAULT_TERM_BEFORE_3_8 = 'gnome-terminal --disable-factory'
 GNOME_DEFAULT_TERM_BEFORE_3_8_CHECK_FILE = "/../share/gnome-terminal/profile-manager.ui" #this glade-related file present for only gnome terminal versions 2.24-3.6
