@@ -79,11 +79,6 @@ if sys.version_info[:2] < (3,2):
     print(STR_BAD_PYTHON_VERSION)
     sys.exit(-1)
 
-try:
-    from Crypto.Cipher import DES
-except ImportError:
-    pass
-
 import xmlrpc.client as xmlrpclib
 import _thread as thread
 import numbers
@@ -601,26 +596,6 @@ def IsPythonSourceFile(path):
     # in the past, we would try to parse the file successfully but
     # this is too complicated in Python 3
 
-
-def IsFileInPath(filename):
-    if filename == '':
-        return False
-
-    try:
-        FindFile(filename)
-        return True
-
-    except IOError:
-        return False
-
-
-
-def IsPrefixInEnviron(_str):
-    for e in os.environ.keys():
-        if e.startswith(_str):
-            return True
-
-    return False
 
 
 

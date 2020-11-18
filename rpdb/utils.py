@@ -286,8 +286,8 @@ def safe_wait(lock, timeout = None):
     #
 
     while True:
+        t0 = time.time()
         try:
-            t0 = time.time()
             return lock.wait(timeout)
 
         except:

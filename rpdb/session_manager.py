@@ -8,19 +8,17 @@ import random
 import tempfile
 import threading
 import time
-import sys
+import stat
 
 from rpdb.breakpoint import CBreakPointsManagerProxy
 from rpdb.const import *
-from rpdb.const import POSIX, RPDB_BPL_FOLDER, BREAKPOINTS_FILE_EXT, RPDB_BPL_FOLDER_NT, LOCALHOST, LOOPBACK
 from rpdb.compat import base64_encodestring, _md5
 from rpdb.events import *
 from rpdb.exceptions import *
-from rpdb.exceptions import CException, CConnectionException, NotAttached
 from rpdb.globals import g_fDefaultStd, g_fScreen, g_fDebug, g_found_unicode_files
 from rpdb.utils import as_unicode, _print, print_debug, is_unicode, as_bytes, ENCODING_AUTO, detect_locale, as_string, \
     get_python_executable, print_debug_exception, print_exception, generate_rid, split_command_line_path_filename_args, \
-    my_os_path_join, FindFile, g_safe_base64_to, getcwdu, calcURL, generate_random_char
+    my_os_path_join, FindFile, g_safe_base64_to, getcwdu, calcURL, generate_random_char, myisfile
 from rpdb.state_manager import CStateManager
 from rpdb.firewall_test import CFirewallTest
 from rpdb.crypto import CCrypto
@@ -154,12 +152,12 @@ class CSessionManager:
         return self.__smi.set_printer(printer)
 
 
-    def report_exception(self, type, value, tb):
+    def report_exception(self, etype, value, tb):
         """
         Sends exception information to the printer.
         """
 
-        return self.__smi.report_exception(type, value, tb)
+        return self.__smi.report_exception(etype, value, tb)
 
 
     def register_callback(self, callback, event_type_dict, fSingleUse):
@@ -920,11 +918,11 @@ class CSimpleSessionManager:
     # Private Methods
     #
 
-    def __unhandled_exception(self, event):
+    def __unhandled_exception(self, _event):
         self.unhandled_exception_callback()
 
 
-    def __termination_callback(self, event):
+    def __termination_callback(self, _event):
         self.script_terminated_callback()
 
 
@@ -961,7 +959,7 @@ class CSimpleSessionManager:
 
         e = s[-1]
 
-        function_name = e[2]
+        _function_name = e[2]
         filename = os.path.basename(e[0])
 
         if filename != DEBUGGER_FILENAME:
@@ -1099,10 +1097,9 @@ class CSessionManagerInternal:
             time.sleep(STARTUP_TIMEOUT / 2)
 
             for i in range(STARTUP_RETRIES):
+                print_debug('Scanning for debuggee...')
+                t0 = time.time()
                 try:
-                    print_debug('Scanning for debuggee...')
-
-                    t0 = time.time()
                     return self.m_server_list_object.calcList(self.m_rpdb2_pwd, self.m_rid, rid)
 
                 except UnknownServer:
@@ -1226,7 +1223,7 @@ class CSessionManagerInternal:
             try:
                 import terminalcommand
                 name = MAC
-            except:
+            except ImportError:
                 name = os.name
 
         if name == 'nt' and g_fDebug:
@@ -1523,7 +1520,7 @@ class CSessionManagerInternal:
         self.m_printer(STR_SIGNAL_EXCEPTION % (event.m_description, event.m_signame, event.m_signum))
 
 
-    def on_event_embedded_sync(self, event):
+    def on_event_embedded_sync(self, _event):
         #
         # time.sleep() allows pending break requests to go through...
         #
@@ -1531,7 +1528,7 @@ class CSessionManagerInternal:
         self.getSession().getProxy().embedded_sync()
 
 
-    def on_event_exit(self, event):
+    def on_event_exit(self, _event):
         self.m_printer(STR_DEBUGGEE_TERMINATED)
         threading.Thread(target = self.detach_job).start()
 
@@ -2402,7 +2399,7 @@ def CalcTerminalCommand():
             return term
 
     if IsPrefixInEnviron(KDE_PREFIX):
-        (s, term) = commands.getstatusoutput(KDE_DEFAULT_TERM_QUERY)
+        (s, term) = subprocess.getstatusoutput(KDE_DEFAULT_TERM_QUERY)
         if (s == 0) and IsFileInPath(term):
             return term
 
@@ -2529,6 +2526,27 @@ def cleanup_bpl_folder(path):
             os.remove(os.path.join(path, f))
         except:
             pass
+
+
+def IsFileInPath(filename):
+    if filename == '':
+        return False
+
+    try:
+        FindFile(filename)
+        return True
+
+    except IOError:
+        return False
+
+
+def IsPrefixInEnviron(_str):
+    for e in os.environ.keys():
+        if e.startswith(_str):
+            return True
+
+    return False
+
 
 
 def ControlRate(t_last_call, max_rate):

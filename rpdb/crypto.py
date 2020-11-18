@@ -5,6 +5,11 @@ import threading
 import time
 import zlib
 
+try:
+    from Crypto.Cipher import DES
+except ImportError:
+    pass
+
 from rpdb.compat import _md5, base64_encodestring, base64_decodestring
 from rpdb.exceptions import EncryptionExpected, EncryptionNotSupported, DecryptionFailure, AuthenticationFailure, \
     AuthenticationBadData, AuthenticationBadIndex

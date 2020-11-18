@@ -193,7 +193,7 @@ class CIOServer:
 
         while True:
             try:
-                server = CXMLRPCServer((host, port), logRequests = 0)
+                server = CXMLRPCServer((host, port), logRequests = False)
                 return (port, server)
 
             except socket.error:

@@ -24,6 +24,7 @@ class CScopeBreakInfo:
         rvl = copy.copy(self.m_valid_lines)
         rvl.reverse()
 
+        l = ''
         for l in rvl:
             if lineno >= l:
                 break

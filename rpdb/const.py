@@ -22,8 +22,6 @@
 """
 
 
-import os
-
 COPYRIGHT_NOTICE = """Copyright (C) 2013-2017 Philippe Fremy, 2005-2009 Nir Aides"""
 CREDITS_NOTICE = """Work on version 1.4.8 was sponsored by Investortools, Inc."""
 LICENSE_NOTICE = """

@@ -305,10 +305,10 @@ class CEventBreakpoint(CEvent):
     REMOVE = as_unicode('remove')
     SET = as_unicode('set')
 
-    def __init__(self, bp, action = SET, id_list = [], fAll = False):
+    def __init__(self, bp, action = SET, id_list = None, fAll = False):
         self.m_bp = breakpoint_copy(bp)
         self.m_action = action
-        self.m_id_list = id_list
+        self.m_id_list = id_list or []
         self.m_fAll = fAll
 
 

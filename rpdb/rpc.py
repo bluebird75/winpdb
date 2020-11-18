@@ -196,7 +196,7 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
                 response = self._dispatch(method, params)
             # wrap response in a singleton tuple
             response = (response,)
-            response = xmlrpclib.dumps(response, methodresponse=1)
+            response = xmlrpclib.dumps(response, methodresponse=True)
         except xmlrpclib.Fault:
             fault = sys.exc_info()[1]
             response = xmlrpclib.dumps(fault)
@@ -279,11 +279,13 @@ class CPwdServerProxy:
 
             except AuthenticationBadIndex:
                 e = sys.exc_info()[1]
+                print_debug("Caught AuthenticationBadIndex: %s" % str(e))
                 self.m_crypto.set_index(e.m_max_index, e.m_anchor)
                 continue
 
             except xmlrpclib.Fault:
                 fault = sys.exc_info()[1]
+                print_debug("Caught xmlrpclib.Fault: %s" % fault.faultString)
                 if class_name(BadVersion) in fault.faultString:
                     s = fault.faultString.split("'")
                     version = ['', s[1]][len(s) > 0]

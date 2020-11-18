@@ -97,7 +97,7 @@ class CFirewallTest:
                 s.connect((LOOPBACK, CFirewallTest.m_port))
 
                 s.send(as_bytes('Hello, world'))
-                data = self.__recv(s, 1024)
+                _data = self.__recv(s, 1024)
                 self.m_result = True
 
             except socket.error:
@@ -140,9 +140,9 @@ class CFirewallTest:
 
         CFirewallTest.m_port = port
 
+        conn = None
         try:
             try:
-                conn = None
                 s.listen(1)
                 conn, addr = s.accept()
 
@@ -163,7 +163,7 @@ class CFirewallTest:
             s.close()
 
 
-    def __recv(self, s, len):
+    def __recv(self, s, _len):
         t0 = time.time()
 
         while True:
