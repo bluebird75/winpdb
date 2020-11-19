@@ -19,7 +19,7 @@ str8 = _stub_type
 
 
 
-def _rpdb2_bytes(s, e):
+def _rpdb2_bytes(s: str, e: str) -> bytes:
     return s.encode(e)
 
 

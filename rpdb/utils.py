@@ -8,6 +8,8 @@ import threading
 import time
 import traceback
 
+from typing import Union, cast, Any, Optional, TextIO, Tuple, List
+
 #
 # Pre-Import needed by my_abspath1
 #
@@ -23,21 +25,24 @@ from rpdb.globals import g_fDebug, g_traceback_lock, g_initial_cwd, g_found_unic
 from rpdb.const import PYTHONW_FILE_EXTENSION, PYTHON_FILE_EXTENSION, PYTHONW_SO_EXTENSION
 
 
-def is_py3k():
+def is_py3k() -> bool:
     return sys.version_info[0] >= 3
 
 
-def is_unicode(s):
+def is_unicode(s: Union[str, bytes]) -> bool:
     if type(s) == str:
         return True
     return False
 
 
-def as_unicode(s, encoding = 'utf-8', fstrict = False):
+def as_unicode(s: str, encoding: str = 'utf-8', fstrict: bool = False) -> str:
     '''Return an unicode string, corresponding to s, encoding it if necessary'''
     if is_unicode(s):
+        assert isinstance(s, str)
+        # s = cast(str, s)
         return s
 
+    assert isinstance(s, bytes)
     if fstrict:
         u = s.decode(encoding)
     else:
@@ -50,10 +55,12 @@ ENCODING_RAW = as_unicode('raw')
 ENCODING_RAW_I = as_unicode('__raw')
 
 
-def as_string(s, encoding = 'utf-8', fstrict = False):
+def as_string(s: Union[str, bytes], encoding: str = 'utf-8', fstrict: bool = False) -> str:
     if is_unicode(s):
+        assert isinstance(s, str)
         return s
 
+    assert isinstance(s, bytes)
     if fstrict:
         e = s.decode(encoding)
     else:
@@ -62,10 +69,12 @@ def as_string(s, encoding = 'utf-8', fstrict = False):
     return e
 
 
-def as_bytes(s, encoding = 'utf-8', fstrict = True):
+def as_bytes(s: Union[str, bytes], encoding: str = 'utf-8', fstrict: bool = True) -> bytes:
     if not is_unicode(s):
+        assert isinstance(s, bytes)
         return s
 
+    assert isinstance(s, str)
     if fstrict:
         b = s.encode(encoding)
     else:
@@ -74,8 +83,8 @@ def as_bytes(s, encoding = 'utf-8', fstrict = True):
     return b
 
 
-def print_debug(_str):
-    #if not g_fDebug:
+def print_debug(_str: str) -> None:
+    #if not g_fDebug:   # TODO: reenable proper debugging support
     #    return
 
     t = time.time()
@@ -96,7 +105,7 @@ def print_debug(_str):
     _print(str, sys.__stderr__)
 
 
-def print_debug_exception(fForce = False):
+def print_debug_exception(fForce: bool = False) -> None:
     """
     Print exceptions to stdout when in debug mode.
     """
@@ -108,7 +117,7 @@ def print_debug_exception(fForce = False):
     print_exception(t, v, tb, fForce)
 
 
-def winlower(path):
+def winlower(path: str) -> str:
     """
     return lowercase version of 'path' on NT systems.
 
@@ -122,13 +131,13 @@ def winlower(path):
     return path
 
 
-def _print(s, f = sys.stdout, feol = True):
+def _print(s: str, f: TextIO = sys.stdout, feol: bool = True) -> None:
     s = as_unicode(s)
 
     encoding = detect_encoding(f)
 
-    s = as_bytes(s, encoding, fstrict = False)
-    s = as_string(s, encoding)
+    b = as_bytes(s, encoding, fstrict = False)
+    s = as_string(b, encoding)
 
     if feol:
         f.write(s + '\n')
@@ -136,7 +145,7 @@ def _print(s, f = sys.stdout, feol = True):
         f.write(s)
 
 
-def print_exception(t, v, tb, fForce = False):
+def print_exception(t: Any, v: Any, tb: Any, fForce: bool = False) -> None:
     """
     Print exceptions to stderr when in debug mode.
     """
@@ -146,33 +155,33 @@ def print_exception(t, v, tb, fForce = False):
 
     try:
         g_traceback_lock.acquire()
-        traceback.print_exception(t, v, tb, file = CFileWrapper(sys.stderr))
+        traceback.print_exception(t, v, tb, file = CFileWrapper(sys.stderr))    # type: ignore
 
     finally:
         g_traceback_lock.release()
 
 
-def thread_set_daemon(thread, fdaemon):
+def thread_set_daemon(thread: threading.Thread, fdaemon: bool) -> None:
     thread.daemon = fdaemon
 
 
-def thread_is_alive(thread):
+def thread_is_alive(thread: threading.Thread) -> bool:
     return thread.is_alive()
 
 
-def thread_set_name(thread, name):
+def thread_set_name(thread: threading.Thread, name: str) -> None:
     thread.name = name
 
 
-def thread_get_name(thread):
+def thread_get_name(thread: threading.Thread) -> str:
     return thread.name
 
 
-def current_thread():
+def current_thread() -> threading.Thread:
     return threading.current_thread()
 
 
-def detect_encoding(file):
+def detect_encoding(file: TextIO) -> str:
     try:
         encoding = file.encoding
         if encoding == None:
@@ -194,7 +203,7 @@ def detect_encoding(file):
     return 'ascii'
 
 
-def detect_locale():
+def detect_locale() -> str:
     encoding = locale.getpreferredencoding()
 
     if encoding == None:
@@ -214,19 +223,19 @@ def detect_locale():
     return 'ascii'
 
 class CFileWrapper:
-    def __init__(self, f):
+    def __init__(self, f: TextIO) -> None:
         self.m_f = f
 
 
-    def write(self, s):
+    def write(self, s: str) -> None:
         _print(s, self.m_f, feol = False)
 
 
-    def __getattr__(self, name):
-        return self.m_f.__getattr__(name)
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.m_f, name)
 
 
-def print_stack():
+def print_stack() -> None:
     """
     Print exceptions to stdout when in debug mode.
     """
@@ -234,13 +243,13 @@ def print_stack():
     if g_fDebug == True or True:
         try:
             g_traceback_lock.acquire()
-            traceback.print_stack(file = CFileWrapper(sys.stderr))
+            traceback.print_stack(file = CFileWrapper(sys.stderr))  # type: ignore
 
         finally:
             g_traceback_lock.release()
 
 
-def get_python_executable( interpreter=None ):
+def get_python_executable( interpreter: Optional[str] = None ) -> str:
     '''Return the python executable, usable to launch the debuggee.
     Pass a value that may override the default executable.
 
@@ -256,7 +265,7 @@ def get_python_executable( interpreter=None ):
     return python_exec
 
 
-def generate_random_char(_str):
+def generate_random_char(_str: str) -> str:
     """
     Return a random character from string argument.
     """
@@ -268,7 +277,7 @@ def generate_random_char(_str):
     return _str[i]
 
 
-def generate_rid():
+def generate_rid() -> str:
     """
     Return a 7 digits random id.
     """
@@ -279,7 +288,7 @@ def generate_rid():
     return rid
 
 
-def safe_wait(lock, timeout = None):
+def safe_wait(lock: threading.Condition, timeout: Optional[float] = None) -> bool:
     #
     # workaround windows bug where signal handlers might raise exceptions
     # even if they return normally.
@@ -291,15 +300,15 @@ def safe_wait(lock, timeout = None):
             return lock.wait(timeout)
 
         except:
-            if timeout == None:
+            if timeout is None:
                 continue
 
             timeout -= (time.time() - t0)
             if timeout <= 0:
-                return
+                return False
 
 
-def split_command_line_path_filename_args(command_line):
+def split_command_line_path_filename_args(command_line: str) -> Tuple[str, str, str]:
     """
     Split command line to a 3 elements tuple (path, filename, args)
     """
@@ -333,27 +342,15 @@ def split_command_line_path_filename_args(command_line):
             return (_path, filename, args)
 
 
-def my_os_path_join(dirname, basename):
-    if is_py3k() or (type(dirname) == str and type(basename) == str):
-        return os.path.join(dirname, basename)
-
-    encoding = sys.getfilesystemencoding()
-
-    if type(dirname) == str:
-        dirname = dirname.decode(encoding)
-
-    if type(basename) == str:
-        basename = basename.decode(encoding)
-
+def my_os_path_join(dirname: str, basename: str) -> str:
     return os.path.join(dirname, basename)
 
-
 def FindFile(
-        filename,
-        sources_paths = [],
-        fModules = False,
-        fAllowAnyExt = True
-        ):
+        filename: str,
+        sources_paths: List[str] = [],
+        fModules: bool = False,
+        fAllowAnyExt: bool = True
+        ) -> str:
 
     """
     FindFile looks for the full path of a script in a rather non-strict
@@ -423,12 +420,7 @@ def FindFile(
             raise IOError
 
         finally:
-            if not is_py3k() and is_unicode(scriptname):
-                fse = sys.getfilesystemencoding()
-                _l = as_string(scriptname, fse)
-                if '?' in _l:
-                    g_found_unicode_files[_l] = scriptname
-                return _l
+            pass
 
     scriptname = CalcScriptName(filename, fAllowAnyExt)
 
@@ -442,39 +434,34 @@ def FindFile(
         cwd = [getcwdu()]
 
     env_path = os.environ['PATH']
-    paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep)
+    paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep) # type: ignore
 
     try:
-        lowered = None
+        nlowered = None
 
         for p in paths:
             f = my_os_path_join(p, scriptname)
             abspath = my_abspath(f)
-            lowered = winlower(abspath)
+            nlowered = winlower(abspath)
 
-            if myisfile(lowered):
-                return lowered
+            if myisfile(nlowered):
+                return nlowered
 
             #
             # Check .pyw files
             #
-            lowered += 'w'
-            if lowered.endswith(PYTHONW_FILE_EXTENSION) and myisfile(lowered):
-                return lowered
+            nlowered += 'w'
+            if nlowered.endswith(PYTHONW_FILE_EXTENSION) and myisfile(nlowered):
+                return nlowered
 
-        lowered = None
+        nlowered = None
         raise IOError
 
     finally:
-        if not is_py3k() and is_unicode(lowered):
-            fse = sys.getfilesystemencoding()
-            _l = as_string(lowered, fse)
-            if '?' in _l:
-                g_found_unicode_files[_l] = lowered
-            return _l
+        pass
 
 
-def split_path(path):
+def split_path(path: str) -> Tuple[str, str]:
     (_path, filename) = os.path.split(path)
 
     #
@@ -487,7 +474,7 @@ def split_path(path):
 
     return (_path, filename)
 
-def FindFileAsModule(filename):
+def FindFileAsModule(filename: str) -> str:
     lowered = winlower(filename)
     (root, ext) = os.path.splitext(lowered)
 
@@ -531,7 +518,7 @@ def FindFileAsModule(filename):
     raise IOError
 
 
-def my_abspath(path):
+def my_abspath(path: str) -> str:
     """
     We need our own little version of os.path.abspath since the original
     code imports modules in the 'nt' code path which can cause our debugger
@@ -550,7 +537,7 @@ def my_abspath(path):
     return  os.path.abspath(path)
 
 
-def my_abspath1(path):
+def my_abspath1(path: str) -> str:
     """
     Modification of ntpath.abspath() that avoids doing an import.
     """
@@ -578,7 +565,7 @@ def my_abspath1(path):
     return np
 
 
-def CalcScriptName(filename, fAllowAnyExt = True):
+def CalcScriptName(filename: str, fAllowAnyExt: bool = True) -> str:
     if filename.endswith(PYTHON_FILE_EXTENSION):
         return filename
 
@@ -601,7 +588,7 @@ def CalcScriptName(filename, fAllowAnyExt = True):
     return scriptname
 
 
-def getcwd():
+def getcwd() -> str:
     try:
         return os.getcwd()
 
@@ -610,10 +597,7 @@ def getcwd():
         raise
 
 
-def getcwdu():
-    if hasattr(os, 'getcwdu'):
-        return os.getcwdu()
-
+def getcwdu() -> str:
     return getcwd()
 
 
@@ -621,14 +605,14 @@ g_safe_base64_to = bytes.maketrans(as_bytes('/+='), as_bytes('_-#'))
 g_safe_base64_from = bytes.maketrans(as_bytes('_-#'), as_bytes('/+='))
 
 
-def _getpid():
+def _getpid() -> int:
     try:
         return os.getpid()
     except:
         return -1
 
 
-def calcURL(host, port):
+def calcURL(host: str, port: str) -> str:
     """
     Form HTTP URL from 'host' and 'port' arguments.
     """
@@ -641,7 +625,7 @@ def calcURL(host, port):
 # myisfile() is similar to os.path.isfile() but also works with
 # Python eggs.
 #
-def myisfile(path):
+def myisfile(path: str) -> bool:
     try:
         mygetfile(path, False)
         return True
@@ -653,10 +637,10 @@ def myisfile(path):
 #
 # Read a file even if inside a Python egg.
 #
-def mygetfile(path, fread_file = True):
+def mygetfile(path: str, fread_file: bool = True) -> str:
     if os.path.isfile(path):
         if not fread_file:
-            return
+            return ''
 
         if sys.platform == 'OpenVMS':
             #
@@ -667,7 +651,7 @@ def mygetfile(path, fread_file = True):
             mode = 'rb'
 
         f = open(path, mode)
-        data = f.read()
+        data = f.read()  # type: str
         f.close()
         return data
 
@@ -696,7 +680,7 @@ def mygetfile(path, fread_file = True):
         raise IOError
 
 
-def FindModuleDir(module_name):
+def FindModuleDir(module_name: str) -> str:
     if module_name == '':
         raise IOError
 
