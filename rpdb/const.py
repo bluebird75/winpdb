@@ -454,11 +454,11 @@ STR_MAX_EVALUATE_LENGTH_WARNING = 'Output length exeeds maximum capacity.'
 
 
 # TODO: use variable directly
-def get_version():
+def get_version():  # type: () -> str
     return RPDB_VERSION
 
 # TODO: use variable directly
-def get_interface_compatibility_version():
+def get_interface_compatibility_version():  # type: () -> str
     return RPDB_COMPATIBILITY_VERSION
 
 

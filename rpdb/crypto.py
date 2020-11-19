@@ -5,6 +5,8 @@ import threading
 import time
 import zlib
 
+from typing import Dict
+
 try:
     from Crypto.Cipher import DES
 except ImportError:
@@ -29,7 +31,7 @@ class CCrypto:
     Handle authentication and encryption of data, using password protection.
     """
 
-    m_keys = {}
+    m_keys = {} # type: Dict[str, str]
 
     def __init__(self, _rpdb2_pwd, fAllowUnencrypted, rid):
         assert(is_unicode(_rpdb2_pwd))

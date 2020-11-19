@@ -15,7 +15,7 @@ import zipfile
 import zipimport
 
 try:
-    from nt import _getfullpathname
+    from nt import _getfullpathname     # type: ignore # nt is not typechecked
 except ImportError:
     pass
 

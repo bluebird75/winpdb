@@ -8,6 +8,8 @@ import weakref
 from http import client as httplib
 from xmlrpc import client as xmlrpclib, server as SimpleXMLRPCServer
 
+from typing import Dict, Any
+
 from rpdb.const import SHUTDOWN_TIMEOUT, POSIX, get_interface_compatibility_version, PING_TIMEOUT, LOCAL_TIMEOUT
 from rpdb.crypto import is_encryption_supported
 from rpdb.exceptions import AuthenticationBadIndex, BadVersion, EncryptionExpected, EncryptionNotSupported, \
@@ -463,7 +465,7 @@ class CLocalTimeoutTransport(CLocalTransport):
 
 class CThread (threading.Thread):
     m_fstop = False
-    m_threads = {}
+    m_threads = {}  # type: Dict[int, Any]
 
     m_lock = threading.RLock()
     m_id = 0

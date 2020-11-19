@@ -1,6 +1,8 @@
 import sys
 import threading
 
+from typing import Dict, Sequence
+
 #
 # In debug mode errors and tracebacks are printed to stdout
 # and frames of rpdb2 are visible to the user in the debugger
@@ -13,7 +15,7 @@ g_fDebug = False
 #
 g_traceback_lock = threading.RLock()
 g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
-g_initial_cwd = []
+g_initial_cwd = []  # type: Sequence[str]
 g_fScreen = False
 g_fDefaultStd = True
 g_server_lock = threading.RLock()
@@ -25,4 +27,4 @@ g_ignore_broken_pipe = 0
 # 'mbcs' encoding. This dict is used to work with such path names on
 # windows.
 #
-g_found_unicode_files = {}
+g_found_unicode_files = {}  # type: Dict[str, str]

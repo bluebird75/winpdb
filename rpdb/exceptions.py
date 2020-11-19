@@ -1,5 +1,7 @@
 import socket
 
+from typing import Any
+
 from rpdb.const import STR_COMMUNICATION_FAILURE, STR_LOST_CONNECTION, STR_FIREWALL_BLOCK, STR_BAD_VERSION, \
     STR_UNEXPECTED_DATA, STR_SPAWN_UNSUPPORTED, STR_DEBUGGEE_UNKNOWN, STR_PASSWORD_MUST_BE_SET, \
     STR_DEBUGGEE_NO_ENCRYPTION, STR_ENCRYPTION_EXPECTED, STR_DECRYPTION_FAILURE, STR_ACCESS_DENIED, STR_BAD_MBCS_PATH, \
@@ -11,7 +13,7 @@ class CException(Exception):
     Base exception class for the debugger.
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args):  # type: (*Any) -> None
         Exception.__init__(self, *args)
 
 
@@ -86,7 +88,7 @@ class NoExceptionFound(CException):
 
 
 class CConnectionException(CException):
-    def __init__(self, *args):
+    def __init__(self, *args):  # type: (*Any) -> None
         CException.__init__(self, *args)
 
 
@@ -96,12 +98,12 @@ class FirewallBlock(CConnectionException):
 
 class BadVersion(CConnectionException):
     """Bad Version."""
-    def __init__(self, version):
+    def __init__(self, version):    # type: (str) -> None
         CConnectionException.__init__(self)
 
         self.m_version = version
 
-    def __str__(self):
+    def __str__(self):  # type: () -> str
         return repr(self.m_version)
 
 
@@ -126,7 +128,7 @@ class UnknownServer(CConnectionException):
 
 
 class CSecurityException(CConnectionException):
-    def __init__(self, *args):
+    def __init__(self, *args):  # type: (*Any) -> None
         CConnectionException.__init__(self, *args)
 
 
@@ -156,13 +158,13 @@ class AuthenticationFailure(CSecurityException):
 
 class AuthenticationBadIndex(CSecurityException):
     """Authentication Bad Index."""
-    def __init__(self, max_index = 0, anchor = 0):
+    def __init__(self, max_index = 0, anchor = 0):  # type: (int, int) -> None
         CSecurityException.__init__(self)
 
         self.m_max_index = max_index
         self.m_anchor = anchor
 
-    def __str__(self):
+    def __str__(self):  # type: () -> str
         return repr((self.m_max_index, self.m_anchor))
 
 
