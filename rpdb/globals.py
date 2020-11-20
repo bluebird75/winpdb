@@ -1,7 +1,7 @@
 import sys
 import threading
 
-from typing import Dict, Sequence
+from typing import Dict, List
 
 #
 # In debug mode errors and tracebacks are printed to stdout
@@ -15,7 +15,7 @@ g_fDebug = False
 #
 g_traceback_lock = threading.RLock()
 g_builtins_module = sys.modules.get('__builtin__', sys.modules.get('builtins'))
-g_initial_cwd = []  # type: Sequence[str]
+g_initial_cwd = []  # type: List[str]
 g_fScreen = False
 g_fDefaultStd = True
 g_server_lock = threading.RLock()

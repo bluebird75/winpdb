@@ -8,7 +8,7 @@ import threading
 import time
 import traceback
 
-from typing import Union, cast, Any, Optional, TextIO, Tuple, List
+from typing import Union, Any, Optional, TextIO, Tuple, List
 
 #
 # Pre-Import needed by my_abspath1
@@ -39,7 +39,6 @@ def as_unicode(s: str, encoding: str = 'utf-8', fstrict: bool = False) -> str:
     '''Return an unicode string, corresponding to s, encoding it if necessary'''
     if is_unicode(s):
         assert isinstance(s, str)
-        # s = cast(str, s)
         return s
 
     assert isinstance(s, bytes)
@@ -434,7 +433,7 @@ def FindFile(
         cwd = [getcwdu()]
 
     env_path = os.environ['PATH']
-    paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep) # type: ignore
+    paths = sources_paths + cwd + g_initial_cwd + sys.path + env_path.split(os.pathsep)
 
     try:
         nlowered = None

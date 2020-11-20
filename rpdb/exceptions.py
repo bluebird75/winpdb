@@ -13,7 +13,7 @@ class CException(Exception):
     Base exception class for the debugger.
     """
 
-    def __init__(self, *args):  # type: (*Any) -> None
+    def __init__(self, *args: Any) -> None:
         Exception.__init__(self, *args)
 
 
@@ -88,7 +88,7 @@ class NoExceptionFound(CException):
 
 
 class CConnectionException(CException):
-    def __init__(self, *args):  # type: (*Any) -> None
+    def __init__(self, *args: Any) -> None:
         CException.__init__(self, *args)
 
 
@@ -98,12 +98,12 @@ class FirewallBlock(CConnectionException):
 
 class BadVersion(CConnectionException):
     """Bad Version."""
-    def __init__(self, version):    # type: (str) -> None
+    def __init__(self, version: str) -> None:
         CConnectionException.__init__(self)
 
         self.m_version = version
 
-    def __str__(self):  # type: () -> str
+    def __str__(self) -> str:
         return repr(self.m_version)
 
 
@@ -128,7 +128,7 @@ class UnknownServer(CConnectionException):
 
 
 class CSecurityException(CConnectionException):
-    def __init__(self, *args):  # type: (*Any) -> None
+    def __init__(self, *args: Any) -> None:
         CConnectionException.__init__(self, *args)
 
 
@@ -158,13 +158,13 @@ class AuthenticationFailure(CSecurityException):
 
 class AuthenticationBadIndex(CSecurityException):
     """Authentication Bad Index."""
-    def __init__(self, max_index = 0, anchor = 0):  # type: (int, int) -> None
+    def __init__(self, max_index: int = 0, anchor: int = 0) -> None:
         CSecurityException.__init__(self)
 
         self.m_max_index = max_index
         self.m_anchor = anchor
 
-    def __str__(self):  # type: () -> str
+    def __str__(self) -> str:
         return repr((self.m_max_index, self.m_anchor))
 
 
