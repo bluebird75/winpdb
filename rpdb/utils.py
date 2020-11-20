@@ -35,7 +35,7 @@ def is_unicode(s: Union[str, bytes]) -> bool:
     return False
 
 
-def as_unicode(s: str, encoding: str = 'utf-8', fstrict: bool = False) -> str:
+def as_unicode(s: Union[str, bytes], encoding: str = 'utf-8', fstrict: bool = False) -> str:
     '''Return an unicode string, corresponding to s, encoding it if necessary'''
     if is_unicode(s):
         assert isinstance(s, str)
@@ -636,10 +636,10 @@ def myisfile(path: str) -> bool:
 #
 # Read a file even if inside a Python egg.
 #
-def mygetfile(path: str, fread_file: bool = True) -> str:
+def mygetfile(path: str, fread_file: bool = True) -> bytes:
     if os.path.isfile(path):
         if not fread_file:
-            return ''
+            return b''
 
         if sys.platform == 'OpenVMS':
             #
@@ -650,7 +650,7 @@ def mygetfile(path: str, fread_file: bool = True) -> str:
             mode = 'rb'
 
         f = open(path, mode)
-        data = f.read()  # type: str
+        data = f.read()  # type: bytes
         f.close()
         return data
 

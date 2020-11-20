@@ -1,14 +1,18 @@
 import copy
-import copyreg as copy_reg
 import signal
 import sys
+import copyreg
+
+from typing import Optional, List, Dict, Any, Callable, TYPE_CHECKING, Tuple
+if TYPE_CHECKING:
+    from rpdb.breakpoint import CBreakPoint
 
 from rpdb.utils import as_unicode
 
 EVENT_EXCLUDE = 'exclude'
 EVENT_INCLUDE = 'include'
 
-def calc_signame(signum):
+def calc_signame(signum: int) -> str:
     for k, v in vars(signal).items():
         if not k.startswith('SIG') or k in ['SIG_IGN', 'SIG_DFL', 'SIGRTMIN', 'SIGRTMAX']:
             continue
@@ -18,7 +22,7 @@ def calc_signame(signum):
 
     return '?'
 
-def breakpoint_copy(bp):
+def breakpoint_copy(bp: Optional[CBreakPoint]) -> Optional[CBreakPoint]:
     if bp is None:
         return None
 
@@ -36,12 +40,12 @@ class CEvent(object):
     Base class for events.
     """
 
-    def __reduce__(self):
-        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
+    def __reduce__(self) -> Tuple[Any, Any, Any, None, None]:
+        rv = (copyreg.__newobj__, (type(self), ), vars(self), None, None)   # type: ignore
         return rv
 
 
-    def is_match(self, arg):
+    def is_match(self, arg: Any) -> bool:
         pass
 
 
@@ -76,7 +80,7 @@ class CEventSignalIntercepted(CEvent):
     Such signals are held pending until tracing code is returned from.
     """
 
-    def __init__(self, signum):
+    def __init__(self, signum: int) -> None:
         self.m_signum = signum
         self.m_signame = calc_signame(signum)
 
@@ -88,7 +92,7 @@ class CEventSignalException(CEvent):
     limitations.
     """
 
-    def __init__(self, signum, description):
+    def __init__(self, signum: int, description: str) -> None:
         self.m_signum = signum
         self.m_signame = calc_signame(signum)
         self.m_description = description
@@ -99,7 +103,7 @@ class CEventEncoding(CEvent):
     The encoding has been set.
     """
 
-    def __init__(self, encoding, fraw):
+    def __init__(self, encoding: str, fraw: bool) -> None:
         self.m_encoding = encoding
         self.m_fraw = fraw
 
@@ -117,7 +121,7 @@ class CEventConflictingModules(CEvent):
     Conflicting modules were detected. rpdb2 is incompatible with these modules.
     """
 
-    def __init__(self, modules_list):
+    def __init__(self, modules_list: List[str]) -> None:
         self.m_modules_list = modules_list
 
 
@@ -127,7 +131,7 @@ class CEventSyncReceivers(CEvent):
     the same time. The synchronization mechanism is internal to rpdb2.
     """
 
-    def __init__(self, sync_n):
+    def __init__(self, sync_n: bool) -> None:
         self.m_sync_n = sync_n
 
 
@@ -161,11 +165,11 @@ class CEventState(CEvent):
     Value of m_state can be one of the STATE_* globals.
     """
 
-    def __init__(self, state):
+    def __init__(self, state: str) -> None:
         self.m_state = as_unicode(state)
 
 
-    def is_match(self, arg):
+    def is_match(self, arg: str) -> bool:
         return self.m_state == as_unicode(arg)
 
 
@@ -175,11 +179,11 @@ class CEventSynchronicity(CEvent):
     Sent when mode changes.
     """
 
-    def __init__(self, fsynchronicity):
+    def __init__(self, fsynchronicity: bool) -> None:
         self.m_fsynchronicity = fsynchronicity
 
 
-    def is_match(self, arg):
+    def is_match(self, arg: bool) -> bool:
         return self.m_fsynchronicity == arg
 
 
@@ -188,10 +192,10 @@ class CEventBreakOnExit(CEvent):
     Mode of break on exit
     Sent when mode changes
     """
-    def __init__(self,fbreakonexit):
+    def __init__(self, fbreakonexit: bool) -> None:
         self.m_fbreakonexit = fbreakonexit
 
-    def is_match(self,arg):
+    def is_match(self, arg: bool) -> bool:
         return self.m_fbreakonexit == arg
 
 
@@ -201,11 +205,11 @@ class CEventTrap(CEvent):
     Sent when the mode changes.
     """
 
-    def __init__(self, ftrap):
+    def __init__(self, ftrap: bool) -> None:
         self.m_ftrap = ftrap
 
 
-    def is_match(self, arg):
+    def is_match(self, arg: bool) -> bool:
         return self.m_ftrap == arg
 
 
@@ -215,7 +219,7 @@ class CEventForkMode(CEvent):
     Sent when the mode changes.
     """
 
-    def __init__(self, ffork_into_child, ffork_auto):
+    def __init__(self, ffork_into_child: bool, ffork_auto: bool) -> None:
         self.m_ffork_into_child = ffork_into_child
         self.m_ffork_auto = ffork_auto
 
@@ -251,7 +255,7 @@ class CEventThreads(CEvent):
     State of threads.
     """
 
-    def __init__(self, _current_thread, thread_list):
+    def __init__(self, _current_thread: int, thread_list: List[Dict[str, Any]]) -> None:
         self.m_current_thread = _current_thread
         self.m_thread_list = thread_list
 
@@ -261,7 +265,7 @@ class CEventThreadBroken(CEvent):
     A thread has broken.
     """
 
-    def __init__(self, tid, name):
+    def __init__(self, tid: int, name: str) -> None:
         self.m_tid = tid
         self.m_name = as_unicode(name)
 
@@ -271,7 +275,7 @@ class CEventStack(CEvent):
     Stack of current thread.
     """
 
-    def __init__(self, stack):
+    def __init__(self, stack: Any) -> None:
         self.m_stack = stack
 
 
@@ -281,7 +285,7 @@ class CEventStackFrameChange(CEvent):
     This event is sent when the debugger goes up or down the stack.
     """
 
-    def __init__(self, frame_index):
+    def __init__(self, frame_index: int) -> None:
         self.m_frame_index = frame_index
 
 
@@ -290,7 +294,7 @@ class CEventStackDepth(CEvent):
     Stack depth has changed.
     """
 
-    def __init__(self, stack_depth, stack_depth_exception):
+    def __init__(self, stack_depth: int, stack_depth_exception: Any) -> None:
         self.m_stack_depth = stack_depth
         self.m_stack_depth_exception = stack_depth_exception
 
@@ -305,7 +309,7 @@ class CEventBreakpoint(CEvent):
     REMOVE = as_unicode('remove')
     SET = as_unicode('set')
 
-    def __init__(self, bp, action = SET, id_list = None, fAll = False):
+    def __init__(self, bp: Optional[CBreakPoint], action: str = SET, id_list: Optional[List[int]] = None, fAll: bool = False) -> None:
         self.m_bp = breakpoint_copy(bp)
         self.m_action = action
         self.m_id_list = id_list or []
@@ -319,7 +323,7 @@ class CEventSync(CEvent):
     the state of the debuggee.
     """
 
-    def __init__(self, fException, fSendUnhandled):
+    def __init__(self, fException: bool, fSendUnhandled: bool) -> None:
         self.m_fException = fException
         self.m_fSendUnhandled = fSendUnhandled
 
@@ -336,19 +340,22 @@ class CEventDispatcher:
     by using register_chain_override() on those events, before event registration.
     """
 
-    def __init__(self, chained_event_dispatcher = None):
+    def __init__(self, chained_event_dispatcher: Optional[Any] = None) -> None:
         self.m_chained_event_dispatcher = chained_event_dispatcher
-        self.m_chain_override_types = {}
+        self.m_chain_override_types = {}    # type: Dict[CEvent, bool]
 
-        self.m_registrants = {}
+        self.m_registrants = {} # type: Dict[CEventDispatcherRecord, bool]
 
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         for er in list(self.m_registrants.keys()):
             self.__remove_dispatcher_record(er)
 
 
-    def register_callback(self, callback, event_type_dict, fSingleUse):
+    def register_callback(self, 
+                          callback: Callable[[CEvent], None], 
+                          event_type_dict: Dict[CEvent, Dict[Any, Any]], 
+                          fSingleUse: bool) -> 'CEventDispatcherRecord':
         er = CEventDispatcherRecord(callback, event_type_dict, fSingleUse)
 
         #
@@ -364,23 +371,23 @@ class CEventDispatcher:
         return er
 
 
-    def remove_callback(self, callback):
+    def remove_callback(self, callback: Any) -> None:
         erl = [er for er in list(self.m_registrants.keys()) if er.m_callback == callback]
         for er in erl:
             self.__remove_dispatcher_record(er)
 
 
-    def fire_events(self, event_list):
+    def fire_events(self, event_list: List[CEvent]) -> None:
         for event in event_list:
             self.fire_event(event)
 
 
-    def fire_event(self, event):
+    def fire_event(self, event: CEvent) -> None:
         for er in list(self.m_registrants.keys()):
             self.__fire_er(event, er)
 
 
-    def __fire_er(self, event, er):
+    def __fire_er(self, event: CEvent, er: 'CEventDispatcherRecord') -> None:
         if not er.is_match(event):
             return
 
@@ -398,7 +405,7 @@ class CEventDispatcher:
             pass
 
 
-    def register_chain_override(self, event_type_dict):
+    def register_chain_override(self, event_type_dict: Dict[CEvent, Dict[Any, Any]]) -> None:
         """
         Chain override prevents registration on chained
         dispatchers for specific event types.
@@ -408,7 +415,9 @@ class CEventDispatcher:
             self.m_chain_override_types[t] = True
 
 
-    def __register_callback_on_chain(self, er, event_type_dict, fSingleUse):
+    def __register_callback_on_chain(self, er: 'CEventDispatcherRecord',
+                                     event_type_dict: Dict[CEvent, Dict[Any, Any]],
+                                     fSingleUse: bool) -> bool:
         _event_type_dict = copy.copy(event_type_dict)
         for t in self.m_chain_override_types:
             if t in _event_type_dict:
@@ -418,14 +427,15 @@ class CEventDispatcher:
             return False
 
 
-        def callback(event, er = er):
+        def callback(event: CEvent, er: 'CEventDispatcherRecord' = er) -> None:
             self.__fire_er(event, er)
 
+        assert self.m_chained_event_dispatcher is not None
         _er = self.m_chained_event_dispatcher.register_callback(callback, _event_type_dict, fSingleUse)
         return _er
 
 
-    def __remove_dispatcher_record(self, er):
+    def __remove_dispatcher_record(self, er: 'CEventDispatcherRecord') -> None:
         try:
             if self.m_chained_event_dispatcher is not None:
                 _er = self.m_registrants[er]
@@ -453,13 +463,15 @@ class CEventDispatcherRecord:
     EVENT_INCLUDE and EVENT_EXCLUDE may not be used together
     """
 
-    def __init__(self, callback, event_type_dict, fSingleUse):
+    def __init__(self, callback: Callable[[CEvent], None], 
+                 event_type_dict: Dict[CEvent, Dict[Any, Any]], 
+                 fSingleUse: bool) -> None:
         self.m_callback = callback
         self.m_event_type_dict = copy.copy(event_type_dict)
         self.m_fSingleUse = fSingleUse
 
 
-    def is_match(self, event):
+    def is_match(self, event: CEvent) -> bool:
         rtl = [t for t in self.m_event_type_dict.keys() if isinstance(event, t)]
         if len(rtl) == 0:
             return False
