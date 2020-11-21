@@ -353,7 +353,7 @@ class CEventDispatcher:
 
 
     def register_callback(self, 
-                          callback: Callable[[CEvent], None], 
+                          callback: Callable[[CEvent], None],
                           event_type_dict: Dict[type, Dict[Any, Any]],
                           fSingleUse: bool) -> 'CEventDispatcherRecord':
         er = CEventDispatcherRecord(callback, event_type_dict, fSingleUse)
@@ -431,7 +431,7 @@ class CEventDispatcher:
             self.__fire_er(event, er)
 
         assert self.m_chained_event_dispatcher is not None
-        _er = self.m_chained_event_dispatcher.register_callback(callback, _event_type_dict, fSingleUse)
+        _er = bool(self.m_chained_event_dispatcher.register_callback(callback, _event_type_dict, fSingleUse))
         return _er
 
 
@@ -463,7 +463,7 @@ class CEventDispatcherRecord:
     EVENT_INCLUDE and EVENT_EXCLUDE may not be used together
     """
 
-    def __init__(self, callback: Callable[[CEvent], None], 
+    def __init__(self, callback: Callable[[CEvent], None],
                  event_type_dict: Dict[type, Dict[Any, Any]],
                  fSingleUse: bool) -> None:
         self.m_callback = callback
