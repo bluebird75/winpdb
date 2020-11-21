@@ -1,9 +1,11 @@
 import sys, os
 
+from typing import List, Dict, Any, Union, Collection
+
 from rpdb.utils import as_unicode, is_unicode, print_debug_exception, ENCODING_RAW_I, as_bytes
 from rpdb.compat import sets, unicode
 
-def is_py3k():
+def is_py3k() -> bool:
     return sys.version_info[0] >= 3
 
 
@@ -12,7 +14,7 @@ DEFAULT_PATH_SUFFIX_LENGTH = 55
 ELLIPSIS_UNICODE = as_unicode('...')
 ELLIPSIS_BYTES = as_bytes('...')
 
-def calc_suffix(_str, n):
+def calc_suffix(_str: str, n: int) -> str:
     """
     Return an n charaters suffix of the argument string of the form
     '...suffix'.
@@ -23,18 +25,18 @@ def calc_suffix(_str, n):
 
     return '...' + _str[-(n - 3):]
 
-def class_name(c):
+def class_name(c: str) -> str:
     s = safe_str(c)
 
     if "'" in s:
         s = s.split("'")[1]
 
-    assert(s.startswith(__name__ + '.'))
+    # assert(s.startswith(__name__ + '.'))
 
     return s
 
 
-def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
+def clip_filename(path: str, n: int = DEFAULT_PATH_SUFFIX_LENGTH) -> str:
     suffix = calc_suffix(path, n)
     if not suffix.startswith('...'):
         return suffix
@@ -48,7 +50,7 @@ def clip_filename(path, n = DEFAULT_PATH_SUFFIX_LENGTH):
     return clip
 
 
-def safe_str(x):
+def safe_str(x: Any) -> str:
     try:
         return str(x)
 
@@ -56,7 +58,7 @@ def safe_str(x):
         return 'N/A'
 
 
-def safe_repr(x):
+def safe_repr(x: Any) -> str:
     try:
         return repr(x)
 
@@ -64,7 +66,7 @@ def safe_repr(x):
         return 'N/A'
 
 
-def parse_type(t):
+def parse_type(t: type) -> str:
     rt = safe_repr(t)
     if not "'" in rt:
         return rt
@@ -73,7 +75,9 @@ def parse_type(t):
     return st
 
 
-def repr_list(pattern, l, length, encoding, is_valid):
+def repr_list(pattern: str,
+              l: Collection[Any],
+              length: int, encoding: str, is_valid: List[bool]) -> str:
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -108,7 +112,7 @@ def repr_list(pattern, l, length, encoding, is_valid):
     return as_unicode(pattern % s)
 
 
-def repr_dict(pattern, d, length, encoding, is_valid):
+def repr_dict(pattern: str, d: Dict[str, Any], length: int, encoding: str, is_valid: List[bool]) -> str:
     length = max(0, length - len(pattern) + 2)
 
     s = ''
@@ -153,9 +157,9 @@ def repr_dict(pattern, d, length, encoding, is_valid):
     return as_unicode(pattern % s)
 
 
-def repr_bytearray(s, length, encoding, is_valid):
+def repr_bytearray(b: bytes, length: int, encoding: str, is_valid: List[bool]) -> str:
     try:
-        s = s.decode(encoding)
+        s = b.decode(encoding)
         r = repr_unicode(s, length, is_valid)
         return 'bytearray(b' + r[1:] + ')'
 
@@ -164,12 +168,12 @@ def repr_bytearray(s, length, encoding, is_valid):
         # If a string is not encoded as utf-8 its repr() will be done with
         # the regular repr() function.
         #
-        return repr_str_raw(s, length, is_valid)
+        return repr_str_raw(b, length, is_valid)
 
 
-def repr_bytes(s, length, encoding, is_valid):
+def repr_bytes(b: bytes, length: int, encoding: str, is_valid: List[bool]) -> str:
     try:
-        s = s.decode(encoding)
+        s = b.decode(encoding)
         r = repr_unicode(s, length, is_valid)
         return 'b' + r[1:]
 
@@ -178,12 +182,12 @@ def repr_bytes(s, length, encoding, is_valid):
         # If a string is not encoded as utf-8 its repr() will be done with
         # the regular repr() function.
         #
-        return repr_str_raw(s, length, is_valid)
+        return repr_str_raw(b, length, is_valid)
 
 
-def repr_str8(s, length, encoding, is_valid):
+def repr_str8(b: bytes, length: int, encoding: str, is_valid: List[bool]) -> str:
     try:
-        s = s.decode(encoding)
+        s = b.decode(encoding)
         r = repr_unicode(s, length, is_valid)
         return 's' + r[1:]
 
@@ -192,10 +196,10 @@ def repr_str8(s, length, encoding, is_valid):
         # If a string is not encoded as utf-8 its repr() will be done with
         # the regular repr() function.
         #
-        return repr_str_raw(s, length, is_valid)
+        return repr_str_raw(b, length, is_valid)
 
 
-def repr_str(s, length, encoding, is_valid):
+def repr_str(s: str, length: int, encoding: str, is_valid: List[bool]) -> str:
     try:
         s = as_unicode(s, encoding, fstrict = True)
         r = repr_unicode(s, length, is_valid)
@@ -209,7 +213,7 @@ def repr_str(s, length, encoding, is_valid):
         return repr_str_raw(s, length, is_valid)
 
 
-def repr_unicode(s, length, is_valid):
+def repr_unicode(s: str, length: int, is_valid: List[bool]) -> str:
     index = [2, 1][is_py3k()]
 
     rs = ''
@@ -234,20 +238,20 @@ def repr_unicode(s, length, is_valid):
     return as_unicode("u'%s'" % rs.replace("'", "\\'"))
 
 
-def repr_str_raw(s, length, is_valid):
-    if is_unicode(s):
-        eli = ELLIPSIS_UNICODE
+def repr_str_raw(s: Union[str, bytes], length: int, is_valid: List[bool]) -> str:
+    if isinstance(s, str):
+        eli = ELLIPSIS_UNICODE  # type: Union[str, bytes]
     else:
         eli = ELLIPSIS_BYTES
 
     if len(s) > length:
         is_valid[0] = False
-        s = s[: length] + eli
+        s = s[: length] + eli   # type: ignore # code is dynamically correct
 
     return as_unicode(repr(s))
 
 
-def repr_base(v, length, is_valid):
+def repr_base(v: Any, length: int, is_valid: List[bool]) -> str:
     r = repr(v)
 
     if len(r) > length:
@@ -257,7 +261,7 @@ def repr_base(v, length, is_valid):
     return as_unicode(r)
 
 
-def repr_ltd(x, length, encoding, is_valid = [True]):
+def repr_ltd(x: Any, length: int, encoding: str, is_valid: List[bool] = [True]) -> str:
     try:
         length = max(0, length)
 
