@@ -1,12 +1,14 @@
 import base64
 
+from typing import Collection, Any
+
 # TODO py3k
 import hashlib
 _md5 = hashlib.md5
 
 from rpdb.globals import g_builtins_module
 
-class _stub_type:
+class _stub_type(Collection[Any]):
     pass
 
 class sets:

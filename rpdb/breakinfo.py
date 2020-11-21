@@ -4,27 +4,25 @@ from rpdb.source_provider import MODULE_SCOPE, MODULE_SCOPE2, get_source, SCOPE_
 from rpdb.utils import as_string, as_unicode, print_debug
 from rpdb.exceptions import InvalidScopeName
 
-def myord(c):
-    try:
+from typing import List, Tuple, Any, Union, Dict
+
+def myord(c: int) -> int:
+    if isinstance(c, str) or isinstance(c, bytes):
         return ord(c)
-    except:
-        return c
-
-
+    return c
 
 class CScopeBreakInfo:
-    def __init__(self, fqn, valid_lines):
+    def __init__(self, fqn: str, valid_lines: List[int]) -> None:
         self.m_fqn = fqn
         self.m_first_line = valid_lines[0]
         self.m_last_line = valid_lines[-1]
         self.m_valid_lines = valid_lines
 
 
-    def CalcScopeLine(self, lineno):
+    def CalcScopeLine(self, lineno: int) -> int:
         rvl = copy.copy(self.m_valid_lines)
         rvl.reverse()
 
-        l = ''
         for l in rvl:
             if lineno >= l:
                 break
@@ -32,7 +30,7 @@ class CScopeBreakInfo:
         return l
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "('" + self.m_fqn + "', " + str(self.m_valid_lines) + ')'
 
 
@@ -41,14 +39,14 @@ class CFileBreakInfo:
     Break info structure for a source file.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename: str) -> None:
         self.m_filename = filename
         self.m_first_line = 0
         self.m_last_line = 0
-        self.m_scope_break_info = []
+        self.m_scope_break_info = []    # type: List[CScopeBreakInfo]
 
 
-    def CalcBreakInfo(self):
+    def CalcBreakInfo(self) -> None:
         (source, encoding) = get_source(self.m_filename)
         _source = as_string(source + as_unicode('\n'), encoding)
 
@@ -58,7 +56,7 @@ class CFileBreakInfo:
         self.m_first_line = code.co_firstlineno
         self.m_last_line = 0
 
-        fqn = []
+        fqn = []    # type: List[str]
         t = [code]
 
         while len(t) > 0:
@@ -78,7 +76,7 @@ class CFileBreakInfo:
             t = subcodeslist + [si] + t
 
 
-    def __CalcSubCodesList(self, code):
+    def __CalcSubCodesList(self, code: Any) -> List[Any]:   # note: Any should be replaced with type code
         tc = type(code)
         t = [(c.co_firstlineno, c) for c in code.co_consts if type(c) == tc]
         t.sort()
@@ -86,7 +84,7 @@ class CFileBreakInfo:
         return scl
 
 
-    def FindScopeByLineno(self, lineno):
+    def FindScopeByLineno(self, lineno: int) -> Tuple[CScopeBreakInfo, int]:
         lineno = max(min(lineno, self.m_last_line), self.m_first_line)
 
         smaller_element = None
@@ -114,7 +112,7 @@ class CFileBreakInfo:
         return (scope, l)
 
 
-    def FindScopeByName(self, name, offset):
+    def FindScopeByName(self, name: str, offset: int) -> Tuple[CScopeBreakInfo, int]:
         if name.startswith(MODULE_SCOPE):
             alt_scope = MODULE_SCOPE2 + name[len(MODULE_SCOPE):]
         elif name.startswith(MODULE_SCOPE2):
@@ -137,24 +135,24 @@ class CBreakInfoManager:
     Manage break info dictionary per filename.
     """
 
-    def __init__(self):
-        self.m_file_info_dic = {}
+    def __init__(self) -> None:
+        self.m_file_info_dic = {}   # type: Dict[str, CFileBreakInfo]
 
 
-    def addFile(self, filename):
+    def addFile(self, filename: str) -> None:
         mbi = CFileBreakInfo(filename)
         mbi.CalcBreakInfo()
         self.m_file_info_dic[filename] = mbi
 
 
-    def getFile(self, filename):
+    def getFile(self, filename: str) -> CFileBreakInfo:
         if not filename in self.m_file_info_dic:
             self.addFile(filename)
 
         return self.m_file_info_dic[filename]
 
 
-def CalcValidLines(code):
+def CalcValidLines(code: Any) -> List[int]: # note: Any should be replaced with type code
     l = code.co_firstlineno
     vl = [l]
 

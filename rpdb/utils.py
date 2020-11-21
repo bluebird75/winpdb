@@ -672,7 +672,7 @@ def mygetfile(path: str, fread_file: bool = True) -> bytes:
     z = zipimport.zipimporter(d)
 
     try:
-        data = z.get_data(path[len(d) + 1:])
+        data = z.get_data(path[len(d) + 1:])    # type: ignore # python does not know that get_data() returns bytes
         return data
 
     except:

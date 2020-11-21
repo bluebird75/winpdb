@@ -1,22 +1,31 @@
 import copyreg as copy_reg
 import threading
 
-from rpdb.events import CEventBreakpoint
+from rpdb.events import CEventBreakpoint, CEvent
 from rpdb.utils import as_bytes, as_unicode, print_debug, winlower
 from rpdb.source_provider import  ENCODING_SOURCE, MODULE_SCOPE, MODULE_SCOPE2, SCOPE_SEP
 from rpdb.breakinfo import CBreakInfoManager
 
-
+from typing import Optional, Tuple, Any, TYPE_CHECKING, Dict, List
+if TYPE_CHECKING:
+    from rpdb.session_manager import CSessionManagerInternal
 
 class CBreakPoint(object):
-    def __init__(self, filename, scope_fqn, scope_first_line, lineno, fEnabled, expr, encoding, fTemporary = False):
+    def __init__(self, filename: str,
+                 scope_fqn: str,
+                 scope_first_line: int,
+                 lineno: int,
+                 fEnabled: bool,
+                 expr: Optional[str],
+                 encoding: str,
+                 fTemporary: bool = False) -> None:
         """
         Breakpoint constructor.
 
         scope_fqn - scope fully qualified name. e.g: module.class.method
         """
 
-        self.m_id = None
+        self.m_id = None        # type: Optional[int]
         self.m_fEnabled = fEnabled
         self.m_filename = filename
         self.m_scope_fqn = scope_fqn
@@ -35,12 +44,12 @@ class CBreakPoint(object):
             self.m_code = compile(_expr, '<string>', 'eval')
 
 
-    def __reduce__(self):
-        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)
+    def __reduce__(self) -> Tuple[Any, Any, Any, None, None]:
+        rv = (copy_reg.__newobj__, (type(self), ), vars(self), None, None)  # type: ignore # mypy does not find__newobj
         return rv
 
 
-    def calc_enclosing_scope_name(self):
+    def calc_enclosing_scope_name(self) -> Optional[str]:
         if self.m_scope_offset != 0:
             return None
 
@@ -53,19 +62,19 @@ class CBreakPoint(object):
         return enclosing_scope_name
 
 
-    def enable(self):
+    def enable(self) -> None:
         self.m_fEnabled = True
 
 
-    def disable(self):
+    def disable(self) -> None:
         self.m_fEnabled = False
 
 
-    def isEnabled(self):
+    def isEnabled(self) -> bool:
         return self.m_fEnabled
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "('" + self.m_filename + "', '" + self.m_scope_fqn + "', " + str(self.m_scope_first_line) + ', ' + str(self.m_scope_offset) + ', ' + str(self.m_lineno) + ')'
 
 
@@ -76,11 +85,11 @@ class CBreakPointsManagerProxy:
     the proxy resides in the debugger (the client - session manager)
     """
 
-    def __init__(self, session_manager):
+    def __init__(self, session_manager: 'CSessionManagerInternal') -> None:
         self.m_session_manager = session_manager
 
-        self.m_break_points_by_file = {}
-        self.m_break_points_by_id = {}
+        self.m_break_points_by_file = {}    # type: Dict[str, Dict[int, CBreakPoint]]
+        self.m_break_points_by_id = {}      # type: Dict[int, CBreakPoint]
 
         self.m_lock = threading.Lock()
 
@@ -89,13 +98,13 @@ class CBreakPointsManagerProxy:
         # event dispatchers in the session manager.
         #
 
-        event_type_dict = {CEventBreakpoint: {}}
+        event_type_dict = {CEventBreakpoint: {}}    # type: Dict[type, Dict[Any, Any]]
 
         self.m_session_manager.m_event_dispatcher_proxy.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
         self.m_session_manager.m_event_dispatcher.register_chain_override(event_type_dict)
 
 
-    def update_bp(self, event):
+    def update_bp(self, event: CEventBreakpoint) -> None:
         """
         Handle breakpoint updates that arrive via the event dispatcher.
         """
@@ -137,10 +146,11 @@ class CBreakPointsManagerProxy:
                     except KeyError:
                         pass
                 return
-
+            assert event.m_bp is not None
             bpm = self.m_break_points_by_file.get(event.m_bp.m_filename, {})
             bpm[event.m_bp.m_lineno] = event.m_bp
 
+            assert event.m_bp.m_id is not None
             self.m_break_points_by_id[event.m_bp.m_id] = event.m_bp
 
         finally:
@@ -149,7 +159,7 @@ class CBreakPointsManagerProxy:
             self.m_session_manager.m_event_dispatcher.fire_event(event)
 
 
-    def sync(self):
+    def sync(self) -> None:
         try:
             self.m_lock.acquire()
 
@@ -174,7 +184,7 @@ class CBreakPointsManagerProxy:
             self.m_lock.release()
 
 
-    def clear(self):
+    def clear(self) -> None:
         try:
             self.m_lock.acquire()
 
@@ -185,30 +195,30 @@ class CBreakPointsManagerProxy:
             self.m_lock.release()
 
 
-    def get_breakpoints(self):
+    def get_breakpoints(self) -> Dict[int, CBreakPoint]:
         return self.m_break_points_by_id
 
 
-    def get_breakpoint(self, filename, lineno):
+    def get_breakpoint(self, filename: str, lineno: int) -> CBreakPoint:
         bpm = self.m_break_points_by_file[filename]
         bp = bpm[lineno]
         return bp
 
 
 class CBreakPointsManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.m_break_info_manager = CBreakInfoManager()
-        self.m_active_break_points_by_file = {}
-        self.m_break_points_by_function = {}
-        self.m_break_points_by_file = {}
-        self.m_break_points_by_id = {}
+        self.m_active_break_points_by_file = {} # type: Dict[str, Dict[int, CBreakPoint]]
+        self.m_break_points_by_function = {}    # type: Dict[str, Dict[CBreakPoint, bool]]
+        self.m_break_points_by_file = {}        # type: Dict[str, Dict[int, CBreakPoint]]
+        self.m_break_points_by_id = {}          # type: Dict[int, CBreakPoint]
         self.m_lock = threading.Lock()
 
-        self.m_temp_bp = None
+        self.m_temp_bp = None                   # type: Optional[CBreakPoint]
         self.m_fhard_tbp = False
 
 
-    def get_active_break_points_by_file(self, filename):
+    def get_active_break_points_by_file(self, filename: str) -> Dict[int, CBreakPoint]:
         """
         Get active breakpoints for file.
         """
@@ -218,7 +228,7 @@ class CBreakPointsManager:
         return self.m_active_break_points_by_file.setdefault(_filename, {})
 
 
-    def __calc_active_break_points_by_file(self, filename):
+    def __calc_active_break_points_by_file(self, filename: str) -> None:
         bpmpt = self.m_active_break_points_by_file.setdefault(filename, {})
         bpmpt.clear()
 
@@ -232,7 +242,7 @@ class CBreakPointsManager:
             bpmpt[tbp.m_lineno] = tbp
 
 
-    def __remove_from_function_list(self, bp):
+    def __remove_from_function_list(self, bp: CBreakPoint) -> None:
         function_name = bp.m_scope_name
 
         try:
@@ -262,7 +272,7 @@ class CBreakPointsManager:
             pass
 
 
-    def __add_to_function_list(self, bp):
+    def __add_to_function_list(self, bp: CBreakPoint) -> None:
         function_name = bp.m_scope_name
 
         bpf = self.m_break_points_by_function.setdefault(function_name, {})
@@ -282,7 +292,7 @@ class CBreakPointsManager:
         _bpf[bp] = True
 
 
-    def get_breakpoint(self, filename, lineno):
+    def get_breakpoint(self, filename: str, lineno: int) -> CBreakPoint:
         """
         Get breakpoint by file and line number.
         """
@@ -292,7 +302,7 @@ class CBreakPointsManager:
         return bp
 
 
-    def del_temp_breakpoint(self, fLock = True, breakpoint = None):
+    def del_temp_breakpoint(self, fLock: bool = True, breakpoint: Optional[CBreakPoint] = None) -> None:
         """
         Delete a temoporary breakpoint.
         A temporary breakpoint is used when the debugger is asked to
@@ -324,7 +334,7 @@ class CBreakPointsManager:
                 self.m_lock.release()
 
 
-    def set_temp_breakpoint(self, filename, scope, lineno, fhard = False):
+    def set_temp_breakpoint(self, filename: str, scope: str, lineno: int, fhard: bool = False) -> None:
         """
         Set a temoporary breakpoint.
         A temporary breakpoint is used when the debugger is asked to
@@ -358,7 +368,7 @@ class CBreakPointsManager:
             self.m_lock.release()
 
 
-    def set_breakpoint(self, filename, scope, lineno, fEnabled, expr, encoding):
+    def set_breakpoint(self, filename: str, scope: str, lineno: int, fEnabled: bool, expr: str, encoding: str) -> CBreakPoint:
         """
         Set breakpoint.
 
@@ -413,6 +423,7 @@ class CBreakPointsManager:
 
             bp.m_id = id
 
+            assert id is not None
             self.m_break_points_by_id[id] = bp
             bpm[l] = bp
             if fEnabled:
@@ -426,7 +437,7 @@ class CBreakPointsManager:
             self.m_lock.release()
 
 
-    def disable_breakpoint(self, id_list, fAll):
+    def disable_breakpoint(self, id_list: List[int], fAll: bool) -> None:
         """
         Disable breakpoint.
         """
@@ -451,7 +462,7 @@ class CBreakPointsManager:
             self.m_lock.release()
 
 
-    def enable_breakpoint(self, id_list, fAll):
+    def enable_breakpoint(self, id_list: List[int], fAll: bool) -> None:
         """
         Enable breakpoint.
         """
@@ -476,7 +487,7 @@ class CBreakPointsManager:
             self.m_lock.release()
 
 
-    def delete_breakpoint(self, id_list, fAll):
+    def delete_breakpoint(self, id_list: List[int], fAll: bool) -> None:
         """
         Delete breakpoint.
         """
@@ -512,5 +523,5 @@ class CBreakPointsManager:
             self.m_lock.release()
 
 
-    def get_breakpoints(self):
+    def get_breakpoints(self) -> Dict[int, CBreakPoint]:
         return self.m_break_points_by_id

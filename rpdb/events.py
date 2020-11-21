@@ -22,7 +22,7 @@ def calc_signame(signum: int) -> str:
 
     return '?'
 
-def breakpoint_copy(bp: Optional[CBreakPoint]) -> Optional[CBreakPoint]:
+def breakpoint_copy(bp: 'Optional[CBreakPoint]') -> 'Optional[CBreakPoint]':
     if bp is None:
         return None
 
@@ -309,7 +309,7 @@ class CEventBreakpoint(CEvent):
     REMOVE = as_unicode('remove')
     SET = as_unicode('set')
 
-    def __init__(self, bp: Optional[CBreakPoint], action: str = SET, id_list: Optional[List[int]] = None, fAll: bool = False) -> None:
+    def __init__(self, bp: 'Optional[CBreakPoint]', action: str = SET, id_list: Optional[List[int]] = None, fAll: bool = False) -> None:
         self.m_bp = breakpoint_copy(bp)
         self.m_action = action
         self.m_id_list = id_list or []
@@ -342,7 +342,7 @@ class CEventDispatcher:
 
     def __init__(self, chained_event_dispatcher: Optional[Any] = None) -> None:
         self.m_chained_event_dispatcher = chained_event_dispatcher
-        self.m_chain_override_types = {}    # type: Dict[CEvent, bool]
+        self.m_chain_override_types = {}    # type: Dict[type, bool]
 
         self.m_registrants = {} # type: Dict[CEventDispatcherRecord, bool]
 
@@ -354,7 +354,7 @@ class CEventDispatcher:
 
     def register_callback(self, 
                           callback: Callable[[CEvent], None], 
-                          event_type_dict: Dict[CEvent, Dict[Any, Any]], 
+                          event_type_dict: Dict[type, Dict[Any, Any]],
                           fSingleUse: bool) -> 'CEventDispatcherRecord':
         er = CEventDispatcherRecord(callback, event_type_dict, fSingleUse)
 
@@ -405,7 +405,7 @@ class CEventDispatcher:
             pass
 
 
-    def register_chain_override(self, event_type_dict: Dict[CEvent, Dict[Any, Any]]) -> None:
+    def register_chain_override(self, event_type_dict: Dict[type, Dict[Any, Any]]) -> None:
         """
         Chain override prevents registration on chained
         dispatchers for specific event types.
@@ -416,7 +416,7 @@ class CEventDispatcher:
 
 
     def __register_callback_on_chain(self, er: 'CEventDispatcherRecord',
-                                     event_type_dict: Dict[CEvent, Dict[Any, Any]],
+                                     event_type_dict: Dict[type, Dict[Any, Any]],
                                      fSingleUse: bool) -> bool:
         _event_type_dict = copy.copy(event_type_dict)
         for t in self.m_chain_override_types:
@@ -464,7 +464,7 @@ class CEventDispatcherRecord:
     """
 
     def __init__(self, callback: Callable[[CEvent], None], 
-                 event_type_dict: Dict[CEvent, Dict[Any, Any]], 
+                 event_type_dict: Dict[type, Dict[Any, Any]],
                  fSingleUse: bool) -> None:
         self.m_callback = callback
         self.m_event_type_dict = copy.copy(event_type_dict)
