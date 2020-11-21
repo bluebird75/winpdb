@@ -5,6 +5,8 @@ import threading
 import time
 import os
 
+from typing import Any, Optional, cast
+
 from rpdb.const import LOOPBACK, POSIX, SERVER_PORT_RANGE_START, SERVER_PORT_RANGE_LENGTH
 from rpdb.utils import thread_is_alive, as_bytes, print_debug
 
@@ -16,7 +18,7 @@ class CFirewallTest:
     m_lock = threading.RLock()
 
 
-    def __init__(self, fremote = False, timeout = 4):
+    def __init__(self, fremote: bool = False, timeout: int = 4) -> None:
         if fremote:
             self.m_loopback = ''
         else:
@@ -24,13 +26,14 @@ class CFirewallTest:
 
         self.m_timeout = timeout
 
-        self.m_result = None
+        self.m_result = None    # type: Optional[bool]
 
-        self.m_last_server_error = None
-        self.m_last_client_error = None
+        self.m_last_server_error = None  # type: Optional[socket.error]
+        self.m_last_client_error = None  # type: Optional[socket.error]
 
 
-    def run(self):
+    def run(self) -> bool:
+        print_debug('CFirewallTest.run()')
         CFirewallTest.m_lock.acquire()
 
         try:
@@ -39,13 +42,13 @@ class CFirewallTest:
             # it means they are blocked by a firewall. Return False.
             #
             server = CFirewallTest.m_thread_server
-            if server != None and thread_is_alive(server):
+            if server is not None and thread_is_alive(server):
                 server.join(self.m_timeout * 1.5)
                 if thread_is_alive(server):
                     return False
 
             client = CFirewallTest.m_thread_client
-            if client != None and thread_is_alive(client):
+            if client is not None and thread_is_alive(client):
                 client.join(self.m_timeout * 1.5)
                 if thread_is_alive(client):
                     return False
@@ -82,13 +85,15 @@ class CFirewallTest:
 
                 time.sleep(0.1)
 
+            print_debug('CFirewallTest.run() - returning %s' % self.m_result)
+            assert self.m_result is not None
             return self.m_result
 
         finally:
             CFirewallTest.m_lock.release()
 
 
-    def __client(self):
+    def __client(self) -> None:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(self.m_timeout)
 
@@ -101,7 +106,7 @@ class CFirewallTest:
                 self.m_result = True
 
             except socket.error:
-                e = sys.exc_info()[1]
+                e = cast(socket.error, sys.exc_info()[1])
                 self.m_last_client_error = e
                 self.m_result = False
 
@@ -109,7 +114,7 @@ class CFirewallTest:
             s.close()
 
 
-    def __server(self):
+    def __server(self) -> None:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(self.m_timeout)
 
@@ -124,7 +129,7 @@ class CFirewallTest:
                 break
 
             except socket.error:
-                e = sys.exc_info()[1]
+                e = cast(socket.error, sys.exc_info()[1])
 
                 if self.__GetSocketError(e) != errno.EADDRINUSE:
                     self.m_last_server_error = e
@@ -154,16 +159,16 @@ class CFirewallTest:
                     conn.send(data)
 
             except socket.error:
-                e = sys.exc_info()[1]
+                e = cast(socket.error, sys.exc_info()[1])
                 self.m_last_server_error = e
 
         finally:
-            if conn != None:
+            if conn is not None:
                 conn.close()
             s.close()
 
 
-    def __recv(self, s, _len):
+    def __recv(self, s: socket.socket, _len: int) -> bytes:
         t0 = time.time()
 
         while True:
@@ -183,8 +188,8 @@ class CFirewallTest:
                 continue
 
 
-    def __GetSocketError(self, e):
+    def __GetSocketError(self, e: Any) -> int:
         if (not isinstance(e.args, tuple)) or (len(e.args) == 0):
             return -1
 
-        return e.args[0]
+        return cast(int, e.args[0])
