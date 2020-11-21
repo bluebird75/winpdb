@@ -5,7 +5,7 @@ import threading
 import time
 import zlib
 
-from typing import Dict
+from typing import Dict, Tuple, Any, List
 
 try:
     from Crypto.Cipher import DES
@@ -19,7 +19,7 @@ from rpdb.utils import is_unicode, as_bytes, as_unicode, print_debug_exception
 
 INDEX_TABLE_SIZE = 100
 
-def is_encryption_supported():
+def is_encryption_supported() -> bool:
     """
     Is the Crypto module imported/available.
     """
@@ -31,9 +31,9 @@ class CCrypto:
     Handle authentication and encryption of data, using password protection.
     """
 
-    m_keys = {} # type: Dict[str, str]
+    m_keys = {} # type: Dict[str, bytes]
 
-    def __init__(self, _rpdb2_pwd, fAllowUnencrypted, rid):
+    def __init__(self, _rpdb2_pwd: str, fAllowUnencrypted: bool, rid: str) -> None:
         assert(is_unicode(_rpdb2_pwd))
         assert(is_unicode(rid))
 
@@ -51,12 +51,12 @@ class CCrypto:
         self.m_index_anchor_ex = 0
 
         self.m_index = 0
-        self.m_index_table = {}
+        self.m_index_table = {} # type: Dict[int, Tuple[int, List[int]]]
         self.m_index_table_size = INDEX_TABLE_SIZE
         self.m_max_index = 0
 
 
-    def __calc_key(self, _rpdb2_pwd):
+    def __calc_key(self, _rpdb2_pwd: str) -> bytes:
         """
         Create and return a key from a password.
         A Weak password means a weak key.
@@ -85,7 +85,7 @@ class CCrypto:
         return key
 
 
-    def set_index(self, i, anchor):
+    def set_index(self, i: int, anchor: int) -> None:
         try:
             self.m_lock.acquire()
 
@@ -96,11 +96,11 @@ class CCrypto:
             self.m_lock.release()
 
 
-    def get_max_index(self):
+    def get_max_index(self) -> int:
         return self.m_max_index
 
 
-    def do_crypto(self, args, fencrypt):
+    def do_crypto(self, args: Any, fencrypt: bool) -> Tuple[bool, str, str]:
         """
         Sign args and possibly encrypt.
         Return signed/encrypted string.
@@ -132,7 +132,8 @@ class CCrypto:
         return (fcompress, digest, u)
 
 
-    def undo_crypto(self, fencrypt, fcompress, digest, msg, fVerifyIndex = True):
+    def undo_crypto(self, fencrypt: bool, fcompress: bool, digest: str, msg: str, fVerifyIndex: bool = True) \
+            -> Tuple[Any, int]:
         """
         Take crypto string, verify its signature and decrypt it, if
         needed.
@@ -158,7 +159,7 @@ class CCrypto:
         return (args, id)
 
 
-    def __encrypt(self, s):
+    def __encrypt(self, s: bytes) -> bytes:
         s_padded = s + as_bytes('\x00') * (DES.block_size - (len(s) % DES.block_size))
 
         key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
@@ -170,7 +171,7 @@ class CCrypto:
         return r
 
 
-    def __decrypt(self, s):
+    def __decrypt(self, s: bytes) -> bytes:
         try:
             key_padded = (self.m_key + as_bytes('0') * (DES.key_size - (len(self.m_key) % DES.key_size)))[:DES.key_size]
             iv = as_bytes('0') * DES.block_size
@@ -185,7 +186,7 @@ class CCrypto:
             raise DecryptionFailure
 
 
-    def __sign(self, args):
+    def __sign(self, args: Any) -> Tuple[str, bytes]:
         i = self.__get_next_index()
         pack = (self.m_index_anchor_ex, i, self.m_rid, args)
 
@@ -202,7 +203,7 @@ class CCrypto:
         return (d, s)
 
 
-    def __get_next_index(self):
+    def __get_next_index(self) -> int:
         try:
             self.m_lock.acquire()
 
@@ -213,7 +214,7 @@ class CCrypto:
             self.m_lock.release()
 
 
-    def __verify_signature(self, digest, s, fVerifyIndex):
+    def __verify_signature(self, digest: str, s: bytes, fVerifyIndex: bool) -> Tuple[Any, int]:
         try:
             h = hmac.new(self.m_key, s, digestmod = _md5)
             d = h.hexdigest()
@@ -242,7 +243,7 @@ class CCrypto:
         return args, id
 
 
-    def __verify_index(self, anchor, i, id):
+    def __verify_index(self, anchor: int, i: int, id: int) -> int:
         """
         Manage messages ids to prevent replay of old messages.
         """
@@ -264,10 +265,12 @@ class CCrypto:
 
                 if (iv is None) or (i > iv):
                     idl = [id]
-                elif (iv == i) and (not id in idl):
-                    idl.append(id)
                 else:
-                    raise AuthenticationBadIndex(self.m_max_index, self.m_index_anchor_in)
+                    assert idl is not None
+                    if (iv == i) and (not id in idl):
+                        idl.append(id)
+                    else:
+                        raise AuthenticationBadIndex(self.m_max_index, self.m_index_anchor_in)
 
                 self.m_index_table[i_mod] = (i, idl)
 
@@ -284,7 +287,7 @@ class CCrypto:
             raise
 
 
-    def __wait_a_little(self):
+    def __wait_a_little(self) -> None:
         self.m_failure_lock.acquire()
         time.sleep((1.0 + random.random()) / 2)
         self.m_failure_lock.release()
