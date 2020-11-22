@@ -165,59 +165,11 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
         rpdb.globals.g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name ='process_request')
 
 
-def my_xmlrpclib_loads(data):
-    """
-    Modification of Python 2.3 xmlrpclib.loads() that does not do an
-    import. Needed to prevent deadlocks.
-    """
-
-    p, u = xmlrpclib.getparser()
-    p.feed(data)
-    p.close()
-    return u.close(), u.getmethodname()
-
-
 class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServer):
     if os.name == POSIX:
         allow_reuse_address = True
     else:
         allow_reuse_address = False
-
-    """
-    Modification of Python 2.3 SimpleXMLRPCServer.SimpleXMLRPCDispatcher
-    that uses my_xmlrpclib_loads(). Needed to prevent deadlocks.
-    """
-
-    def __marshaled_dispatch(self, data, dispatch_method = None):
-        params, method = my_xmlrpclib_loads(data)
-
-        # generate response
-        try:
-            if dispatch_method is not None:
-                response = dispatch_method(method, params)
-            else:
-                response = self._dispatch(method, params)
-            # wrap response in a singleton tuple
-            response = (response,)
-            response = xmlrpclib.dumps(response, methodresponse=True)
-        except xmlrpclib.Fault:
-            fault = sys.exc_info()[1]
-            response = xmlrpclib.dumps(fault)
-        except:
-            # report exception back to server
-            response = xmlrpclib.dumps(
-                xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value))
-                )
-            print_debug_exception()
-
-        return response
-
-    if sys.version_info[:2] <= (2, 3):
-        _marshaled_dispatch = __marshaled_dispatch
-
-
-    #def server_activate(self):
-    #    self.socket.listen(1)
 
     def handle_error(self, request: bytes, client_address: Tuple[str, int]) -> None:
         print_debug("handle_error() in pid %d" % _getpid())
@@ -402,22 +354,11 @@ class CLocalTransport(xmlrpclib.Transport):
     """
 
     _connection_class = httplib.HTTPConnection
-    _connection_class_old = httplib_HTTP
 
 
-    def make_connection(self, host):
-        # New Python version of connect().
-        # However, make_connection is hacked to always create a new connection
-        # Otherwise all threads use single connection and crash.
-        if hasattr(self, '_connection'):
-            chost, self._extra_headers, x509 = self.get_host_info(host)
-            return self._connection_class(chost)
-
-        # Old Python version of connect().
-        # create a HTTP connection object from a host descriptor
-        host, extra_headers, x509 = self.get_host_info(host)
-        return self._connection_class_old(host)
-
+    def make_connection(self, host: Union[Tuple[str, Dict[str, str]], str]) -> httplib.HTTPConnection:
+        chost, self._extra_headers, x509 = self.get_host_info(host)
+        return self._connection_class(chost)
 
     def __parse_response(self, file: BinaryIO, sock: socket.socket) -> Any:
         # read response from input file/socket, and parse it
@@ -451,7 +392,6 @@ class CTimeoutTransport(CLocalTransport):
     """
 
     _connection_class = CTimeoutHTTPConnection
-    _connection_class_old = CTimeoutHTTP
 
 
 class CLocalTimeoutTransport(CLocalTransport):
@@ -460,8 +400,6 @@ class CLocalTimeoutTransport(CLocalTransport):
     """
 
     _connection_class = CLocalTimeoutHTTPConnection
-    _connection_class_old = CLocalTimeoutHTTP
-
 
 class CThread (threading.Thread):
     m_fstop = False
@@ -560,13 +498,9 @@ class CThread (threading.Thread):
 
         print_debug('Shut down debugger threads, done.')
 
-    joinAll = classmethod(joinAll)
-
-
-    def clearJoin(cls):
+    @classmethod
+    def clearJoin(cls) -> None:
         CThread.m_fstop = False
-
-    clearJoin = classmethod(clearJoin)
 
 
     def __getId(self) -> int:
