@@ -25,7 +25,7 @@ def calc_suffix(_str: str, n: int) -> str:
 
     return '...' + _str[-(n - 3):]
 
-def class_name(c: str) -> str:
+def class_name(c: type) -> str:
     s = safe_str(c)
 
     if "'" in s:

@@ -8,7 +8,7 @@ from rpdb.const import PING_TIMEOUT
 from rpdb.events import CEventState, CEventDispatcher
 from rpdb.utils import safe_wait
 
-g_alertable_waiters = {}     # type: Dict[int, Tuple[threading.Condition, List[Callable]]]
+g_alertable_waiters = {}     # type: Dict[int, Tuple[threading.Condition, List[Callable[[],None]]]]
 
 
 # TODO: remove these compatibility functions and change the code using them directly
@@ -36,7 +36,7 @@ class CStateManager:
 
         if self.m_event_dispatcher_input is not None:
             event_type_dict = {CEventState: {}} # type: Dict[type, Dict[Any, Any]]
-            self.m_event_dispatcher_input.register_callback(self.event_handler, event_type_dict, fSingleUse = False)
+            self.m_event_dispatcher_input.register_callback(self.event_handler, event_type_dict, fSingleUse = False)    # type: ignore # CEventState / CEvent mismatch
 
             if self.m_event_dispatcher_output is not None:
                 self.m_event_dispatcher_output.register_chain_override(event_type_dict)
@@ -182,7 +182,7 @@ class CStateManager:
 
 
 def alertable_wait(lock: threading.Condition, timeout: Optional[float] = None) -> None:
-    jobs = []   # type: List[Callable]
+    jobs = []   # type: List[Callable[[], None]]
     tid = thread.get_ident()
     g_alertable_waiters[tid] = (lock, jobs)
 

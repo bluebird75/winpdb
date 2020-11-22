@@ -8,10 +8,10 @@ import weakref
 from http import client as httplib
 from xmlrpc import client as xmlrpclib, server as SimpleXMLRPCServer
 
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, Callable, cast, BinaryIO, Optional, List, Union, Iterable, TypeVar
 
 from rpdb.const import SHUTDOWN_TIMEOUT, POSIX, get_interface_compatibility_version, PING_TIMEOUT, LOCAL_TIMEOUT
-from rpdb.crypto import is_encryption_supported
+from rpdb.crypto import is_encryption_supported, CCrypto
 from rpdb.exceptions import AuthenticationBadIndex, BadVersion, EncryptionExpected, EncryptionNotSupported, \
     DecryptionFailure, AuthenticationBadData, AuthenticationFailure, CConnectionException
 from rpdb.repr import class_name
@@ -30,9 +30,9 @@ class CWorkQueue:
     Worker threads pool mechanism for RPC server.
     """
 
-    def __init__(self, size = N_WORK_QUEUE_THREADS):
+    def __init__(self, size: int = N_WORK_QUEUE_THREADS) -> None:
         self.m_lock = threading.Condition()
-        self.m_work_items = []
+        self.m_work_items = []  # type: List[Tuple[Callable[...,None], Any, str]]
         self.m_f_shutdown = False
 
         self.m_size = size
@@ -42,13 +42,13 @@ class CWorkQueue:
         self.__create_thread()
 
 
-    def __create_thread(self):
+    def __create_thread(self) -> None:
         t = CThread(name = '__worker_target', target = self.__worker_target, shutdown = self.shutdown)
         #thread_set_daemon(t, True)
         t.start()
 
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """
         Signal worker threads to exit, and wait until they do.
         """
@@ -76,7 +76,7 @@ class CWorkQueue:
         print_debug('Shutting down worker queue, done.')
 
 
-    def __worker_target(self):
+    def __worker_target(self) -> None:
         try:
             self.m_lock.acquire()
 
@@ -134,7 +134,7 @@ class CWorkQueue:
             self.m_lock.release()
 
 
-    def post_work_item(self, target, args, name ):
+    def post_work_item(self, target: Callable[..., None], args: Any, name: str ) -> None:
         if self.m_f_shutdown:
             return
 
@@ -160,7 +160,8 @@ class CUnTracedThreadingMixIn(SocketServer.ThreadingMixIn):
     circumstances.
     """
 
-    def process_request(self, request, client_address):
+    def process_request(self, request: bytes, client_address: Tuple[str, int]) -> None:
+        assert rpdb.globals.g_server is not None
         rpdb.globals.g_server.m_work_queue.post_work_item(target = SocketServer.ThreadingMixIn.process_request_thread, args = (self, request, client_address), name ='process_request')
 
 
@@ -218,8 +219,7 @@ class CXMLRPCServer(CUnTracedThreadingMixIn, SimpleXMLRPCServer.SimpleXMLRPCServ
     #def server_activate(self):
     #    self.socket.listen(1)
 
-
-    def handle_error(self, request, client_address):
+    def handle_error(self, request: bytes, client_address: Tuple[str, int]) -> None:
         print_debug("handle_error() in pid %d" % _getpid())
 
         if rpdb.globals.g_ignore_broken_pipe + 5 > time.time():
@@ -234,7 +234,7 @@ class CPwdServerProxy:
     Works by wrapping a xmlrpclib.ServerProxy object.
     """
 
-    def __init__(self, crypto, uri, transport = None, target_rid = 0):
+    def __init__(self, crypto: CCrypto, uri: str, transport: Any = None, target_rid: int = 0):
         self.m_crypto = crypto
         self.m_proxy = xmlrpclib.ServerProxy(uri, transport)
 
@@ -244,15 +244,15 @@ class CPwdServerProxy:
         self.m_method = getattr(self.m_proxy, DISPACHER_METHOD)
 
 
-    def __set_encryption(self, fEncryption):
+    def __set_encryption(self, fEncryption: bool) -> None:
         self.m_fEncryption = fEncryption
 
 
-    def get_encryption(self):
+    def get_encryption(self) -> bool:
         return self.m_fEncryption
 
 
-    def __request(self, name, params):
+    def __request(self, name: str, params: Any) -> Any:
         """
         Call debuggee method 'name' with parameters 'params'.
         """
@@ -280,13 +280,13 @@ class CPwdServerProxy:
                     raise _e
 
             except AuthenticationBadIndex:
-                e = sys.exc_info()[1]
+                e = cast(AuthenticationBadIndex, sys.exc_info()[1])
                 print_debug("Caught AuthenticationBadIndex: %s" % str(e))
                 self.m_crypto.set_index(e.m_max_index, e.m_anchor)
                 continue
 
             except xmlrpclib.Fault:
-                fault = sys.exc_info()[1]
+                fault = cast(xmlrpclib.Fault, sys.exc_info()[1])
                 print_debug("Caught xmlrpclib.Fault: %s" % fault.faultString)
                 if class_name(BadVersion) in fault.faultString:
                     s = fault.faultString.split("'")
@@ -324,7 +324,7 @@ class CPwdServerProxy:
             return _r
 
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return xmlrpclib._Method(self.__request, name)
 
 
@@ -335,7 +335,7 @@ class CTimeoutHTTPConnection(httplib.HTTPConnection):
 
     _rpdb2_timeout = PING_TIMEOUT
 
-    def connect(self):
+    def connect(self) -> None:
         """Connect to the host and port specified in __init__."""
 
         # New Python version of connect().
@@ -344,19 +344,19 @@ class CTimeoutHTTPConnection(httplib.HTTPConnection):
             return httplib.HTTPConnection.connect(self)
 
         # Old Python version of connect().
-        msg = "getaddrinfo returns an empty list"
+        msg = "getaddrinfo returns an empty list"    # type: Union[str, OSError]
         for res in socket.getaddrinfo(self.host, self.port, 0,
                                       socket.SOCK_STREAM):
             af, socktype, proto, canonname, sa = res
             try:
                 self.sock = socket.socket(af, socktype, proto)
                 self.sock.settimeout(self._rpdb2_timeout)
-                if self.debuglevel > 0:
+                if self.debuglevel > 0: # type: ignore # debugLevel exists in httplib.HTTPConnection
                     print_debug("connect: (%s, %s)" % (self.host, self.port))
                 self.sock.connect(sa)
             except socket.error:
-                msg = sys.exc_info()[1]
-                if self.debuglevel > 0:
+                msg = cast(OSError, sys.exc_info()[1])
+                if self.debuglevel > 0: # type: ignore # debugLevel exists in httplib.HTTPConnection
                     print_debug('connect fail: ' + repr((self.host, self.port)))
                 if self.sock:
                     self.sock.close()
@@ -419,7 +419,7 @@ class CLocalTransport(xmlrpclib.Transport):
         return self._connection_class_old(host)
 
 
-    def __parse_response(self, file, sock):
+    def __parse_response(self, file: BinaryIO, sock: socket.socket) -> Any:
         # read response from input file/socket, and parse it
 
         p, u = self.getparser()
@@ -432,7 +432,7 @@ class CLocalTransport(xmlrpclib.Transport):
                 response = file.read(1024)
             if not response:
                 break
-            if self.verbose:
+            if self.verbose:    # type: ignore # verbose exists in Transport but is dynamically created
                 _print("body: " + repr(response))
             p.feed(response)
 
@@ -471,8 +471,11 @@ class CThread (threading.Thread):
     m_id = 0
 
 
-    def __init__(self, name = None, target = None, args = (), shutdown = None):
-        threading.Thread.__init__(self, name = name, target = target, args = args)
+    def __init__(self, name: Optional[str] = None,
+                 target: Optional[Callable[..., None]] = None,
+                 args: Tuple[Any, ...] = (),
+                 shutdown: Optional[Callable[..., None]] = None) -> None:
+        threading.Thread.__init__(self, name = name, target = target, args = args) # type: ignore
 
         self.m_fstarted = False
         self.m_shutdown_callback = shutdown
@@ -480,7 +483,7 @@ class CThread (threading.Thread):
         self.m_id = self.__getId()
 
 
-    def __del__(self):
+    def __del__(self) -> None:
         #print_debug('Destructor called for ' + thread_get_name(self))
 
         #threading.Thread.__del__(self)
@@ -492,7 +495,7 @@ class CThread (threading.Thread):
                 pass
 
 
-    def start(self):
+    def start(self) -> None:
         if CThread.m_fstop:
             return
 
@@ -507,26 +510,27 @@ class CThread (threading.Thread):
         threading.Thread.start(self)
 
 
-    def run(self):
+    def run(self) -> None:
         sys.settrace(None)
         sys.setprofile(None)
 
         threading.Thread.run(self)
 
 
-    def join(self, timeout = None):
+    def join(self, timeout: Optional[float] = None) -> None:
         try:
             threading.Thread.join(self, timeout)
         except AssertionError:
             pass
 
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         if self.m_shutdown_callback:
             self.m_shutdown_callback()
 
 
-    def joinAll(cls):
+    @classmethod
+    def joinAll(cls) -> None:
         print_debug('Shutting down debugger threads...')
 
         CThread.m_fstop = True
@@ -565,7 +569,7 @@ class CThread (threading.Thread):
     clearJoin = classmethod(clearJoin)
 
 
-    def __getId(self):
+    def __getId(self) -> int:
         CThread.m_lock.acquire()
         id = CThread.m_id
         CThread.m_id += 1

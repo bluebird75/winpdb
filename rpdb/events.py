@@ -3,7 +3,7 @@ import signal
 import sys
 import copyreg
 
-from typing import Optional, List, Dict, Any, Callable, TYPE_CHECKING, Tuple
+from typing import Optional, List, Dict, Any, Callable, TYPE_CHECKING, Tuple, Type
 if TYPE_CHECKING:
     from rpdb.breakpoint import CBreakPoint
 

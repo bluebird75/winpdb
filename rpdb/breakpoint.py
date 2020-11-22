@@ -100,7 +100,7 @@ class CBreakPointsManagerProxy:
 
         event_type_dict = {CEventBreakpoint: {}}    # type: Dict[type, Dict[Any, Any]]
 
-        self.m_session_manager.m_event_dispatcher_proxy.register_callback(self.update_bp, event_type_dict, fSingleUse = False)
+        self.m_session_manager.m_event_dispatcher_proxy.register_callback(self.update_bp, event_type_dict, fSingleUse = False)  # type: ignore # CEvent / CEventBreakpoint mismatch
         self.m_session_manager.m_event_dispatcher.register_chain_override(event_type_dict)
 
 
