@@ -1221,7 +1221,7 @@ class CSessionManagerInternal:
             name = DARWIN
         else:
             try:
-                import terminalcommand
+                import terminalcommand   # type: ignore # no library stub for terminalcommand
                 name = MAC
             except ImportError:
                 name = os.name
