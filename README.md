@@ -2,9 +2,9 @@
 
 **Note from Philippe Fremy**
 
-*Port of winpdb-reborn to Python 3 / WxPython 4 is work-in-progress. There are still some rough edges.*
+*The port of winpdb-reborn to Python 3 / WxPython 4 is unfortunately not working very well. So Winpdb for Python 3 does not really work. Feel free to submit
+Pull Requests to improve the situation. At the moment, this project is stopped. *
 
-*Please help by providing bug reports and ideally bug fixes. All pull requests are welcome.*
 
 --------------------
 
