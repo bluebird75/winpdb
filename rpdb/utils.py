@@ -93,7 +93,7 @@ def print_debug(_str):
 
     str = '%s %s:%d %s %s(): %s' % (s, filename, lineno, threadinfo, name, _str)
 
-    _print(str, sys.__stderr__)
+    _print(str, sys.stderr)
 
 
 def print_debug_exception(fForce = False):
