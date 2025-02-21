@@ -123,17 +123,18 @@ def winlower(path):
 
 
 def _print(s, f = sys.stdout, feol = True):
-    s = as_unicode(s)
+    if f is not None:
+        s = as_unicode(s)
 
-    encoding = detect_encoding(f)
+        encoding = detect_encoding(f)
 
-    s = as_bytes(s, encoding, fstrict = False)
-    s = as_string(s, encoding)
+        s = as_bytes(s, encoding, fstrict = False)
+        s = as_string(s, encoding)
 
-    if feol:
-        f.write(s + '\n')
-    else:
-        f.write(s)
+        if feol:
+            f.write(s + '\n')
+        else:
+            f.write(s)
 
 
 def print_exception(t, v, tb, fForce = False):
